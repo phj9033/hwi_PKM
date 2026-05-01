@@ -11,6 +11,7 @@ from pathlib import Path
 import typer
 
 from pkm.errors import PKMStateError
+from pkm.store.toc import rebuild_index
 
 # All directories that init must create (relative to root).
 _DIRS = [
@@ -52,17 +53,17 @@ def _do_init(root: Path, force: bool) -> dict:
     for rel in _DIRS:
         (root / rel).mkdir(parents=True, exist_ok=True)
 
-    # Seed log.md (empty) and index.md (header)
+    # Seed log.md as empty (append-only; first event = first mutation).
     (root / "data" / "log.md").write_text("", encoding="utf-8")
-    (root / "data" / "index.md").write_text(
-        "# Index\n\n_Auto-maintained TOC. Do not edit by hand._\n",
-        encoding="utf-8",
-    )
 
     for rel, template in _FILES_FROM_TEMPLATES:
         target = root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_load_template(template), encoding="utf-8")
+
+    # Generate index.md via the same generator future mutations use, so
+    # init and rebuild_index never diverge.
+    rebuild_index(root)
 
     return {"ok": True, "path": str(root.resolve())}
 

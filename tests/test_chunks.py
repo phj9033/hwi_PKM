@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -129,3 +130,56 @@ def test_rm_removes_topic_tree(tmp_path):
     res = runner.invoke(app, ["chunks", "rm", "rm", "--root", str(tmp_path)])
     assert res.exit_code == 0
     assert not (tmp_path / "data/raw/chunks/rm").exists()
+
+
+def test_chunks_new_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    res = runner.invoke(
+        app,
+        ["chunks", "new", "oauth-deep-dive",
+         "--root", str(tmp_path), "--json"],
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert payload["git_commit"] is not None and len(payload["git_commit"]) == 40
+
+
+def test_chunks_add_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(app, ["chunks", "new", "oauth", "--root", str(tmp_path)])
+    src = tmp_path / "extra.txt"
+    src.write_text("hello")
+    res = runner.invoke(
+        app,
+        ["chunks", "add", "oauth", str(src),
+         "--root", str(tmp_path), "--json"],
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert payload["git_commit"] is not None
+
+
+def test_chunks_set_status_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(app, ["chunks", "new", "oauth", "--root", str(tmp_path)])
+    res = runner.invoke(
+        app,
+        ["chunks", "set-status", "oauth", "curating",
+         "--root", str(tmp_path), "--json"],
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert payload["git_commit"] is not None
+
+
+def test_chunks_rm_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(app, ["chunks", "new", "oauth", "--root", str(tmp_path)])
+    res = runner.invoke(
+        app,
+        ["chunks", "rm", "oauth",
+         "--root", str(tmp_path), "--json"],
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert payload["git_commit"] is not None

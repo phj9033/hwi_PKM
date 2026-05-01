@@ -53,6 +53,8 @@ def _register_all() -> None:
     doctor_cmd.register(app)
     from pkm.commands import capture as capture_cmd
     capture_cmd.register(app)
+    from pkm.commands import chunks as chunks_cmd
+    chunks_cmd.register(app)
 
 
 _register_all()

@@ -5,6 +5,7 @@ Spec reference: §3.2 (commands), §6.1 (capture frontmatter), §6.6 (auto log/i
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from pkm.store.files import atomic_write, date_prefix_slug
 from pkm.store.frontmatter import serialize
 from pkm.store.frontmatter_schemas import capture_defaults, validate_capture
 from pkm.store.log import LogEvent
+
+_DATE_PREFIXED = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 
 
 def _capture_path(root: Path, full_slug: str) -> Path:
@@ -38,7 +41,10 @@ def _do_create(
     status: str,
     lang: str,
 ) -> dict:
-    full_slug = date_prefix_slug(slug)
+    # Accept both `--slug foo` (auto-prefix today's date) and
+    # `--slug 2026-05-01-foo` (already date-prefixed) without producing
+    # `2026-05-01-2026-05-01-foo`.
+    full_slug = slug if _DATE_PREFIXED.match(slug) else date_prefix_slug(slug)
     target = _capture_path(root, full_slug)
     if target.exists():
         raise PKMStateError(
@@ -133,7 +139,7 @@ def register(app: typer.Typer) -> None:
 
     @capture_app.command("create")
     def create_cmd(
-        slug: str = typer.Option(..., "--slug", help="Stem for the capture filename (date prefix added automatically)."),
+        slug: str = typer.Option(..., "--slug", help="Stem for the capture filename. Date prefix YYYY-MM-DD- added automatically if absent."),
         title: str = typer.Option(..., "--title", help="Capture title."),
         url: str | None = typer.Option(None, "--url", help="Source URL."),
         from_file: Path | None = typer.Option(None, "--from-file", help="Read body from this file (else stdin)."),

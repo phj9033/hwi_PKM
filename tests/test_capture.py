@@ -269,3 +269,36 @@ def test_capture_rm_json_has_git_commit(tmp_path: Path):
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None  # still a commit (deletion + log)
+
+
+# --- date-prefix dedup (M3.5 cleanup) ---
+
+def test_create_with_date_prefixed_slug_does_not_double_prefix(tmp_path: Path):
+    """Passing `--slug 2026-05-01-foo` should NOT produce `2026-05-01-2026-05-01-foo`."""
+    _init(tmp_path)
+    res = runner.invoke(
+        app,
+        ["capture", "create", "--root", str(tmp_path),
+         "--slug", "2026-05-01-foo", "--title", "Foo"],
+        input="body\n",
+    )
+    assert res.exit_code == 0, res.output
+    files = list((tmp_path / "data/raw/captures").glob("*.md"))
+    assert len(files) == 1
+    assert files[0].stem == "2026-05-01-foo"
+
+
+def test_create_with_bare_slug_still_prefixes(tmp_path: Path):
+    """Passing `--slug foo` (no date) should still auto-prefix today's date."""
+    import re
+    _init(tmp_path)
+    res = runner.invoke(
+        app,
+        ["capture", "create", "--root", str(tmp_path),
+         "--slug", "foo", "--title", "Foo"],
+        input="body\n",
+    )
+    assert res.exit_code == 0, res.output
+    files = list((tmp_path / "data/raw/captures").glob("*-foo.md"))
+    assert len(files) == 1
+    assert re.match(r"^\d{4}-\d{2}-\d{2}-foo$", files[0].stem)

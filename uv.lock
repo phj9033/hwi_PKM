@@ -261,12 +261,14 @@ dev = [
     { name = "ruff" },
 ]
 ml = [
+    { name = "huggingface-hub" },
     { name = "sentence-transformers" },
     { name = "sqlite-vec" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "huggingface-hub", marker = "extra == 'ml'", specifier = ">=0.23" },
     { name = "psutil", specifier = ">=5.9" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },

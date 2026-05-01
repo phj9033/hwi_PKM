@@ -21,6 +21,7 @@ ml = [
     # sqlite-vec is pre-v1; minor bumps may break (per its SemVer policy).
     # Lock to the 0.1.x line until M3 evaluates 0.2+.
     "sqlite-vec>=0.1,<0.2",
+    "huggingface_hub>=0.23",
 ]
 dev = [
     "pytest>=8",

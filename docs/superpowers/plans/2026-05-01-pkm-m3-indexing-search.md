@@ -800,7 +800,7 @@ def _estimate_tokens(text: str) -> int:
     """Rough token estimate: ASCII words + Korean chars/2."""
     if not text:
         return 0
-    korean_chars = sum(1 for ch in text if _KOREAN_RE.match(ch))
+    korean_chars = sum(1 for ch in text if bool(_KOREAN_RE.fullmatch(ch)))
     other = text.replace("\n", " ").split()
     return len(other) + korean_chars // 2
 
@@ -857,8 +857,24 @@ def split_markdown(text: str, target_tokens: int = 500, overlap: float = 0.15) -
             chunks.append(Chunk(idx, path, sec_text, _estimate_tokens(sec_text)))
             idx += 1
             continue
-        # Sentence-aware split with overlap
+        # Sentence-aware split with overlap.
         sentences = _split_on_sentences(sec_text)
+        # If a "sentence" is itself oversized (e.g. body text with no sentence
+        # boundaries at all), further split it into word slices of size
+        # target_tokens. Without this, _split_on_sentences may return one giant
+        # string that the buffer loop never breaks.
+        expanded: list[str] = []
+        for sent in sentences:
+            if _estimate_tokens(sent) <= target_tokens:
+                expanded.append(sent)
+            else:
+                words = sent.split()
+                start = 0
+                while start < len(words):
+                    expanded.append(" ".join(words[start : start + target_tokens]))
+                    start += target_tokens
+        sentences = expanded
+
         buf: list[str] = []
         buf_tokens = 0
         for sent in sentences:

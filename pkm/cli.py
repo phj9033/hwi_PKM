@@ -55,6 +55,10 @@ def _register_all() -> None:
     capture_cmd.register(app)
     from pkm.commands import chunks as chunks_cmd
     chunks_cmd.register(app)
+    from pkm.commands import log as log_cmd
+    from pkm.commands import index as index_cmd
+    log_cmd.register(app)
+    index_cmd.register(app)
 
 
 _register_all()

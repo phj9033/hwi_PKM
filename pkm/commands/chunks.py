@@ -38,8 +38,13 @@ def _do_new(root: Path, topic_in: str, description: str | None) -> dict:
     target.mkdir(parents=True)
     fm = chunk_defaults(topic=topic, description=description)
     validate_chunk(fm)
-    atomic_write(_readme(target), serialize(fm, "(curated chunk — add sources via `pkm chunks add`)\n"))
-    post_mutation(root, LogEvent(type="chunks.new", ref=topic, message=description or ""))
+    readme_path = _readme(target)
+    atomic_write(readme_path, serialize(fm, "(curated chunk — add sources via `pkm chunks add`)\n"))
+    post_mutation(
+        root,
+        LogEvent(type="chunks.new", ref=topic, message=description or ""),
+        paths=[str(readme_path.relative_to(root))],
+    )
     return {"ok": True, "id": topic, "path": target.relative_to(root).as_posix()}
 
 
@@ -60,7 +65,13 @@ def _do_add(root: Path, topic: str, files: list[Path]) -> dict:
     fm["sources"] = sources
     validate_chunk(fm)
     atomic_write(readme, serialize(fm, body))
-    post_mutation(root, LogEvent(type="chunks.add", ref=topic, message=", ".join(copied)))
+    changed_paths = [str((target_dir / name).relative_to(root)) for name in copied]
+    changed_paths.append(str(readme.relative_to(root)))
+    post_mutation(
+        root,
+        LogEvent(type="chunks.add", ref=topic, message=", ".join(copied)),
+        paths=changed_paths,
+    )
     return {"ok": True, "id": topic, "added": copied}
 
 
@@ -108,14 +119,18 @@ def _do_set_status(root: Path, topic: str, status: str) -> dict:
     fm["status"] = status
     validate_chunk(fm)
     atomic_write(readme, serialize(fm, body))
-    post_mutation(root, LogEvent(type="chunks.set-status", ref=topic, message=status))
+    post_mutation(
+        root,
+        LogEvent(type="chunks.set-status", ref=topic, message=status),
+        paths=[str(readme.relative_to(root))],
+    )
     return {"ok": True, "id": topic, "status": status}
 
 
 def _do_rm(root: Path, topic: str) -> dict:
     target = resolve_chunk_topic(root, topic)
     shutil.rmtree(target)
-    post_mutation(root, LogEvent(type="chunks.rm", ref=topic, message=""))
+    post_mutation(root, LogEvent(type="chunks.rm", ref=topic, message=""))  # dir gone — no reindex
     return {"ok": True, "id": topic}
 
 

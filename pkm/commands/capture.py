@@ -49,7 +49,11 @@ def _do_create(
     fm = capture_defaults(slug=full_slug, title=title, source_url=url, status=status, lang=lang)
     validate_capture(fm)
     atomic_write(target, serialize(fm, body))
-    post_mutation(root, LogEvent(type="capture.create", ref=full_slug, message=title))
+    post_mutation(
+        root,
+        LogEvent(type="capture.create", ref=full_slug, message=title),
+        paths=[str(target.relative_to(root))],
+    )
     return {
         "ok": True,
         "id": full_slug,
@@ -100,7 +104,11 @@ def _do_set_status(root: Path, ref: str, status: str) -> dict:
     fm["status"] = status
     validate_capture(fm)  # raises PKMValidationError on bad enum
     atomic_write(p, serialize(fm, body))
-    post_mutation(root, LogEvent(type="capture.set-status", ref=fm["slug"], message=status))
+    post_mutation(
+        root,
+        LogEvent(type="capture.set-status", ref=fm["slug"], message=status),
+        paths=[str(p.relative_to(root))],
+    )
     return {"ok": True, "id": fm["slug"], "path": p.relative_to(root).as_posix()}
 
 
@@ -109,7 +117,7 @@ def _do_rm(root: Path, ref: str) -> dict:
     p = resolve_capture(root, ref)
     slug = p.stem
     p.unlink()
-    post_mutation(root, LogEvent(type="capture.rm", ref=slug, message=""))
+    post_mutation(root, LogEvent(type="capture.rm", ref=slug, message=""))  # file gone — no reindex
     return {"ok": True, "id": slug, "path": p.relative_to(root).as_posix()}
 
 

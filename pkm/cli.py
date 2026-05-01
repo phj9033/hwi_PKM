@@ -59,6 +59,8 @@ def _register_all() -> None:
     from pkm.commands import log as log_cmd
     log_cmd.register(app)
     index_cmd.register(app)
+    from pkm.commands import reindex as reindex_cmd
+    reindex_cmd.register(app)
 
 
 _register_all()

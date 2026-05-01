@@ -253,12 +253,14 @@ pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]
 
 #### 인덱싱 / 임베딩
 ```
-pkm reindex [<path>] [--full] [--scope wiki|raw|all] [--low-memory]
+pkm reindex db [<path>] [--full] [--scope wiki|raw|all] [--low-memory]
             # 기본: 증분 (content_hash 비교) — 변경 감지된 파일만 재임베딩.
-            # <path>      : 특정 파일/글롭만 재임베딩 (예: pkm reindex data/wiki/concepts/foo.md)
+            # <path>      : 특정 파일/글롭만 재임베딩 (예: pkm reindex db data/wiki/concepts/foo.md)
             # --scope     : 버킷 단위 enum (예: --scope wiki). <path>와 상호배타.
             # --full      : 처음부터 전부 재구축.
             # --low-memory: batch=4, reranker 무로드.
+            # `db`는 typer 서브커맨드 — 후속 슬롯(예: `pkm reindex toc` 별칭) 확장용.
+            # M2의 `pkm index rebuild`(TOC = data/index.md)와 별개 명령.
 ```
 
 #### 로그 / TOC
@@ -618,8 +620,8 @@ JSON 출력 예:
 | `--expand` 지정 → AI CLI 호출 실패 | exit≠0, `EXPAND_FAILED`. 옵트인이므로 미지정이 기본 |
 | 재랭킹 활성 → 모델 로드 실패 | exit≠0, `RERANK_MODEL_MISSING`. `--no-rerank` 우회 |
 | 임베딩 모델 미존재 | exit≠0, `EMBED_MODEL_MISSING` + `pkm doctor --download` 안내 |
-| 인덱스 비어있음 | exit≠0, `INDEX_EMPTY` + `pkm reindex` 안내 |
-| 인덱스 손상 | `pkm doctor` 감지 → `pkm reindex --full` 권장 |
+| 인덱스 비어있음 | exit≠0, `INDEX_EMPTY` + `pkm reindex db` 안내 |
+| 인덱스 손상 | `pkm doctor` 감지 → `pkm reindex db --full` 권장 |
 
 **사전 점검**: `pkm doctor` 가 호출 전 모델/AI CLI/DB 상태 보고:
 ```

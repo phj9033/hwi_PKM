@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+.env
+dist/
+build/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# PKM build artifacts (per spec §2)
+/dashboard/
+/.pkm/index.db
+/.pkm/cache/
+/.pkm/config.local.toml
+/.claude/settings.local.json
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

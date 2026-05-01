@@ -73,14 +73,22 @@ def test_commit_paths_empty_change_returns_none(tmp_path: Path):
     assert sha2 is None
 
 
-def test_commit_paths_skips_missing_file_gracefully(tmp_path: Path):
-    """If a path doesn't exist, commit_paths skips it (the caller may have
-    deleted the file). Other listed paths still commit."""
+def test_commit_paths_handles_deleted_file(tmp_path: Path):
+    """A path that was tracked then deleted on disk should still be staged
+    as a deletion."""
     gitmod.git_init(tmp_path)
     subprocess.run(["git", "config", "user.email", "test@example.com"],
                    cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test"],
                    cwd=tmp_path, check=True)
-    (tmp_path / "real.txt").write_text("data")
-    sha = gitmod.commit_paths(tmp_path, ["real.txt", "ghost.txt"], "test: real")
+    f = tmp_path / "real.txt"
+    f.write_text("data")
+    gitmod.commit_paths(tmp_path, ["real.txt"], "test: add")
+    f.unlink()
+    sha = gitmod.commit_paths(tmp_path, ["real.txt"], "test: rm")
     assert sha is not None
+    out = subprocess.run(
+        ["git", "log", "-1", "--name-status"], cwd=tmp_path,
+        capture_output=True, text=True, check=True,
+    ).stdout
+    assert "D\treal.txt" in out  # 'D' = deleted

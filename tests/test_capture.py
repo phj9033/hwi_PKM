@@ -218,3 +218,54 @@ def test_rm_deletes_file_and_logs(tmp_path):
     assert not list((tmp_path / "data/raw/captures").glob("*-rmme.md"))
     log = (tmp_path / "data/log.md").read_text(encoding="utf-8")
     assert "capture.rm" in log
+
+
+def test_capture_create_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    res = runner.invoke(
+        app,
+        ["capture", "create", "--slug", "foo", "--title", "Foo",
+         "--root", str(tmp_path), "--json"],
+        input="body of foo\n",
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert "git_commit" in payload
+    assert payload["git_commit"] is not None
+    assert len(payload["git_commit"]) == 40
+
+
+def test_capture_set_status_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(
+        app,
+        ["capture", "create", "--slug", "foo", "--title", "Foo",
+         "--root", str(tmp_path), "--json"],
+        input="body\n",
+    )
+    res = runner.invoke(
+        app,
+        ["capture", "set-status", "foo", "reviewed",
+         "--root", str(tmp_path), "--json"],
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert payload["git_commit"] is not None
+
+
+def test_capture_rm_json_has_git_commit(tmp_path: Path):
+    runner = CliRunner()
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(
+        app,
+        ["capture", "create", "--slug", "foo", "--title", "Foo",
+         "--root", str(tmp_path), "--json"],
+        input="body\n",
+    )
+    res = runner.invoke(
+        app,
+        ["capture", "rm", "foo",
+         "--root", str(tmp_path), "--json"],
+    )
+    payload = json.loads(res.output.splitlines()[-1])
+    assert payload["git_commit"] is not None  # still a commit (deletion + log)

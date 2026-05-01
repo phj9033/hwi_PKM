@@ -60,7 +60,7 @@ def git_init(root: Path) -> None:
 
 
 def commit_paths(root: Path, paths: list[str], message: str) -> str | None:
-    """Stage `paths` (skipping missing ones) plus implicit log/index files,
+    """Stage `paths` (including deletions) plus implicit log/index files,
     then create one commit. Returns the new SHA, or None if:
       - root is not a git repo, OR
       - nothing was staged (e.g. all paths were unchanged), OR
@@ -68,9 +68,14 @@ def commit_paths(root: Path, paths: list[str], message: str) -> str | None:
     """
     if not is_git_repo(root):
         return None
-    abs_paths = [str((root / p)) for p in paths if (root / p).exists()]
-    if abs_paths:
-        _run(["git", "add", "--", *abs_paths], cwd=root)
+
+    if paths:
+        # `git add -A -- <paths>` stages adds, modifications, AND deletions
+        # for the given pathspecs (even if the path is gone from disk).
+        # This is what we want when a mutation removes a file.
+        rel_paths = [str(p) for p in paths]
+        _run(["git", "add", "-A", "--", *rel_paths], cwd=root)
+
     diff = _run(["git", "diff", "--cached", "--name-only"], cwd=root)
     if not diff.stdout.strip():
         return None

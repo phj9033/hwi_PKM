@@ -49,7 +49,7 @@ def _do_create(
     fm = capture_defaults(slug=full_slug, title=title, source_url=url, status=status, lang=lang)
     validate_capture(fm)
     atomic_write(target, serialize(fm, body))
-    post_mutation(
+    sha = post_mutation(
         root,
         LogEvent(type="capture.create", ref=full_slug, message=title),
         paths=[str(target.relative_to(root))],
@@ -58,6 +58,7 @@ def _do_create(
         "ok": True,
         "id": full_slug,
         "path": target.relative_to(root).as_posix(),
+        "git_commit": sha,
     }
 
 
@@ -104,21 +105,26 @@ def _do_set_status(root: Path, ref: str, status: str) -> dict:
     fm["status"] = status
     validate_capture(fm)  # raises PKMValidationError on bad enum
     atomic_write(p, serialize(fm, body))
-    post_mutation(
+    sha = post_mutation(
         root,
         LogEvent(type="capture.set-status", ref=fm["slug"], message=status),
         paths=[str(p.relative_to(root))],
     )
-    return {"ok": True, "id": fm["slug"], "path": p.relative_to(root).as_posix()}
+    return {"ok": True, "id": fm["slug"], "path": p.relative_to(root).as_posix(), "git_commit": sha}
 
 
 def _do_rm(root: Path, ref: str) -> dict:
     from pkm.store.refs import resolve_capture
     p = resolve_capture(root, ref)
     slug = p.stem
+    rel_path = p.relative_to(root)
     p.unlink()
-    post_mutation(root, LogEvent(type="capture.rm", ref=slug, message=""))  # file gone — no reindex
-    return {"ok": True, "id": slug, "path": p.relative_to(root).as_posix()}
+    sha = post_mutation(
+        root,
+        LogEvent(type="capture.rm", ref=slug, message=""),
+        paths=[str(rel_path)],
+    )  # file gone — no reindex; git add -A stages the deletion
+    return {"ok": True, "id": slug, "path": rel_path.as_posix(), "git_commit": sha}
 
 
 def register(app: typer.Typer) -> None:

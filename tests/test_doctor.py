@@ -1,5 +1,6 @@
 """Tests for pkm.commands.doctor (M1 scope: structure + python only)."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 

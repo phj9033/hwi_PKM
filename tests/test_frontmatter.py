@@ -1,8 +1,10 @@
 """Tests for pkm.store.frontmatter."""
 from __future__ import annotations
+
 import pytest
-from pkm.store.frontmatter import parse, serialize
+
 from pkm.errors import PKMValidationError
+from pkm.store.frontmatter import parse, serialize
 
 
 def test_parse_with_frontmatter():

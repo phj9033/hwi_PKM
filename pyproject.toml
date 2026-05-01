@@ -52,9 +52,12 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "RUF"]
-ignore = ["E501"]  # line length handled by formatter
+ignore = ["E501", "B008"]  # E501: line length handled by formatter; B008: typer.Option() in defaults is idiomatic
 
 [tool.pyright]
 pythonVersion = "3.11"
+pythonPlatform = "Darwin"
+venvPath = "."
+venv = ".venv"
 include = ["pkm", "tests"]
 typeCheckingMode = "basic"

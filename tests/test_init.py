@@ -1,9 +1,9 @@
 """Tests for pkm.commands.init."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pkm.cli import app
@@ -63,7 +63,7 @@ def test_init_log_md_is_empty_or_header_only(tmp_path: Path):
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     log_text = (tmp_path / "data" / "log.md").read_text(encoding="utf-8")
     # log.md is append-only; init may seed a header line, but no events yet.
-    lines = [l for l in log_text.splitlines() if l.strip()]
+    lines = [ln for ln in log_text.splitlines() if ln.strip()]
     assert len(lines) <= 1  # header at most
 
 

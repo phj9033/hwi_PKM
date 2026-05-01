@@ -46,8 +46,8 @@ def _root(
 
 def _register_all() -> None:
     # Imported here to avoid circular imports during module-init.
-    from pkm.commands import init as init_cmd
     from pkm.commands import doctor as doctor_cmd
+    from pkm.commands import init as init_cmd
 
     init_cmd.register(app)
     doctor_cmd.register(app)

@@ -215,6 +215,12 @@ New items in `pkm doctor` output:
 
 `pkm doctor --download` triggers `huggingface_hub.snapshot_download` for `BAAI/bge-m3` into `~/.cache/pkm/models/bge-m3/`. Progress is printed (huggingface_hub default tqdm). `--strict` exit policy from M1 stays: missing bge-m3 → exit≠0 under `--strict`, exit 0 under default doctor.
 
+**Cache root resolution** (single helper `pkm.store.embedder.model_cache_root() -> Path`):
+1. `$PKM_MODEL_CACHE` if set (used by tests via `monkeypatch.setenv` to point at `tmp_path`).
+2. Otherwise `~/.cache/pkm/models/`.
+
+The same helper is consumed by `RealEmbedder` (passed as `cache_folder=` to `sentence_transformers.SentenceTransformer`) and by `pkm doctor` (cache existence probe). One source of truth, env-overridable, hermetic for tests.
+
 ---
 
 ## 5. Data flow
@@ -238,8 +244,12 @@ post_mutation(root, event):
        │     chunker.split_markdown(body) → Chunk[]
        │     if bucket == "wiki" or vec_opted_in: embedder.embed(chunks)
        │     DB transaction:
-       │       delete old (chunks, chunks_fts, chunks_vec, links) for doc_id
-       │       upsert documents row
+       │       upsert documents row (path is UNIQUE → ON CONFLICT(path) UPDATE);
+       │         doc_id stays stable across reindexes so wikilinks survive
+       │       delete old chunks WHERE doc_id=? (FK ON DELETE CASCADE wipes
+       │         chunks_fts, chunks_vec rows for that doc)
+       │       delete links WHERE src_doc_id=? (outgoing only — incoming links
+       │         from other docs are preserved)
        │       insert chunks + chunks_fts (always)
        │       insert chunks_vec (wiki / opt-in only)
        │       insert links from wikilinks + frontmatter

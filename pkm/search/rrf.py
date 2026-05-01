@@ -9,7 +9,7 @@ either signal in the fused output.
 """
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from pkm.search.bm25 import Hit
 

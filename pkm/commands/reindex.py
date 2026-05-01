@@ -17,11 +17,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 import tomllib
+from collections.abc import Iterable
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterable
 
 import typer
 
@@ -228,7 +227,7 @@ def register(app: typer.Typer) -> None:
                     )
                 files = [(bucket, abs_path)]
             else:
-                files = _walk_files(root, _SCOPE_BUCKETS[scope])
+                files = _walk_files(root.resolve(), _SCOPE_BUCKETS[scope])
 
             indexed = 0
             skipped = 0

@@ -36,7 +36,7 @@ def register(app: typer.Typer) -> None:
             typer.echo(f"Error [{e.code}]: {e.message}")
             if e.hint:
                 typer.echo(f"  hint: {e.hint}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
         if json_out:
             typer.echo(json.dumps(out, ensure_ascii=False))

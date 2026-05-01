@@ -1,5 +1,6 @@
 """Tests for pkm.search.pipeline."""
 from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +17,7 @@ def _seed_two_wiki(conn, embedder):
         ("data/wiki/b.md", "wiki", "Transformer attention 메커니즘"),
     ]
     vecs = embedder.embed([d[2] for d in docs])
-    for (path, bucket, text), vec in zip(docs, vecs):
+    for (path, bucket, text), vec in zip(docs, vecs, strict=True):
         cur = conn.execute(
             "INSERT INTO documents(path, bucket, title, lang, indexed_at) "
             "VALUES (?,?,?,?,datetime('now'))",

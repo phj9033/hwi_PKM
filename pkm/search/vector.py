@@ -10,11 +10,10 @@ becomes a bottleneck, add a per-bucket vec0 partition in M3.x.
 from __future__ import annotations
 
 import sqlite3
-from typing import Sequence
 
 import numpy as np
 
-from pkm.search.bm25 import Hit, _BUCKET_MAP
+from pkm.search.bm25 import _BUCKET_MAP, Hit
 
 
 def query_vector(conn: sqlite3.Connection, query_vec: np.ndarray,

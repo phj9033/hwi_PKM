@@ -1,13 +1,12 @@
 """Tests for pkm.store.embedder (Stub embedder + cache root resolution)."""
 from __future__ import annotations
-import os
+
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from pkm.store import embedder as emb
-
 
 # --- model_cache_root -----------
 

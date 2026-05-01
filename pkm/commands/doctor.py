@@ -119,6 +119,7 @@ def _check_model_cache() -> _Item:
 
 def _do_download() -> None:
     from huggingface_hub import snapshot_download
+
     from pkm.store.embedder import MODEL_NAME, model_cache_root
     cache = model_cache_root()
     cache.mkdir(parents=True, exist_ok=True)

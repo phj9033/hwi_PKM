@@ -78,7 +78,7 @@ def split_markdown(text: str, target_tokens: int = 500, overlap: float = 0.15) -
                 current_lines = []
             level = len(m.group(1))
             title = m.group(2)
-            current_path = current_path[: level - 1] + [title]
+            current_path = [*current_path[: level - 1], title]
         else:
             current_lines.append(line)
     if current_lines:
@@ -127,7 +127,7 @@ def split_markdown(text: str, target_tokens: int = 500, overlap: float = 0.15) -
                         break
                     carry.insert(0, prev)
                     carry_tokens += pt
-                buf = carry + [sent]
+                buf = [*carry, sent]
                 buf_tokens = carry_tokens + t
             else:
                 buf.append(sent)

@@ -1,5 +1,6 @@
 """Golden snapshot tests for `pkm search` over the Korean fixture corpus."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 

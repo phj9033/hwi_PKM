@@ -1,5 +1,6 @@
 """Tests for pkm.store.index_schema."""
 from __future__ import annotations
+
 import sqlite3
 
 from pkm.store import index_schema

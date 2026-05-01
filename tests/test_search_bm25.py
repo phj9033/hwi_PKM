@@ -1,8 +1,7 @@
 """Tests for pkm.search.bm25."""
 from __future__ import annotations
-from pathlib import Path
 
-import pytest
+from pathlib import Path
 
 from pkm.search.bm25 import query_bm25
 from pkm.store.index_db import connect

@@ -1,9 +1,7 @@
 """Tests for pkm.store.chunker."""
 from __future__ import annotations
 
-import pytest
-
-from pkm.store.chunker import Chunk, split_markdown
+from pkm.store.chunker import split_markdown
 
 
 def test_empty_returns_no_chunks():

@@ -1,9 +1,9 @@
 """Tests for pkm.search.vector."""
 from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from pkm.search.vector import query_vector
 from pkm.store.embedder import StubEmbedder
@@ -17,7 +17,7 @@ def _seed(conn, embedder):
         ("data/raw/captures/c.md", "captures", "gamma capture"),
     ]
     vecs = embedder.embed([r[2] for r in rows])
-    for (path, bucket, text), vec in zip(rows, vecs):
+    for (path, bucket, text), vec in zip(rows, vecs, strict=True):
         cur = conn.execute(
             "INSERT INTO documents(path, bucket, indexed_at) VALUES (?,?,datetime('now'))",
             (path, bucket),

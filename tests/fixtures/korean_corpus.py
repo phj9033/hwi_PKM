@@ -4,6 +4,7 @@ Five wiki documents covering distinct topics + one captures doc that exists
 only to verify FTS-only path. Frontmatter is minimal but valid for each schema.
 """
 from __future__ import annotations
+
 from pathlib import Path
 
 WIKI_DOCS = {

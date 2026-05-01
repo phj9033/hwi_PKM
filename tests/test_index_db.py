@@ -1,8 +1,7 @@
 """Tests for pkm.store.index_db."""
 from __future__ import annotations
-from pathlib import Path
 
-import pytest
+from pathlib import Path
 
 from pkm.store import index_db
 

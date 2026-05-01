@@ -1,5 +1,6 @@
 """Tests for the M3 reindex step inside _mutations.post_mutation."""
 from __future__ import annotations
+
 from pathlib import Path
 
 import pytest

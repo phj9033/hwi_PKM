@@ -1,5 +1,6 @@
 """Tests for M3 additions to `pkm doctor`."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -59,7 +60,9 @@ def test_doctor_download_invokes_snapshot(tmp_path: Path, monkeypatch):
 
     def fake_snapshot(repo_id, **kwargs):
         called["repo_id"] = repo_id
-        cache = Path(kwargs.get("cache_dir") or kwargs.get("local_dir"))
+        cache_dir = kwargs.get("cache_dir") or kwargs.get("local_dir")
+        assert cache_dir is not None
+        cache = Path(cache_dir)
         cache.mkdir(parents=True, exist_ok=True)
         (cache / "config.json").write_text("{}")
         return str(cache)

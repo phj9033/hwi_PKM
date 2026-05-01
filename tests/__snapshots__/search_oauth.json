@@ -1,0 +1,76 @@
+{
+  "query": "OAuth 토큰 저장",
+  "scope": "wiki",
+  "results": [
+    {
+      "path": "data/wiki/concepts/oauth-token-storage.md",
+      "chunk_idx": 0,
+      "heading_path": [
+        "OAuth 토큰 저장",
+        "보안 권고"
+      ],
+      "scores": {
+        "bm25": 1.3167,
+        "vector": -0.3663,
+        "rrf": 0.0325,
+        "final": 0.0325
+      }
+    },
+    {
+      "path": "data/wiki/concepts/korean-tokenization.md",
+      "chunk_idx": 0,
+      "heading_path": [
+        "한국어 토크나이저",
+        "형태소 분석"
+      ],
+      "scores": {
+        "bm25": 1.3967,
+        "vector": -0.4272,
+        "rrf": 0.0318,
+        "final": 0.0318
+      }
+    },
+    {
+      "path": "data/wiki/concepts/database-indexing.md",
+      "chunk_idx": 0,
+      "heading_path": [
+        "Database Indexing",
+        "B-tree"
+      ],
+      "scores": {
+        "bm25": 0.0,
+        "vector": -0.4025,
+        "rrf": 0.0161,
+        "final": 0.0161
+      }
+    },
+    {
+      "path": "data/wiki/concepts/react-hooks.md",
+      "chunk_idx": 0,
+      "heading_path": [
+        "React Hooks",
+        "useEffect"
+      ],
+      "scores": {
+        "bm25": 0.0,
+        "vector": -0.406,
+        "rrf": 0.0159,
+        "final": 0.0159
+      }
+    },
+    {
+      "path": "data/wiki/concepts/transformer-attention.md",
+      "chunk_idx": 0,
+      "heading_path": [
+        "Transformer Attention",
+        "Mechanism"
+      ],
+      "scores": {
+        "bm25": 0.0,
+        "vector": -0.414,
+        "rrf": 0.0156,
+        "final": 0.0156
+      }
+    }
+  ]
+}

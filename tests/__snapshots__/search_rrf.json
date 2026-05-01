@@ -1,0 +1,19 @@
+{
+  "query": "BM25 RRF",
+  "scope": "raw",
+  "results": [
+    {
+      "path": "data/raw/captures/2026-05-01-rrf-paper.md",
+      "chunk_idx": 0,
+      "heading_path": [
+        "RRF"
+      ],
+      "scores": {
+        "bm25": 1.2544,
+        "vector": 0.0,
+        "rrf": 0.0164,
+        "final": 0.0164
+      }
+    }
+  ]
+}

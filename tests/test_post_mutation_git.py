@@ -1,5 +1,6 @@
 """Integration: post_mutation calls commit_paths after log/TOC/reindex."""
 from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 

@@ -1,12 +1,10 @@
 """Tests for pkm.store.git."""
 from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from pkm.store import git as gitmod
-
 
 # --- is_git_repo ----
 

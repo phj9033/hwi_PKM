@@ -1,9 +1,9 @@
 """Tests for git initialization at the end of `pkm init`."""
 from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pkm.cli import app

@@ -17,6 +17,7 @@ pkm doctor                # check environment + structure
 - [x] M1 — Foundation (this milestone)
 - [x] M2 — Capture & Chunks
 - [x] M3 — Indexing & Search
+- [x] M3.5 — Git Auto-commit
 - [ ] M4 — Promote & Lint
 - [ ] M5 — AI bridge & Writing
 - [ ] M6 — Dashboard

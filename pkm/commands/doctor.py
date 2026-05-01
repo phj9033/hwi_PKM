@@ -112,7 +112,8 @@ def _check_index_db(root: Path) -> _Item:
 def _check_git(root: Path) -> _Item:
     """Two checks rolled into one item: git CLI present + this dir is a repo."""
     import subprocess  # NB: doctor.py prefers module-level imports; left here
-                       # only for symmetry with _check_index_db's lazy sqlite3.
+
+    # only for symmetry with _check_index_db's lazy sqlite3.
     from pkm.store import git as gitmod
     try:
         subprocess.run(["git", "--version"], capture_output=True, check=True)

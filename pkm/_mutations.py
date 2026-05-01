@@ -75,7 +75,7 @@ def _git_commit_for(root: Path, event: LogEvent, paths: list[str]) -> str | None
     if not gitmod.is_git_repo(root):
         print("warning: not a git repo, skipping commit", file=sys.stderr)
         return None
-    stage = list(paths) + [_LOG_REL, _INDEX_REL]
+    stage = [*list(paths), _LOG_REL, _INDEX_REL]
     message = f"pkm {event.type}: {event.ref}"
     try:
         return gitmod.commit_paths(root, stage, message)

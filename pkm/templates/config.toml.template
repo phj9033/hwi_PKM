@@ -1,0 +1,18 @@
+# .pkm/config.toml — committed, public defaults.
+# DO NOT put `exec`, `env`, credentials, or absolute paths here.
+# Use .pkm/config.local.toml for those (gitignored).
+
+[ai_cli]
+# Name of the AI CLI command alias to use by default. Definitions live in
+# .pkm/config.local.toml. Empty = autodetect from PATH (claude/codex/gemini).
+default = ""
+fallback_order = []
+
+[indexing]
+embed_captures = false
+embed_chunks   = false
+batch_size     = 16
+
+[memory]
+auto_throttle   = true
+low_memory_mode = false

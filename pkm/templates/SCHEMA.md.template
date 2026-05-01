@@ -1,0 +1,48 @@
+# SCHEMA — hwi_PKM Operating Manual
+
+> This file is the AI agent's entry point. Read it at the start of every PKM session.
+
+## 1. Mission
+
+This is a Karpathy-style **compounding wiki**. Markdown files in `data/` are the source of truth. The AI agent operates the system via the deterministic `pkm` CLI.
+
+## 2. Layout
+
+```
+data/
+├── log.md                # append-only event log
+├── index.md              # auto-generated TOC
+├── raw/
+│   ├── captures/         # AI-driven single-note captures (with URL/summary)
+│   └── chunks/           # User-curated topic folders (multi-source)
+├── wiki/                 # canonical, embedded knowledge
+│   ├── concepts/
+│   ├── entities/
+│   ├── notes/
+│   └── reports/
+└── writing/              # AI synthesis workspace
+```
+
+## 3. Frontmatter (M1 placeholder — full schemas in M4)
+
+Every markdown file under `data/` carries YAML frontmatter. The full per-bucket schemas land in M4 (`pkm lint`). For now, treat any frontmatter as opaque metadata.
+
+## 4. Workflows
+
+(Empty in M1. Populated as commands land in M2–M6.)
+
+## 5. CLI Reference
+
+(Empty in M1. `pkm --help` is authoritative.)
+
+## 6. Invariants
+
+- **Files = truth.** Don't edit `.pkm/index.db`; it's regenerated.
+- **Raw immutability.** Files under `data/raw/` are immutable after `status: reviewed`. Updates go through new captures or wiki edits.
+- **No direct wiki writes (M4+).** Use `pkm promote` or `pkm wiki edit`. (Enforced by `.claude/settings.json` deny rules from M4.)
+
+## 7. Anti-patterns
+
+- Editing `.pkm/index.db` by hand.
+- Writing to `data/wiki/**` directly without going through `pkm promote`.
+- Asserting facts in `/ask` answers without citations to wiki paths.

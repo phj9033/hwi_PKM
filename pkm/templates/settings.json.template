@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkm *)",
+      "Read(./**)",
+      "Write(./data/raw/**)", "Edit(./data/raw/**)",
+      "Write(./data/writing/**)", "Edit(./data/writing/**)",
+      "WebFetch", "WebSearch"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Write(./data/wiki/**)", "Edit(./data/wiki/**)",
+      "Bash(pkm * --no-git*)"
+    ]
+  }
+}

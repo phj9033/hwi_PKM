@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install deps
+        run: uv sync --all-extras
+
+      - name: Lint (ruff)
+        run: uv run ruff check pkm tests
+
+      - name: Type check (pyright)
+        run: uv run pyright
+
+      - name: Fast tests
+        run: uv run pytest -n auto -m "not slow"
+
+      - name: Smoke — pkm init + doctor in tmpdir
+        run: |
+          mkdir /tmp/pkm-smoke
+          cd /tmp/pkm-smoke
+          uv --project ${{ github.workspace }} run pkm init
+          uv --project ${{ github.workspace }} run pkm doctor --strict

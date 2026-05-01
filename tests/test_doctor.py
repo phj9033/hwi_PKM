@@ -15,6 +15,16 @@ def _init_pkm(tmp_path: Path) -> None:
     runner.invoke(app, ["init", "--root", str(tmp_path)])
 
 
+def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
+    """Full initialization: init + reindex + model cache stub for M3 items."""
+    monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(app, ["reindex", "db", "--full", "--root", str(tmp_path)])
+    model_cache = tmp_path / "cache"
+    (model_cache / "bge-m3").mkdir(parents=True)
+    monkeypatch.setenv("PKM_MODEL_CACHE", str(model_cache))
+
+
 def test_doctor_on_initialized_repo_passes(tmp_path: Path):
     _init_pkm(tmp_path)
     result = runner.invoke(app, ["doctor", "--root", str(tmp_path)])
@@ -36,17 +46,19 @@ def test_doctor_strict_mode_exits_nonzero_on_missing(tmp_path: Path):
     assert result.exit_code != 0
 
 
-def test_doctor_strict_on_initialized_repo_exits_zero(tmp_path: Path):
-    _init_pkm(tmp_path)
+def test_doctor_strict_on_initialized_repo_exits_zero(tmp_path: Path, monkeypatch):
+    # M3: full init (init + reindex + model cache) required for strict mode to pass
+    _full_init_pkm(tmp_path, monkeypatch)
     result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--strict"])
     assert result.exit_code == 0
 
 
-def test_doctor_json_output_contract(tmp_path: Path):
+def test_doctor_json_output_contract(tmp_path: Path, monkeypatch):
     """Per spec §5.7: doctor --json must NOT include exec, env, absolute paths,
     or credentials. Whitelist: ok, items[].{name,status,detail}, system.{...}.
     """
-    _init_pkm(tmp_path)
+    # M3: full init (init + reindex + model cache) required for payload["ok"] True
+    _full_init_pkm(tmp_path, monkeypatch)
     result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.output)

@@ -93,6 +93,38 @@ def _system_info() -> dict[str, object]:
     return info
 
 
+def _check_index_db(root: Path) -> _Item:
+    db = root / ".pkm" / "index.db"
+    if not db.exists():
+        return _Item("index.db", "missing", "run: pkm reindex db --full")
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db)
+        try:
+            cnt = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+            return _Item("index.db", "ok", f"{cnt} chunks")
+        finally:
+            conn.close()
+    except Exception as e:
+        return _Item("index.db", "error", f"{type(e).__name__}")
+
+
+def _check_model_cache() -> _Item:
+    from pkm.store.embedder import model_cache_root
+    cache = model_cache_root() / "bge-m3"
+    if cache.exists() or any(model_cache_root().glob("models--BAAI--bge-m3*")):
+        return _Item("bge-m3", "ok", None)
+    return _Item("bge-m3", "missing", "run: pkm doctor --download")
+
+
+def _do_download() -> None:
+    from huggingface_hub import snapshot_download
+    from pkm.store.embedder import MODEL_NAME, model_cache_root
+    cache = model_cache_root()
+    cache.mkdir(parents=True, exist_ok=True)
+    snapshot_download(MODEL_NAME, cache_dir=str(cache))
+
+
 def _render_human(items: list[_Item], system: dict[str, object]) -> str:
     lines: list[str] = []
     lines.append("[ Doctor ]")
@@ -126,11 +158,20 @@ def register(app: typer.Typer) -> None:
             "--json",
             help="Emit JSON output (strict field whitelist).",
         ),
+        download: bool = typer.Option(
+            False,
+            "--download",
+            help="Fetch missing models (BAAI/bge-m3) into the cache.",
+        ),
     ) -> None:
         """Report PKM environment & structure status."""
+        if download:
+            _do_download()
         items: list[_Item] = []
         items.append(_check_python())
         items.extend(_check_paths(root))
+        items.append(_check_index_db(root))
+        items.append(_check_model_cache())
         system = _system_info()
 
         any_bad = any(it.status in ("missing", "error") for it in items)

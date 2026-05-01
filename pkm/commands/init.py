@@ -65,6 +65,17 @@ def _do_init(root: Path, force: bool) -> dict:
     # init and rebuild_index never diverge.
     rebuild_index(root)
 
+    # M3.5: bootstrap git so future mutations can auto-commit.
+    from pkm.store import git as gitmod
+    gitmod.git_init(root)
+    gitmod.commit_paths(
+        root,
+        ["SCHEMA.md", ".gitignore", ".pkm/config.toml",
+         ".claude/settings.json", ".claude/commands",
+         "data/log.md", "data/index.md"],
+        f"pkm init: {root.resolve().name}",
+    )
+
     return {"ok": True, "path": str(root.resolve())}
 
 

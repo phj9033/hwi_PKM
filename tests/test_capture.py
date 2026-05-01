@@ -1,5 +1,6 @@
 """Tests for pkm.commands.capture (M2.5: create subcommand)."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 

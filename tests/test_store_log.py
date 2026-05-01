@@ -1,8 +1,7 @@
 """Tests for pkm.store.log."""
 from __future__ import annotations
-from pathlib import Path
 
-import pytest
+from pathlib import Path
 
 from pkm.store.log import LogEvent, append_event, read_events
 

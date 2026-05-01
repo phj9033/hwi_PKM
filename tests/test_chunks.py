@@ -1,7 +1,7 @@
 """Tests for pkm.commands.chunks."""
 from __future__ import annotations
+
 import json
-from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -60,8 +60,10 @@ def test_add_copies_file_and_records_source(tmp_path):
 def test_add_multiple_files(tmp_path):
     _init(tmp_path)
     runner.invoke(app, ["chunks", "new", "t", "--root", str(tmp_path)])
-    a = tmp_path / "a.md"; a.write_text("a")
-    b = tmp_path / "b.md"; b.write_text("b")
+    a = tmp_path / "a.md"
+    a.write_text("a")
+    b = tmp_path / "b.md"
+    b.write_text("b")
     res = runner.invoke(app, ["chunks", "add", "t", str(a), str(b),
                               "--root", str(tmp_path)])
     assert res.exit_code == 0
@@ -71,7 +73,8 @@ def test_add_multiple_files(tmp_path):
 
 def test_add_refuses_missing_topic(tmp_path):
     _init(tmp_path)
-    src = tmp_path / "x.md"; src.write_text("x")
+    src = tmp_path / "x.md"
+    src.write_text("x")
     res = runner.invoke(app, ["chunks", "add", "absent", str(src),
                               "--root", str(tmp_path)])
     assert res.exit_code != 0
@@ -90,7 +93,8 @@ def test_list_returns_topics(tmp_path):
 def test_show_returns_readme_and_files(tmp_path):
     _init(tmp_path)
     runner.invoke(app, ["chunks", "new", "x", "--root", str(tmp_path)])
-    src = tmp_path / "f.md"; src.write_text("y")
+    src = tmp_path / "f.md"
+    src.write_text("y")
     runner.invoke(app, ["chunks", "add", "x", str(src), "--root", str(tmp_path)])
     res = runner.invoke(app, ["chunks", "show", "x", "--root", str(tmp_path), "--json"])
     payload = json.loads(res.output)
@@ -119,7 +123,8 @@ def test_set_status_invalid_enum(tmp_path):
 def test_rm_removes_topic_tree(tmp_path):
     _init(tmp_path)
     runner.invoke(app, ["chunks", "new", "rm", "--root", str(tmp_path)])
-    src = tmp_path / "f.md"; src.write_text("y")
+    src = tmp_path / "f.md"
+    src.write_text("y")
     runner.invoke(app, ["chunks", "add", "rm", str(src), "--root", str(tmp_path)])
     res = runner.invoke(app, ["chunks", "rm", "rm", "--root", str(tmp_path)])
     assert res.exit_code == 0

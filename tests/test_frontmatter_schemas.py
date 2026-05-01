@@ -1,6 +1,7 @@
 """Tests for pkm.store.frontmatter_schemas."""
 from __future__ import annotations
-from datetime import datetime, timezone
+
+from datetime import datetime
 
 import pytest
 
@@ -11,7 +12,6 @@ from pkm.store.frontmatter_schemas import (
     validate_capture,
     validate_chunk,
 )
-
 
 # --- capture ----
 

@@ -9,7 +9,7 @@ Spec reference: §2 (layout — log.md), §6.6 (auto-update).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 _LOG_REL = "data/log.md"
@@ -34,7 +34,7 @@ def _escape(s: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
 def append_event(root: Path, event: LogEvent) -> None:

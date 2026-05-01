@@ -1,8 +1,7 @@
 """Tests for pkm.store.toc."""
 from __future__ import annotations
-from pathlib import Path
 
-import pytest
+from pathlib import Path
 
 from pkm.store.frontmatter import serialize
 from pkm.store.toc import rebuild_index

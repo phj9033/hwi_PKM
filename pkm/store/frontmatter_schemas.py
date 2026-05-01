@@ -12,8 +12,8 @@ exists) live in `pkm lint` (M4).
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from pkm.errors import PKMValidationError
 
@@ -29,7 +29,7 @@ _CHUNK_LANGS = ("ko", "en", "mixed")
 
 def _now_iso() -> str:
     """Return the current local timestamp in ISO 8601 with timezone."""
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
 def capture_defaults(

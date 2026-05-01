@@ -1,5 +1,6 @@
 """Tests for pkm._mutations.post_mutation."""
 from __future__ import annotations
+
 from pathlib import Path
 
 from pkm._mutations import post_mutation

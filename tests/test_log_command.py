@@ -1,9 +1,11 @@
 """Tests for pkm.commands.log."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
 from typer.testing import CliRunner
+
 from pkm.cli import app
 
 runner = CliRunner()

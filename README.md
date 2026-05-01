@@ -15,7 +15,7 @@ pkm doctor                # check environment + structure
 ## Status
 
 - [x] M1 — Foundation (this milestone)
-- [ ] M2 — Capture & Chunks
+- [x] M2 — Capture & Chunks
 - [ ] M3 — Indexing & Search
 - [ ] M4 — Promote & Lint
 - [ ] M5 — AI bridge & Writing

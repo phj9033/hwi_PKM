@@ -1,8 +1,10 @@
 """Tests for pkm.commands.index."""
 from __future__ import annotations
+
 from pathlib import Path
 
 from typer.testing import CliRunner
+
 from pkm.cli import app
 
 runner = CliRunner()

@@ -109,6 +109,20 @@ def _check_index_db(root: Path) -> _Item:
         return _Item("index.db", "error", f"{type(e).__name__}")
 
 
+def _check_git(root: Path) -> _Item:
+    """Two checks rolled into one item: git CLI present + this dir is a repo."""
+    import subprocess  # NB: doctor.py prefers module-level imports; left here
+                       # only for symmetry with _check_index_db's lazy sqlite3.
+    from pkm.store import git as gitmod
+    try:
+        subprocess.run(["git", "--version"], capture_output=True, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return _Item("git", "missing", "install: brew install git (macOS) / apt-get install git (Linux)")
+    if gitmod.is_git_repo(root):
+        return _Item("git", "ok", "repo present")
+    return _Item("git", "missing", "run: pkm init  (or git init)")
+
+
 def _check_model_cache() -> _Item:
     from pkm.store.embedder import model_cache_root
     cache = model_cache_root() / "bge-m3"
@@ -173,6 +187,7 @@ def register(app: typer.Typer) -> None:
         items.extend(_check_paths(root))
         items.append(_check_index_db(root))
         items.append(_check_model_cache())
+        items.append(_check_git(root))
         system = _system_info()
 
         any_bad = any(it.status in ("missing", "error") for it in items)

@@ -565,7 +565,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import struct
 from pathlib import Path
 from typing import Protocol
 
@@ -602,17 +601,17 @@ class StubEmbedder:
 
     @staticmethod
     def _vector_for(text: str) -> np.ndarray:
-        # 32 bytes of SHA-256 → tile to 4096 bytes → 1024 float32 values.
+        # SHA-256 digest → seed numpy RNG → 1024-d standard-normal → L2 normalize.
+        # Naive `struct.unpack("<1024f", digest_tiled)` would reinterpret random
+        # bytes as IEEE 754 floats — most patterns map to ±inf/NaN, collapsing the
+        # L2 norm. Seeded RNG keeps the result deterministic + numerically stable.
         digest = hashlib.sha256(text.encode("utf-8")).digest()  # 32 bytes
-        # Repeat the digest 128 times to fill 4096 bytes (1024 float32 = 4096 bytes).
-        repeats = (4096 // len(digest)) + 1
-        buf = (digest * repeats)[:4096]
-        floats = np.array(struct.unpack("<1024f", buf), dtype=np.float32)
-        # Center around 0 then L2-normalize so cosine math is well-defined.
-        floats = floats - floats.mean()
+        seed = int.from_bytes(digest, "little") % (2**32)
+        rng = np.random.default_rng(seed)
+        floats = rng.standard_normal(EMB_DIM).astype(np.float32)
         norm = np.linalg.norm(floats)
         if norm == 0.0:
-            # Degenerate — return a fixed unit vector
+            # Degenerate (probability ≈ 0) — return a fixed unit vector
             v = np.zeros(EMB_DIM, dtype=np.float32)
             v[0] = 1.0
             return v

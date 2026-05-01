@@ -117,3 +117,99 @@ def test_create_refuses_existing_slug(tmp_path: Path):
                                "--slug", "dup", "--title", "Dup2"], input="y")
     assert res2.exit_code != 0
     assert "exists" in res2.output.lower() or "STATE_ERROR" in res2.output
+
+
+def _create(tmp_path, slug, title="t", status="draft", lang="ko", url=None):
+    args = ["capture", "create", "--root", str(tmp_path),
+            "--slug", slug, "--title", title, "--status", status, "--lang", lang]
+    if url:
+        args += ["--url", url]
+    return runner.invoke(app, args, input="body")
+
+
+def test_list_returns_all(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "a")
+    _create(tmp_path, "b", status="reviewed")
+    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path), "--json"])
+    assert res.exit_code == 0
+    payload = json.loads(res.output)
+    assert payload["ok"] is True
+    slugs = [it["slug"] for it in payload["items"]]
+    assert any(s.endswith("-a") for s in slugs)
+    assert any(s.endswith("-b") for s in slugs)
+
+
+def test_list_filter_status(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "a", status="draft")
+    _create(tmp_path, "b", status="reviewed")
+    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path),
+                              "--status", "reviewed", "--json"])
+    payload = json.loads(res.output)
+    assert all(it["status"] == "reviewed" for it in payload["items"])
+    assert any(it["slug"].endswith("-b") for it in payload["items"])
+
+
+def test_list_filter_lang(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "a", lang="ko")
+    _create(tmp_path, "b", lang="en")
+    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path),
+                              "--lang", "en", "--json"])
+    payload = json.loads(res.output)
+    assert all(it["lang"] == "en" for it in payload["items"])
+
+
+def test_show_by_full_slug(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "uniq", title="Uniq")
+    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path), "--json"])
+    full = json.loads(res.output)["items"][0]["slug"]
+    res2 = runner.invoke(app, ["capture", "show", full, "--root", str(tmp_path), "--json"])
+    assert res2.exit_code == 0
+    payload = json.loads(res2.output)
+    assert payload["ok"] is True
+    assert payload["frontmatter"]["title"] == "Uniq"
+
+
+def test_show_by_partial_slug(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "uniq")
+    res = runner.invoke(app, ["capture", "show", "uniq", "--root", str(tmp_path), "--json"])
+    assert res.exit_code == 0
+
+
+def test_show_not_found(tmp_path):
+    _init(tmp_path)
+    res = runner.invoke(app, ["capture", "show", "absent", "--root", str(tmp_path)])
+    assert res.exit_code != 0
+
+
+def test_set_status_changes_frontmatter(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "promoteme", status="draft")
+    res = runner.invoke(app, ["capture", "set-status", "promoteme", "reviewed",
+                              "--root", str(tmp_path)])
+    assert res.exit_code == 0
+    res2 = runner.invoke(app, ["capture", "show", "promoteme",
+                               "--root", str(tmp_path), "--json"])
+    assert json.loads(res2.output)["frontmatter"]["status"] == "reviewed"
+
+
+def test_set_status_invalid_enum(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "x")
+    res = runner.invoke(app, ["capture", "set-status", "x", "weird",
+                              "--root", str(tmp_path)])
+    assert res.exit_code != 0
+
+
+def test_rm_deletes_file_and_logs(tmp_path):
+    _init(tmp_path)
+    _create(tmp_path, "rmme")
+    res = runner.invoke(app, ["capture", "rm", "rmme", "--root", str(tmp_path)])
+    assert res.exit_code == 0
+    assert not list((tmp_path / "data/raw/captures").glob("*-rmme.md"))
+    log = (tmp_path / "data/log.md").read_text(encoding="utf-8")
+    assert "capture.rm" in log

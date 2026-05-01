@@ -57,6 +57,62 @@ def _do_create(
     }
 
 
+def _list_captures(root: Path) -> list[dict]:
+    cap_dir = root / "data" / "raw" / "captures"
+    if not cap_dir.exists():
+        return []
+    out: list[dict] = []
+    for p in sorted(cap_dir.glob("*.md")):
+        try:
+            from pkm.store.frontmatter import parse
+            fm, _ = parse(p.read_text(encoding="utf-8"))
+        except Exception:
+            fm = {}
+        out.append({
+            "slug": fm.get("slug") or p.stem,
+            "title": fm.get("title") or "",
+            "status": fm.get("status") or "?",
+            "lang": fm.get("lang") or "?",
+            "path": p.relative_to(root).as_posix(),
+        })
+    return out
+
+
+def _do_show(root: Path, ref: str) -> dict:
+    from pkm.store.frontmatter import parse
+    from pkm.store.refs import resolve_capture
+    p = resolve_capture(root, ref)
+    fm, body = parse(p.read_text(encoding="utf-8"))
+    return {
+        "ok": True,
+        "slug": fm.get("slug") or p.stem,
+        "path": p.relative_to(root).as_posix(),
+        "frontmatter": fm,
+        "body": body,
+    }
+
+
+def _do_set_status(root: Path, ref: str, status: str) -> dict:
+    from pkm.store.frontmatter import parse
+    from pkm.store.refs import resolve_capture
+    p = resolve_capture(root, ref)
+    fm, body = parse(p.read_text(encoding="utf-8"))
+    fm["status"] = status
+    validate_capture(fm)  # raises PKMValidationError on bad enum
+    atomic_write(p, serialize(fm, body))
+    post_mutation(root, LogEvent(type="capture.set-status", ref=fm["slug"], message=status))
+    return {"ok": True, "id": fm["slug"], "path": p.relative_to(root).as_posix()}
+
+
+def _do_rm(root: Path, ref: str) -> dict:
+    from pkm.store.refs import resolve_capture
+    p = resolve_capture(root, ref)
+    slug = p.stem
+    p.unlink()
+    post_mutation(root, LogEvent(type="capture.rm", ref=slug, message=""))
+    return {"ok": True, "id": slug, "path": p.relative_to(root).as_posix()}
+
+
 def register(app: typer.Typer) -> None:
     capture_app = typer.Typer(name="capture", help="Manage captures (raw/captures/).", no_args_is_help=True)
     app.add_typer(capture_app, name="capture")
@@ -91,3 +147,83 @@ def register(app: typer.Typer) -> None:
             typer.echo(json.dumps(result, ensure_ascii=False))
         else:
             typer.echo(f"Created capture: {result['path']}")
+
+    @capture_app.command("list")
+    def list_cmd(
+        status: str | None = typer.Option(None, "--status"),
+        lang: str | None = typer.Option(None, "--lang"),
+        root: Path = typer.Option(Path("."), "--root", "-r"),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        items = _list_captures(root)
+        if status:
+            items = [it for it in items if it["status"] == status]
+        if lang:
+            items = [it for it in items if it["lang"] == lang]
+        if json_out:
+            typer.echo(json.dumps({"ok": True, "items": items}, ensure_ascii=False))
+        else:
+            for it in items:
+                typer.echo(f"{it['slug']}  [{it['status']}/{it['lang']}]  {it['title']}")
+
+    @capture_app.command("show")
+    def show_cmd(
+        ref: str = typer.Argument(...),
+        root: Path = typer.Option(Path("."), "--root", "-r"),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        try:
+            result = _do_show(root, ref)
+        except PKMError as e:
+            if json_out:
+                typer.echo(json.dumps({"ok": False, "error": e.to_dict()}, ensure_ascii=False))
+            else:
+                typer.echo(f"Error [{e.code}]: {e.message}", err=True)
+            raise typer.Exit(code=1) from None
+        if json_out:
+            typer.echo(json.dumps(result, ensure_ascii=False))
+        else:
+            typer.echo(f"--- {result['slug']} ---")
+            for k, v in result["frontmatter"].items():
+                typer.echo(f"{k}: {v}")
+            typer.echo("")
+            typer.echo(result["body"])
+
+    @capture_app.command("set-status")
+    def set_status_cmd(
+        ref: str = typer.Argument(...),
+        status: str = typer.Argument(..., help="draft | reviewed | archived"),
+        root: Path = typer.Option(Path("."), "--root", "-r"),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        try:
+            result = _do_set_status(root, ref, status)
+        except PKMError as e:
+            if json_out:
+                typer.echo(json.dumps({"ok": False, "error": e.to_dict()}, ensure_ascii=False))
+            else:
+                typer.echo(f"Error [{e.code}]: {e.message}", err=True)
+            raise typer.Exit(code=1) from None
+        if json_out:
+            typer.echo(json.dumps(result, ensure_ascii=False))
+        else:
+            typer.echo(f"{result['id']}: status → {status}")
+
+    @capture_app.command("rm")
+    def rm_cmd(
+        ref: str = typer.Argument(...),
+        root: Path = typer.Option(Path("."), "--root", "-r"),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        try:
+            result = _do_rm(root, ref)
+        except PKMError as e:
+            if json_out:
+                typer.echo(json.dumps({"ok": False, "error": e.to_dict()}, ensure_ascii=False))
+            else:
+                typer.echo(f"Error [{e.code}]: {e.message}", err=True)
+            raise typer.Exit(code=1) from None
+        if json_out:
+            typer.echo(json.dumps(result, ensure_ascii=False))
+        else:
+            typer.echo(f"removed {result['id']}")

@@ -31,6 +31,9 @@ _FILES_FROM_TEMPLATES: list[tuple[str, str]] = [
     (".pkm/config.toml", "config.toml.template"),
     (".claude/settings.json", "settings.json.template"),
     (".gitignore", "gitignore.template"),
+    (".claude/commands/collect.md", ".claude/commands/collect.md"),
+    (".claude/commands/research.md", ".claude/commands/research.md"),
+    (".claude/commands/review-captures.md", ".claude/commands/review-captures.md"),
 ]
 
 

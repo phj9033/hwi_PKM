@@ -25,6 +25,9 @@ def _expected_paths(root: Path) -> list[Path]:
         root / ".pkm" / "config.toml",
         root / ".claude" / "settings.json",
         root / ".claude" / "commands",
+        root / ".claude" / "commands" / "collect.md",
+        root / ".claude" / "commands" / "research.md",
+        root / ".claude" / "commands" / "review-captures.md",
         root / "SCHEMA.md",
         root / ".gitignore",
     ]

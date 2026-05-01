@@ -23,13 +23,34 @@ data/
 └── writing/              # AI synthesis workspace
 ```
 
-## 3. Frontmatter (M1 placeholder — full schemas in M4)
+## 3. Frontmatter
 
-Every markdown file under `data/` carries YAML frontmatter. The full per-bucket schemas land in M4 (`pkm lint`). For now, treat any frontmatter as opaque metadata.
+Two schemas land in M2. Wiki and writing schemas land in M4–M5.
+
+### Capture (`data/raw/captures/*.md`)
+- Required: `title`, `slug`, `created_at`, `status` (`draft|reviewed|archived`), `source_type` (`url|text|research`), `lang` (`ko|en|mixed`).
+- Optional: `source_url`, `fetched_at`, `tags`, `summary`.
+
+### Chunk README (`data/raw/chunks/<topic>/README.md`)
+- Required: `topic`, `created_at`, `status` (`collecting|curating|ready`), `lang`, `sources` (list).
+- Optional: `description`, `tags`.
 
 ## 4. Workflows
 
-(Empty in M1. Populated as commands land in M2–M6.)
+### Collect
+- Input: a URL or pasted text.
+- `pkm capture create --slug <s> --title "<t>" --url <u?> --status draft` (stdin = body).
+- Result: a draft capture in `data/raw/captures/`.
+
+### Research
+- Input: a topic.
+- Multiple WebSearch+WebFetch → `pkm capture create` per source. Bundle into `pkm chunks new <topic>` + `pkm chunks add` if it's a multi-source dive.
+
+### Review captures
+- `pkm capture list --status draft --json` → for each, `set-status reviewed` or `rm`.
+
+### Chunk curation
+- `pkm chunks new <topic>` → `pkm chunks add <topic> <file>...` → `pkm chunks set-status <topic> ready` once you've finished gathering.
 
 ## 5. CLI Reference
 

@@ -51,6 +51,8 @@ def _register_all() -> None:
 
     init_cmd.register(app)
     doctor_cmd.register(app)
+    from pkm.commands import capture as capture_cmd
+    capture_cmd.register(app)
 
 
 _register_all()

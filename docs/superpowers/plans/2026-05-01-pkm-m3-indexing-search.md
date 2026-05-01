@@ -1828,6 +1828,19 @@ def _content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _json_default(obj):
+    """Serialize types PyYAML may produce that json.dumps can't handle natively.
+
+    YAML's ISO-8601 strings (e.g. `created_at: 2026-05-01T00:00:00+00:00`) are
+    auto-converted to `datetime` objects on load — passing them through
+    `json.dumps` without `default=` raises TypeError.
+    """
+    from datetime import date, datetime
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def _vec_opted_in(root: Path) -> bool:
     cfg = root / ".pkm" / "config.toml"
     if not cfg.exists():
@@ -1886,7 +1899,7 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path,
         (
             rel, bucket,
             fm.get("title"), fm.get("lang"), fm.get("status"), fm.get("source_url"),
-            json.dumps(fm, ensure_ascii=False) if fm else None,
+            json.dumps(fm, ensure_ascii=False, default=_json_default) if fm else None,
             chash,
         ),
     )
@@ -2014,7 +2027,11 @@ def register(app: typer.Typer) -> None:
 
 
 def _bucket_for(root: Path, abs_path: Path) -> str | None:
-    rel = abs_path.relative_to(root) if abs_path.is_absolute() else abs_path
+    try:
+        rel = abs_path.relative_to(root) if abs_path.is_absolute() else abs_path
+    except ValueError:
+        # abs_path is outside root → not a known bucket
+        return None
     rel_str = str(rel)
     for name, prefix in _BUCKETS.items():
         if rel_str.startswith(prefix + "/") or rel_str == prefix:

@@ -2156,6 +2156,7 @@ from pathlib import Path
 
 import typer
 
+from pkm.errors import PKMError
 from pkm.search import pipeline
 
 
@@ -2174,7 +2175,16 @@ def register(app: typer.Typer) -> None:
         root: Path = typer.Option(Path("."), "--root", "-r"),
     ) -> None:
         """Search across the indexed corpus."""
-        out = pipeline.search(root, query, scope=scope, n=n, explain=explain)
+        # CliRunner invokes the command without going through pkm.cli.main(),
+        # so PKMError must be caught at the command level for the error to
+        # become observable to tests (and for JSON output downstream).
+        try:
+            out = pipeline.search(root, query, scope=scope, n=n, explain=explain)
+        except PKMError as e:
+            typer.echo(f"Error [{e.code}]: {e.message}")
+            if e.hint:
+                typer.echo(f"  hint: {e.hint}")
+            raise typer.Exit(1) from None
         if json_out:
             typer.echo(json.dumps(out, ensure_ascii=False))
         else:

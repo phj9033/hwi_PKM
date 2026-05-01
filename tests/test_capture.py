@@ -76,7 +76,11 @@ def test_create_json_output(tmp_path: Path):
         input="b",
     )
     assert res.exit_code == 0
-    payload = json.loads(res.output)
+    # Take only the first line: post_mutation may emit a "not a git repo"
+    # warning on stderr which CliRunner mixes into res.output until M3.5.3
+    # wires git_init into `pkm init`.
+    json_line = res.output.splitlines()[0]
+    payload = json.loads(json_line)
     assert payload["ok"] is True
     assert payload["id"].endswith("-baz")
     assert "raw/captures" in payload["path"]

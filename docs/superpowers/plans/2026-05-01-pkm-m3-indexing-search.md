@@ -1057,6 +1057,27 @@ class Hit:
     chunk_text: str
 
 
+def _build_fts_query(query: str) -> str:
+    """Convert a user query string into an FTS5 trigram-compatible OR query.
+
+    FTS5 trigram needs ≥3 codepoints per token. Short tokens (e.g. 2-char CJK
+    words like '토큰') are wrapped as a phrase with a leading space — `'" 토큰"'`
+    — which matches the indexed ` 토큰` trigram at word boundaries.
+
+    All tokens are joined with OR so a multi-word query hits any document
+    that contains at least one of the terms (matches typical search UX, not
+    FTS5's default implicit AND).
+    """
+    tokens = query.split()
+    fts_tokens: list[str] = []
+    for tok in tokens:
+        if len(tok) < 3:
+            fts_tokens.append(f'" {tok}"')
+        else:
+            fts_tokens.append(tok)
+    return " OR ".join(fts_tokens)
+
+
 def query_bm25(conn: sqlite3.Connection, query: str, scope: str = "wiki",
                top: int = 50) -> list[Hit]:
     if not query.strip():
@@ -1065,6 +1086,7 @@ def query_bm25(conn: sqlite3.Connection, query: str, scope: str = "wiki",
     if buckets is None:
         raise ValueError(f"unknown scope: {scope!r}")
     placeholders = ",".join("?" for _ in buckets)
+    fts_query = _build_fts_query(query)
     sql = f"""
         SELECT c.id AS chunk_id, c.doc_id AS doc_id, d.path AS path,
                d.bucket AS bucket, c.text AS text,
@@ -1077,7 +1099,7 @@ def query_bm25(conn: sqlite3.Connection, query: str, scope: str = "wiki",
         ORDER BY bm25(chunks_fts) ASC
         LIMIT ?
     """
-    params = (query, *buckets, top)
+    params = (fts_query, *buckets, top)
     rows = conn.execute(sql, params).fetchall()
     # bm25() in FTS5 is "smaller is better"; flip sign so higher = better
     # downstream. Keep as a positive-ish score for RRF (rank-based) ranking is

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>{{ title }} — pkm dashboard</title>
+<link rel="stylesheet" href="{{ '../' * depth }}assets/style.css">
+{% block head_extra %}{% endblock %}
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ '../' * depth }}index.html">hwi_PKM</a>
+  <nav>
+    <a href="{{ '../' * depth }}captures.html">captures</a>
+    <a href="{{ '../' * depth }}chunks.html">chunks</a>
+    <a href="{{ '../' * depth }}wiki.html">wiki</a>
+    <a href="{{ '../' * depth }}writing.html">writing</a>
+    <a href="{{ '../' * depth }}search.html">search</a>
+    <a href="{{ '../' * depth }}help.html">help</a>
+    <a href="{{ '../' * depth }}status.html">status</a>
+  </nav>
+  <button id="theme-toggle" type="button" aria-label="Toggle theme">◐</button>
+</header>
+<main>{% block content %}{% endblock %}</main>
+<footer><span>generated {{ generated_at }}</span></footer>
+<script>
+  (function(){
+    var k = "pkm-theme";
+    var saved = localStorage.getItem(k);
+    if (saved) document.documentElement.dataset.theme = saved;
+    document.getElementById("theme-toggle").addEventListener("click", function(){
+      var cur = document.documentElement.dataset.theme || "auto";
+      var next = cur === "dark" ? "light" : (cur === "light" ? "auto" : "dark");
+      if (next === "auto") { localStorage.removeItem(k); delete document.documentElement.dataset.theme; }
+      else { localStorage.setItem(k, next); document.documentElement.dataset.theme = next; }
+    });
+  })();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

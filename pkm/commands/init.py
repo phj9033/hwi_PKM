@@ -35,6 +35,8 @@ _FILES_FROM_TEMPLATES: list[tuple[str, str]] = [
     (".claude/commands/collect.md", ".claude/commands/collect.md"),
     (".claude/commands/research.md", ".claude/commands/research.md"),
     (".claude/commands/review-captures.md", ".claude/commands/review-captures.md"),
+    (".claude/commands/promote.md", ".claude/commands/promote.md"),
+    (".claude/commands/lint.md", ".claude/commands/lint.md"),
 ]
 
 

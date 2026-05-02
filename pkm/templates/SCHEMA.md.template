@@ -25,7 +25,7 @@ data/
 
 ## 3. Frontmatter
 
-Two schemas land in M2. Wiki and writing schemas land in M4–M5.
+Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 
 ### Capture (`data/raw/captures/*.md`)
 - Required: `title`, `slug`, `created_at`, `status` (`draft|reviewed|archived`), `source_type` (`url|text|research`), `lang` (`ko|en|mixed`).
@@ -34,6 +34,14 @@ Two schemas land in M2. Wiki and writing schemas land in M4–M5.
 ### Chunk README (`data/raw/chunks/<topic>/README.md`)
 - Required: `topic`, `created_at`, `status` (`collecting|curating|ready`), `lang`, `sources` (list).
 - Optional: `description`, `tags`.
+
+### Wiki (`data/wiki/<bucket>/*.md`)
+- Required: `title`, `slug`, `created_at`, `status` (`stub|active|deprecated`), `lang`.
+- Optional: `promoted_from` (source ref when created via `pkm promote`), `tags`, `aliases`.
+
+### Writing (`data/writing/*.md`)
+- Required: `title`, `slug`, `created_at`, `status` (`draft|final|promoted|abandoned`), `lang`, `derived_from` (list of wiki/capture refs).
+- Optional: `tags`, `summary`.
 
 ## 4. Workflows
 
@@ -51,6 +59,21 @@ Two schemas land in M2. Wiki and writing schemas land in M4–M5.
 
 ### Chunk curation
 - `pkm chunks new <topic>` → `pkm chunks add <topic> <file>...` → `pkm chunks set-status <topic> ready` once you've finished gathering.
+
+### Promote
+- Input: a reviewed capture.
+- `pkm promote <ref> --to concepts|entities|notes|reports [--slug NEW] [--keep-source]`.
+- Result: a stub wiki page at `data/wiki/<bucket>/<slug>.md` with `promoted_from: <source>`. Source flips to `archived` (unless `--keep-source`).
+
+### Wiki edit (escape valve)
+- `data/wiki/**` is deny-write under strict mode (`.claude/settings.json`). The only authorized mutation path is `pkm wiki edit`.
+- `pkm wiki edit <wiki-ref> --replace < new_full_file.md` — replace whole file.
+- `pkm wiki edit <wiki-ref> --patch < unified.diff` — apply a unified diff via `git apply`.
+- Both modes validate frontmatter + wikilinks before writing.
+
+### Lint
+- `pkm lint --json` for the full report.
+- `pkm lint --fix` to apply the 2 spec-marked auto-fixes.
 
 ## 5. CLI Reference
 

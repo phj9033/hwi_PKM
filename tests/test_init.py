@@ -28,6 +28,8 @@ def _expected_paths(root: Path) -> list[Path]:
         root / ".claude" / "commands" / "collect.md",
         root / ".claude" / "commands" / "research.md",
         root / ".claude" / "commands" / "review-captures.md",
+        root / ".claude" / "commands" / "promote.md",
+        root / ".claude" / "commands" / "lint.md",
         root / "SCHEMA.md",
         root / ".gitignore",
     ]

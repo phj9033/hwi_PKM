@@ -115,3 +115,123 @@ def validate_chunk(fm: dict) -> None:
     _check_enum(fm, "lang", _CHUNK_LANGS, "chunk")
     if not isinstance(fm.get("sources"), list):
         raise PKMValidationError("chunk frontmatter `sources` must be a list")
+
+
+# --- wiki ---
+
+_WIKI_REQUIRED = ("title", "slug", "bucket", "created_at", "updated_at", "status", "lang", "tags")
+_WIKI_BUCKETS = ("concepts", "entities", "notes", "reports")
+_WIKI_STATUSES = ("stub", "active", "deprecated")
+_WIKI_LANGS = ("ko", "en", "mixed")
+
+
+def wiki_defaults(
+    *,
+    slug: str,
+    title: str,
+    bucket: str,
+    status: str = "stub",
+    lang: str = "ko",
+    tags: list[str] | None = None,
+    promoted_from: str | None = None,
+    derived_from: list[str] | None = None,
+    related: list[str] | None = None,
+) -> dict:
+    """Build a frontmatter dict for a new wiki page."""
+    now = _now_iso()
+    fm: dict = {
+        "title": title,
+        "slug": slug,
+        "bucket": bucket,
+        "created_at": now,
+        "updated_at": now,
+        "status": status,
+        "lang": lang,
+        "tags": list(tags) if tags else [],
+    }
+    if promoted_from:
+        fm["promoted_from"] = promoted_from
+    if derived_from:
+        fm["derived_from"] = list(derived_from)
+    if related:
+        fm["related"] = list(related)
+    return fm
+
+
+def validate_wiki(fm: dict) -> None:
+    _check_required(fm, _WIKI_REQUIRED, "wiki")
+    _check_enum(fm, "bucket", _WIKI_BUCKETS, "wiki")
+    _check_enum(fm, "status", _WIKI_STATUSES, "wiki")
+    _check_enum(fm, "lang", _WIKI_LANGS, "wiki")
+    if not isinstance(fm.get("tags"), list):
+        raise PKMValidationError("wiki frontmatter `tags` must be a list")
+
+
+# --- writing ---
+
+_WRITING_REQUIRED = ("title", "slug", "created_at", "updated_at", "status", "purpose", "derived_from", "lang", "tags")
+_WRITING_PURPOSES = ("guideline", "report", "summary", "essay")
+_WRITING_STATUSES = ("draft", "final", "promoted", "abandoned")
+_WRITING_LANGS = ("ko", "en", "mixed")
+
+
+def writing_defaults(
+    *,
+    slug: str,
+    title: str,
+    purpose: str,
+    derived_from: list[str],
+    status: str = "draft",
+    lang: str = "ko",
+    tags: list[str] | None = None,
+    search_seed: str | None = None,
+) -> dict:
+    """Build a frontmatter dict for a new writing artifact."""
+    now = _now_iso()
+    fm: dict = {
+        "title": title,
+        "slug": slug,
+        "created_at": now,
+        "updated_at": now,
+        "status": status,
+        "purpose": purpose,
+        "derived_from": list(derived_from),
+        "lang": lang,
+        "tags": list(tags) if tags else [],
+    }
+    if search_seed:
+        fm["search_seed"] = search_seed
+    return fm
+
+
+def validate_writing(fm: dict) -> None:
+    _check_required(fm, _WRITING_REQUIRED, "writing")
+    _check_enum(fm, "purpose", _WRITING_PURPOSES, "writing")
+    _check_enum(fm, "status", _WRITING_STATUSES, "writing")
+    _check_enum(fm, "lang", _WRITING_LANGS, "writing")
+    derived = fm.get("derived_from")
+    if not isinstance(derived, list) or not derived:
+        raise PKMValidationError(
+            "writing frontmatter `derived_from` must be a non-empty list",
+            hint="A writing artifact must trace back to at least one source.",
+        )
+
+
+# Public aliases — `pkm.lint.rules` consumes these to avoid importing
+# underscore-prefixed names. The underscore versions remain the internal
+# module-level reference for the validators above.
+CAPTURE_REQUIRED = _CAPTURE_REQUIRED
+CAPTURE_STATUSES = _CAPTURE_STATUSES
+CAPTURE_SOURCE_TYPES = _CAPTURE_SOURCE_TYPES
+CAPTURE_LANGS = _CAPTURE_LANGS
+CHUNK_REQUIRED = _CHUNK_REQUIRED
+CHUNK_STATUSES = _CHUNK_STATUSES
+CHUNK_LANGS = _CHUNK_LANGS
+WIKI_REQUIRED = _WIKI_REQUIRED
+WIKI_BUCKETS = _WIKI_BUCKETS
+WIKI_STATUSES = _WIKI_STATUSES
+WIKI_LANGS = _WIKI_LANGS
+WRITING_REQUIRED = _WRITING_REQUIRED
+WRITING_PURPOSES = _WRITING_PURPOSES
+WRITING_STATUSES = _WRITING_STATUSES
+WRITING_LANGS = _WRITING_LANGS

@@ -189,15 +189,16 @@ def test_promote_collision_existing_wiki_path(repo_with_capture: Path):
     assert payload["error"]["code"] == "STATE_ERROR"
 
 
-def test_promote_writing_input_returns_carve_error(tmp_path: Path):
+def test_promote_writing_missing_derived_from_fails(tmp_path: Path):
+    """Writing with missing derived_from path should fail with VALIDATION_ERROR (M5.11)."""
     runner.invoke(app, ["init", "--root", str(tmp_path), "-f"])
-    # Manually drop a writing file (write new is M5)
+    # Writing file references a derived_from path that does not exist on disk
     w = tmp_path / "data" / "writing" / "x.md"
     w.write_text(
         "---\ntitle: t\nslug: x\ncreated_at: 2026-05-01T10:00:00+09:00\n"
         "updated_at: 2026-05-01T10:00:00+09:00\n"
         "status: final\npurpose: report\n"
-        "derived_from: [data/wiki/concepts/y.md]\n"
+        "derived_from:\n- data/wiki/concepts/y.md\n"
         "lang: ko\ntags: []\n---\nbody\n",
         encoding="utf-8",
     )
@@ -210,7 +211,7 @@ def test_promote_writing_input_returns_carve_error(tmp_path: Path):
     )
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
-    assert payload["error"]["code"] == "PROMOTE_FROM_WRITING_NOT_YET"
+    assert payload["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_promote_chunk_input_rejected(tmp_path: Path):

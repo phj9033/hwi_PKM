@@ -1,7 +1,6 @@
-"""`pkm promote <ref> --to <bucket>` — capture → wiki.
+"""`pkm promote <ref> --to <bucket>` — capture or writing → wiki.
 
-M4 handles the capture branch only. Writing branch returns
-PROMOTE_FROM_WRITING_NOT_YET (M5 fills in).
+M4 implemented the capture branch. M5.11 adds the writing branch.
 
 Spec reference: §6.3 (gate), §6.6 (auto side-effects).
 """
@@ -17,7 +16,7 @@ import typer
 from pkm._mutations import post_mutation
 from pkm.errors import (
     PKMError,
-    PKMPromoteFromWritingNotYet,
+    PKMNotFoundError,
     PKMStateError,
     PKMStatusError,
     PKMValidationError,
@@ -54,11 +53,13 @@ def _do_promote(
             hint=f"Valid buckets: {', '.join(WIKI_BUCKETS)}.",
         )
 
-    # Reject writing input early (M5 carve-out)
+    # Writing → wiki branch (M5.11)
     if ref.startswith("data/writing/") or ref.startswith("writing/"):
-        raise PKMPromoteFromWritingNotYet(
-            "promoting from data/writing/ lands in M5 alongside `pkm write new`",
-            hint="For now, promote a capture instead, or wait for M5.",
+        return _promote_from_writing(
+            root, ref,
+            bucket=bucket,
+            new_slug=new_slug,
+            keep_source=keep_source,
         )
     # Reject chunk dirs explicitly (spec §6.3 says chunks → AI synthesis route)
     if ref.startswith("data/raw/chunks/") or ref.startswith("chunks/"):
@@ -125,6 +126,94 @@ def _do_promote(
     }
 
 
+def _promote_from_writing(
+    root: Path,
+    ref: str,
+    *,
+    bucket: str,
+    new_slug: str | None,
+    keep_source: bool,
+) -> dict:
+    if bucket not in WIKI_BUCKETS:
+        raise PKMValidationError(
+            f"unknown bucket {bucket!r}",
+            hint=f"Valid buckets: {', '.join(WIKI_BUCKETS)}.",
+        )
+
+    from pkm.store.writing_paths import resolve_writing
+    src = resolve_writing(root, ref)
+    if not src.exists():
+        raise PKMNotFoundError(
+            f"writing not found: {ref}",
+            hint="`pkm write list` to see slugs.",
+        )
+
+    fm_src, body_src = parse(src.read_text(encoding="utf-8"))
+
+    if fm_src.get("status") != "final":
+        raise PKMStatusError(
+            f"writing status is {fm_src.get('status')!r}, must be 'final'",
+            hint=f"Run: pkm write set-status {fm_src.get('slug')} final",
+        )
+
+    derived = fm_src.get("derived_from") or []
+    missing = [p for p in derived if not (root / p).exists()]
+    if missing:
+        raise PKMValidationError(
+            f"derived_from references missing paths: {missing}",
+            hint="Fix derived_from in the writing source before promote.",
+        )
+
+    dst_slug = new_slug if new_slug is not None else fm_src["slug"]
+    dst = wiki_path(root, bucket, dst_slug)
+    if dst.exists():
+        raise PKMStateError(
+            f"wiki page already exists at {dst.relative_to(root)}",
+            hint="Pick a different --slug, or `pkm wiki edit` the existing page.",
+        )
+
+    fm_dst = wiki_defaults(
+        slug=dst_slug,
+        title=fm_src.get("title", dst_slug),
+        bucket=bucket,
+        status="stub",
+        lang=fm_src.get("lang", "ko"),
+        tags=fm_src.get("tags") or [],
+        promoted_from=str(src.relative_to(root)),
+    )
+    # carry derived_from through to the wiki page
+    if derived:
+        fm_dst["derived_from"] = derived
+    validate_wiki(fm_dst)
+
+    atomic_write(dst, serialize(fm_dst, body_src))
+
+    paths = [str(dst.relative_to(root))]
+    if not keep_source:
+        fm_src["status"] = "promoted"
+        atomic_write(src, serialize(fm_src, body_src))
+        paths.append(str(src.relative_to(root)))
+
+    sha = post_mutation(
+        root,
+        LogEvent(
+            type="writing.promote",
+            ref=fm_src.get("slug", dst_slug),
+            message=f"writing → {bucket}/{dst_slug}",
+        ),
+        paths=paths,
+    )
+    return {
+        "ok": True,
+        "wiki_path": dst.relative_to(root).as_posix(),
+        "wiki_slug": dst_slug,
+        "source_path": src.relative_to(root).as_posix(),
+        "source_kind": "writing",
+        "source_status_after": "promoted" if not keep_source else fm_src.get("status"),
+        "git_commit": sha,
+    }
+
+
 def register(app: typer.Typer) -> None:
     @app.command("promote")
     def promote_cmd(
@@ -141,7 +230,7 @@ def register(app: typer.Typer) -> None:
         root: Path = typer.Option(Path("."), "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
     ) -> None:
-        """Promote a reviewed capture into a wiki bucket."""
+        """Promote a capture or writing artifact into a wiki bucket."""
         try:
             result = _do_promote(root, ref=ref, bucket=to, new_slug=slug, keep_source=keep_source)
         except PKMError as e:
@@ -155,7 +244,9 @@ def register(app: typer.Typer) -> None:
         if json_out:
             typer.echo(json.dumps(result, ensure_ascii=False))
         else:
+            # capture branch has "source_archived"; writing branch has "source_status_after"
+            source_kept = keep_source
             typer.echo(
                 f"promoted {result['source_path']} → {result['wiki_path']}"
-                + (" (source kept)" if not result["source_archived"] else " (source archived)")
+                + (" (source kept)" if source_kept else " (source archived)")
             )

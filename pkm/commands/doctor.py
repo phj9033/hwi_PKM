@@ -129,6 +129,16 @@ def _check_git(root: Path) -> _Item:
     return _Item("git", "missing", "run: pkm init  (or git init)")
 
 
+def _check_ai_cli() -> _Item:
+    """Check for AI CLI on PATH. Reports detected: <name> or optional: missing."""
+    from pkm.llm_bridge import detect_ai_cli
+
+    detected = detect_ai_cli()
+    if detected:
+        return _Item("ai_cli", "ok", f"detected: {detected.name}")
+    return _Item("ai_cli", "optional", "no ai cli on PATH")
+
+
 def _check_model_cache() -> _Item:
     from pkm.store.embedder import model_cache_root
 
@@ -196,6 +206,7 @@ def register(app: typer.Typer) -> None:
         items.append(_check_index_db(root))
         items.append(_check_model_cache())
         items.append(_check_git(root))
+        items.append(_check_ai_cli())
         system = _system_info()
 
         any_bad = any(it.status in ("missing", "error") for it in items)

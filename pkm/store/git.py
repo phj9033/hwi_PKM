@@ -10,14 +10,16 @@ Thin wrapper over the `git` CLI via `subprocess.run`. Three functions:
 
 The caller decides what to do with `None`. Master spec §6.6 step 4.
 """
+
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
 
-def _run(args: list[str], cwd: Path, *, check: bool = True,
-         capture: bool = True) -> subprocess.CompletedProcess[str]:
+def _run(
+    args: list[str], cwd: Path, *, check: bool = True, capture: bool = True
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         args,
         cwd=cwd,
@@ -34,7 +36,8 @@ def is_git_repo(root: Path) -> bool:
     try:
         out = _run(
             ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=root, check=False,
+            cwd=root,
+            check=False,
         )
     except FileNotFoundError:
         # `git` not installed

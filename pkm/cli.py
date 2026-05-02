@@ -7,6 +7,7 @@ Run `pkm --help` to see the full command tree.
 
 Spec reference: §3.2 (command surface).
 """
+
 from __future__ import annotations
 
 import sys
@@ -52,26 +53,36 @@ def _register_all() -> None:
     init_cmd.register(app)
     doctor_cmd.register(app)
     from pkm.commands import capture as capture_cmd
+
     capture_cmd.register(app)
     from pkm.commands import chunks as chunks_cmd
+
     chunks_cmd.register(app)
     from pkm.commands import index as index_cmd
     from pkm.commands import log as log_cmd
+
     log_cmd.register(app)
     index_cmd.register(app)
     from pkm.commands import reindex as reindex_cmd
+
     reindex_cmd.register(app)
     from pkm.commands import search as search_cmd
+
     search_cmd.register(app)
     from pkm.commands import extract as extract_cmd
+
     extract_cmd.register(app)
     from pkm.commands import wiki as wiki_cmd
+
     wiki_cmd.register(app)
     from pkm.commands import promote as promote_cmd
+
     promote_cmd.register(app)
     from pkm.commands import demote as demote_cmd
+
     demote_cmd.register(app)
     from pkm.commands import lint as lint_cmd
+
     lint_cmd.register(app)
 
 

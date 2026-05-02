@@ -1,4 +1,5 @@
 """Tests for `pkm reindex db`."""
+
 from __future__ import annotations
 
 import json
@@ -47,19 +48,17 @@ def test_reindex_full_creates_db_and_rows(tmp_path: Path):
         assert conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 2
         assert conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] >= 2
         # wiki doc has a vec row; capture (default config) does not
-        wiki_id = conn.execute(
-            "SELECT id FROM documents WHERE bucket='wiki'"
-        ).fetchone()[0]
-        cap_id = conn.execute(
-            "SELECT id FROM documents WHERE bucket='captures'"
-        ).fetchone()[0]
+        wiki_id = conn.execute("SELECT id FROM documents WHERE bucket='wiki'").fetchone()[0]
+        cap_id = conn.execute("SELECT id FROM documents WHERE bucket='captures'").fetchone()[0]
         wiki_vec = conn.execute(
             "SELECT COUNT(*) FROM chunks_vec WHERE chunk_id IN "
-            "(SELECT id FROM chunks WHERE doc_id=?)", (wiki_id,)
+            "(SELECT id FROM chunks WHERE doc_id=?)",
+            (wiki_id,),
         ).fetchone()[0]
         cap_vec = conn.execute(
             "SELECT COUNT(*) FROM chunks_vec WHERE chunk_id IN "
-            "(SELECT id FROM chunks WHERE doc_id=?)", (cap_id,)
+            "(SELECT id FROM chunks WHERE doc_id=?)",
+            (cap_id,),
         ).fetchone()[0]
         assert wiki_vec >= 1
         assert cap_vec == 0
@@ -91,8 +90,9 @@ def test_reindex_single_path(tmp_path: Path):
 def test_reindex_scope_wiki_only(tmp_path: Path):
     _scaffold(tmp_path)
     runner = CliRunner()
-    res = runner.invoke(app, ["reindex", "db", "--scope", "wiki",
-                              "--root", str(tmp_path), "--full", "--json"])
+    res = runner.invoke(
+        app, ["reindex", "db", "--scope", "wiki", "--root", str(tmp_path), "--full", "--json"]
+    )
     payload = json.loads(res.output)
     assert payload["ok"] is True
     assert payload["stats"]["documents_indexed"] == 1  # only wiki

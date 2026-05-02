@@ -1,4 +1,5 @@
 """Tests for pkm.store.frontmatter_schemas."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -14,6 +15,7 @@ from pkm.store.frontmatter_schemas import (
 )
 
 # --- capture ----
+
 
 def test_capture_defaults_minimal():
     fm = capture_defaults(slug="2026-05-01-foo", title="foo")
@@ -59,6 +61,7 @@ def test_capture_validate_lang_enum():
 
 
 # --- chunk ----
+
 
 def test_chunk_defaults_minimal():
     fm = chunk_defaults(topic="oauth-deep-dive")

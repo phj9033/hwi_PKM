@@ -1,4 +1,5 @@
 """Tests for pkm.commands.capture (M2.5: create subcommand)."""
+
 from __future__ import annotations
 
 import json
@@ -20,8 +21,7 @@ def test_create_from_stdin(tmp_path: Path):
     _init(tmp_path)
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "foo", "--title", "Foo"],
+        ["capture", "create", "--root", str(tmp_path), "--slug", "foo", "--title", "Foo"],
         input="body here\n",
     )
     assert res.exit_code == 0, res.output
@@ -39,9 +39,20 @@ def test_create_with_url_and_status(tmp_path: Path):
     _init(tmp_path)
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "bar", "--title", "Bar",
-         "--url", "https://x", "--status", "reviewed"],
+        [
+            "capture",
+            "create",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "bar",
+            "--title",
+            "Bar",
+            "--url",
+            "https://x",
+            "--status",
+            "reviewed",
+        ],
         input="ignored",
     )
     assert res.exit_code == 0, res.output
@@ -58,8 +69,18 @@ def test_create_from_file(tmp_path: Path):
     src.write_text("from-file body", encoding="utf-8")
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "qux", "--title", "Qux", "--from-file", str(src)],
+        [
+            "capture",
+            "create",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "qux",
+            "--title",
+            "Qux",
+            "--from-file",
+            str(src),
+        ],
     )
     assert res.exit_code == 0
     p = next((tmp_path / "data/raw/captures").glob("*-qux.md"))
@@ -71,8 +92,7 @@ def test_create_json_output(tmp_path: Path):
     _init(tmp_path)
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "baz", "--title", "Baz", "--json"],
+        ["capture", "create", "--root", str(tmp_path), "--slug", "baz", "--title", "Baz", "--json"],
         input="b",
     )
     assert res.exit_code == 0
@@ -90,8 +110,7 @@ def test_create_appends_log_and_rebuilds_index(tmp_path: Path):
     _init(tmp_path)
     runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "logme", "--title", "Logme"],
+        ["capture", "create", "--root", str(tmp_path), "--slug", "logme", "--title", "Logme"],
         input="b",
     )
     log = (tmp_path / "data/log.md").read_text(encoding="utf-8")
@@ -106,8 +125,18 @@ def test_create_invalid_status_clean_error(tmp_path: Path):
     _init(tmp_path)
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "x", "--title", "X", "--status", "weird"],
+        [
+            "capture",
+            "create",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "x",
+            "--title",
+            "X",
+            "--status",
+            "weird",
+        ],
         input="b",
     )
     assert res.exit_code != 0
@@ -116,17 +145,35 @@ def test_create_invalid_status_clean_error(tmp_path: Path):
 
 def test_create_refuses_existing_slug(tmp_path: Path):
     _init(tmp_path)
-    runner.invoke(app, ["capture", "create", "--root", str(tmp_path),
-                        "--slug", "dup", "--title", "Dup"], input="x")
-    res2 = runner.invoke(app, ["capture", "create", "--root", str(tmp_path),
-                               "--slug", "dup", "--title", "Dup2"], input="y")
+    runner.invoke(
+        app,
+        ["capture", "create", "--root", str(tmp_path), "--slug", "dup", "--title", "Dup"],
+        input="x",
+    )
+    res2 = runner.invoke(
+        app,
+        ["capture", "create", "--root", str(tmp_path), "--slug", "dup", "--title", "Dup2"],
+        input="y",
+    )
     assert res2.exit_code != 0
     assert "exists" in res2.output.lower() or "STATE_ERROR" in res2.output
 
 
 def _create(tmp_path, slug, title="t", status="draft", lang="ko", url=None):
-    args = ["capture", "create", "--root", str(tmp_path),
-            "--slug", slug, "--title", title, "--status", status, "--lang", lang]
+    args = [
+        "capture",
+        "create",
+        "--root",
+        str(tmp_path),
+        "--slug",
+        slug,
+        "--title",
+        title,
+        "--status",
+        status,
+        "--lang",
+        lang,
+    ]
     if url:
         args += ["--url", url]
     return runner.invoke(app, args, input="body")
@@ -149,8 +196,9 @@ def test_list_filter_status(tmp_path):
     _init(tmp_path)
     _create(tmp_path, "a", status="draft")
     _create(tmp_path, "b", status="reviewed")
-    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path),
-                              "--status", "reviewed", "--json"])
+    res = runner.invoke(
+        app, ["capture", "list", "--root", str(tmp_path), "--status", "reviewed", "--json"]
+    )
     payload = json.loads(res.output)
     assert all(it["status"] == "reviewed" for it in payload["items"])
     assert any(it["slug"].endswith("-b") for it in payload["items"])
@@ -160,8 +208,7 @@ def test_list_filter_lang(tmp_path):
     _init(tmp_path)
     _create(tmp_path, "a", lang="ko")
     _create(tmp_path, "b", lang="en")
-    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path),
-                              "--lang", "en", "--json"])
+    res = runner.invoke(app, ["capture", "list", "--root", str(tmp_path), "--lang", "en", "--json"])
     payload = json.loads(res.output)
     assert all(it["lang"] == "en" for it in payload["items"])
 
@@ -194,19 +241,18 @@ def test_show_not_found(tmp_path):
 def test_set_status_changes_frontmatter(tmp_path):
     _init(tmp_path)
     _create(tmp_path, "promoteme", status="draft")
-    res = runner.invoke(app, ["capture", "set-status", "promoteme", "reviewed",
-                              "--root", str(tmp_path)])
+    res = runner.invoke(
+        app, ["capture", "set-status", "promoteme", "reviewed", "--root", str(tmp_path)]
+    )
     assert res.exit_code == 0
-    res2 = runner.invoke(app, ["capture", "show", "promoteme",
-                               "--root", str(tmp_path), "--json"])
+    res2 = runner.invoke(app, ["capture", "show", "promoteme", "--root", str(tmp_path), "--json"])
     assert json.loads(res2.output)["frontmatter"]["status"] == "reviewed"
 
 
 def test_set_status_invalid_enum(tmp_path):
     _init(tmp_path)
     _create(tmp_path, "x")
-    res = runner.invoke(app, ["capture", "set-status", "x", "weird",
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["capture", "set-status", "x", "weird", "--root", str(tmp_path)])
     assert res.exit_code != 0
 
 
@@ -225,8 +271,7 @@ def test_capture_create_json_has_git_commit(tmp_path: Path):
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     res = runner.invoke(
         app,
-        ["capture", "create", "--slug", "foo", "--title", "Foo",
-         "--root", str(tmp_path), "--json"],
+        ["capture", "create", "--slug", "foo", "--title", "Foo", "--root", str(tmp_path), "--json"],
         input="body of foo\n",
     )
     payload = json.loads(res.output.splitlines()[-1])
@@ -240,14 +285,12 @@ def test_capture_set_status_json_has_git_commit(tmp_path: Path):
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     runner.invoke(
         app,
-        ["capture", "create", "--slug", "foo", "--title", "Foo",
-         "--root", str(tmp_path), "--json"],
+        ["capture", "create", "--slug", "foo", "--title", "Foo", "--root", str(tmp_path), "--json"],
         input="body\n",
     )
     res = runner.invoke(
         app,
-        ["capture", "set-status", "foo", "reviewed",
-         "--root", str(tmp_path), "--json"],
+        ["capture", "set-status", "foo", "reviewed", "--root", str(tmp_path), "--json"],
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None
@@ -258,14 +301,12 @@ def test_capture_rm_json_has_git_commit(tmp_path: Path):
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     runner.invoke(
         app,
-        ["capture", "create", "--slug", "foo", "--title", "Foo",
-         "--root", str(tmp_path), "--json"],
+        ["capture", "create", "--slug", "foo", "--title", "Foo", "--root", str(tmp_path), "--json"],
         input="body\n",
     )
     res = runner.invoke(
         app,
-        ["capture", "rm", "foo",
-         "--root", str(tmp_path), "--json"],
+        ["capture", "rm", "foo", "--root", str(tmp_path), "--json"],
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None  # still a commit (deletion + log)
@@ -273,13 +314,22 @@ def test_capture_rm_json_has_git_commit(tmp_path: Path):
 
 # --- date-prefix dedup (M3.5 cleanup) ---
 
+
 def test_create_with_date_prefixed_slug_does_not_double_prefix(tmp_path: Path):
     """Passing `--slug 2026-05-01-foo` should NOT produce `2026-05-01-2026-05-01-foo`."""
     _init(tmp_path)
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "2026-05-01-foo", "--title", "Foo"],
+        [
+            "capture",
+            "create",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "2026-05-01-foo",
+            "--title",
+            "Foo",
+        ],
         input="body\n",
     )
     assert res.exit_code == 0, res.output
@@ -291,11 +341,11 @@ def test_create_with_date_prefixed_slug_does_not_double_prefix(tmp_path: Path):
 def test_create_with_bare_slug_still_prefixes(tmp_path: Path):
     """Passing `--slug foo` (no date) should still auto-prefix today's date."""
     import re
+
     _init(tmp_path)
     res = runner.invoke(
         app,
-        ["capture", "create", "--root", str(tmp_path),
-         "--slug", "foo", "--title", "Foo"],
+        ["capture", "create", "--root", str(tmp_path), "--slug", "foo", "--title", "Foo"],
         input="body\n",
     )
     assert res.exit_code == 0, res.output

@@ -7,6 +7,7 @@ bucket, chunk_text). The original per-list scores are intentionally NOT
 re-attached here — `pipeline.search()` does that lookup so we don't lose
 either signal in the fused output.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -26,13 +27,15 @@ def rrf_fuse(*ranked_lists: Sequence[Hit], k: int = 60) -> list[Hit]:
     fused: list[Hit] = []
     for chunk_id, score in scored.items():
         base = first_seen[chunk_id]
-        fused.append(Hit(
-            chunk_id=base.chunk_id,
-            doc_id=base.doc_id,
-            path=base.path,
-            bucket=base.bucket,
-            score=score,
-            chunk_text=base.chunk_text,
-        ))
+        fused.append(
+            Hit(
+                chunk_id=base.chunk_id,
+                doc_id=base.doc_id,
+                path=base.path,
+                bucket=base.bucket,
+                score=score,
+                chunk_text=base.chunk_text,
+            )
+        )
     fused.sort(key=lambda h: h.score, reverse=True)
     return fused

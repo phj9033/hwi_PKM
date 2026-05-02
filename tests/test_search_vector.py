@@ -1,4 +1,5 @@
 """Tests for pkm.search.vector."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -5,6 +5,7 @@ CLI orchestrator (commands/lint.py) calls `collect_findings(root)`.
 
 Spec reference: §6.5.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -46,8 +47,8 @@ _HANGUL_RE = re.compile(r"[가-힣]")
 @dataclass(frozen=True)
 class LintFinding:
     code: str
-    severity: str   # "error" | "warning"
-    path: str       # repo-relative
+    severity: str  # "error" | "warning"
+    path: str  # repo-relative
     message: str
     field: str | None = None
     fixable: bool = False
@@ -56,9 +57,10 @@ class LintFinding:
 @dataclass
 class _Doc:
     """Pre-parsed snapshot row."""
+
     path: Path
     rel: str
-    kind: str       # "capture" | "chunk" | "wiki" | "writing"
+    kind: str  # "capture" | "chunk" | "wiki" | "writing"
     fm: dict
     body: str
     mtime: float
@@ -101,8 +103,15 @@ def _load_snapshot(root: Path) -> _Snapshot:
         except PKMValidationError as e:
             fm, body, err = {}, "", str(e)
         snap.docs.append(
-            _Doc(path=p, rel=rel, kind=kind, fm=fm, body=body,
-                 mtime=p.stat().st_mtime, parse_error=err)
+            _Doc(
+                path=p,
+                rel=rel,
+                kind=kind,
+                fm=fm,
+                body=body,
+                mtime=p.stat().st_mtime,
+                parse_error=err,
+            )
         )
     return snap
 
@@ -139,15 +148,25 @@ _ENUMS_BY_KIND = {
 def _missing_field(snap: _Snapshot) -> Iterator[LintFinding]:
     for d in snap.docs:
         if d.parse_error:
-            yield LintFinding("MISSING_FIELD", "error", d.rel,
-                              f"frontmatter unparsable: {d.parse_error}", fixable=False)
+            yield LintFinding(
+                "MISSING_FIELD",
+                "error",
+                d.rel,
+                f"frontmatter unparsable: {d.parse_error}",
+                fixable=False,
+            )
             continue
         for key in _REQUIRED_BY_KIND.get(d.kind, ()):
             if key not in d.fm:
                 fixable = key in ("created_at", "slug")
-                yield LintFinding("MISSING_FIELD", "error", d.rel,
-                                  f"required field {key!r} missing",
-                                  field=key, fixable=fixable)
+                yield LintFinding(
+                    "MISSING_FIELD",
+                    "error",
+                    d.rel,
+                    f"required field {key!r} missing",
+                    field=key,
+                    fixable=fixable,
+                )
 
 
 def _invalid_value(snap: _Snapshot) -> Iterator[LintFinding]:
@@ -155,8 +174,9 @@ def _invalid_value(snap: _Snapshot) -> Iterator[LintFinding]:
         for key, allowed in _ENUMS_BY_KIND.get(d.kind, []):
             val = d.fm.get(key)
             if val is not None and val not in allowed:
-                yield LintFinding("INVALID_VALUE", "error", d.rel,
-                                  f"{key}={val!r} not in {allowed}", field=key)
+                yield LintFinding(
+                    "INVALID_VALUE", "error", d.rel, f"{key}={val!r} not in {allowed}", field=key
+                )
 
 
 def _duplicate_slug(snap: _Snapshot) -> Iterator[LintFinding]:
@@ -174,7 +194,9 @@ def _duplicate_slug(snap: _Snapshot) -> Iterator[LintFinding]:
             if len(paths) > 1:
                 for p in paths:
                     yield LintFinding(
-                        "DUPLICATE_SLUG", "error", p,
+                        "DUPLICATE_SLUG",
+                        "error",
+                        p,
                         f"slug {slug!r} appears in {len(paths)} files: {', '.join(paths)}",
                     )
 
@@ -187,7 +209,9 @@ def _broken_wikilink(snap: _Snapshot) -> Iterator[LintFinding]:
         for m in _WIKILINK_RE.findall(d.body):
             if m not in known:
                 yield LintFinding(
-                    "BROKEN_WIKILINK", "error", d.rel,
+                    "BROKEN_WIKILINK",
+                    "error",
+                    d.rel,
                     f"[[{m}]] doesn't resolve to any wiki slug",
                 )
 
@@ -202,7 +226,9 @@ def _broken_derived_from(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
                 continue
             if not (root / ref).exists():
                 yield LintFinding(
-                    "BROKEN_DERIVED_FROM", "error", d.rel,
+                    "BROKEN_DERIVED_FROM",
+                    "error",
+                    d.rel,
                     f"derived_from path doesn't exist: {ref}",
                 )
 
@@ -220,7 +246,9 @@ def _orphan_promoted_source(root: Path, snap: _Snapshot) -> Iterator[LintFinding
             continue  # BROKEN_DERIVED_FROM-style would catch missing files separately
         if src.fm.get("status") != "archived":
             yield LintFinding(
-                "ORPHAN_PROMOTED_SOURCE", "error", d.rel,
+                "ORPHAN_PROMOTED_SOURCE",
+                "error",
+                d.rel,
                 f"promoted_from {pf} has status={src.fm.get('status')!r}, expected 'archived'",
                 fixable=True,
             )
@@ -235,16 +263,24 @@ def _stale_draft(snap: _Snapshot) -> Iterator[LintFinding]:
     cutoff = _NOW() - _STALE_DRAFT_DAYS * 86400
     for d in snap.by_kind("capture"):
         if d.fm.get("status") == "draft" and d.mtime < cutoff:
-            yield LintFinding("STALE_DRAFT", "warning", d.rel,
-                              f"draft for >{_STALE_DRAFT_DAYS} days; review or rm")
+            yield LintFinding(
+                "STALE_DRAFT",
+                "warning",
+                d.rel,
+                f"draft for >{_STALE_DRAFT_DAYS} days; review or rm",
+            )
 
 
 def _stale_stub(snap: _Snapshot) -> Iterator[LintFinding]:
     cutoff = _NOW() - _STALE_STUB_DAYS * 86400
     for d in snap.by_kind("wiki"):
         if d.fm.get("status") == "stub" and d.mtime < cutoff:
-            yield LintFinding("STALE_STUB", "warning", d.rel,
-                              f"stub for >{_STALE_STUB_DAYS} days; expand or deprecate")
+            yield LintFinding(
+                "STALE_STUB",
+                "warning",
+                d.rel,
+                f"stub for >{_STALE_STUB_DAYS} days; expand or deprecate",
+            )
 
 
 def _orphan_wiki(snap: _Snapshot) -> Iterator[LintFinding]:
@@ -257,7 +293,7 @@ def _orphan_wiki(snap: _Snapshot) -> Iterator[LintFinding]:
             incoming.setdefault(slug, set()).add(d.rel)
     derived_from_targets: set[str] = set()
     for d in snap.docs:
-        for ref in (d.fm.get("derived_from") or []):
+        for ref in d.fm.get("derived_from") or []:
             if isinstance(ref, str):
                 derived_from_targets.add(ref)
     for d in snap.by_kind("wiki"):
@@ -268,8 +304,9 @@ def _orphan_wiki(snap: _Snapshot) -> Iterator[LintFinding]:
         is_derived_target = d.rel in derived_from_targets
         has_tags = bool(d.fm.get("tags"))
         if not (has_incoming or is_derived_target or has_tags):
-            yield LintFinding("ORPHAN_WIKI", "warning", d.rel,
-                              "no incoming wikilinks, derived_from, or tags")
+            yield LintFinding(
+                "ORPHAN_WIKI", "warning", d.rel, "no incoming wikilinks, derived_from, or tags"
+            )
 
 
 def _large_chunk_never_promoted(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
@@ -279,7 +316,7 @@ def _large_chunk_never_promoted(root: Path, snap: _Snapshot) -> Iterator[LintFin
     for d in snap.docs:
         if d.kind != "wiki":
             continue
-        for ref in (d.fm.get("derived_from") or []):
+        for ref in d.fm.get("derived_from") or []:
             if isinstance(ref, str):
                 referenced.add(ref)
         for m in _CITATION_RE.findall(d.body):
@@ -293,7 +330,9 @@ def _large_chunk_never_promoted(root: Path, snap: _Snapshot) -> Iterator[LintFin
         if any(r.startswith(topic_dir) for r in referenced):
             continue
         yield LintFinding(
-            "LARGE_CHUNK_NEVER_PROMOTED", "warning", d.rel,
+            "LARGE_CHUNK_NEVER_PROMOTED",
+            "warning",
+            d.rel,
             f"chunk ready for >{_LARGE_CHUNK_DAYS} days with no wiki references; consider synthesizing.",
         )
 
@@ -308,11 +347,19 @@ def _lang_inconsistent(snap: _Snapshot) -> Iterator[LintFinding]:
         lang = d.fm.get("lang")
         has_hangul = bool(_HANGUL_RE.search(body))
         if lang == "ko" and not has_hangul:
-            yield LintFinding("LANG_INCONSISTENT", "warning", d.rel,
-                              "declared lang=ko but body has no Hangul characters")
+            yield LintFinding(
+                "LANG_INCONSISTENT",
+                "warning",
+                d.rel,
+                "declared lang=ko but body has no Hangul characters",
+            )
         elif lang == "en" and has_hangul:
-            yield LintFinding("LANG_INCONSISTENT", "warning", d.rel,
-                              "declared lang=en but body contains Hangul characters")
+            yield LintFinding(
+                "LANG_INCONSISTENT",
+                "warning",
+                d.rel,
+                "declared lang=en but body contains Hangul characters",
+            )
 
 
 def _raw_body_mutated(snap: _Snapshot) -> Iterator[LintFinding]:
@@ -325,7 +372,9 @@ def _raw_body_mutated(snap: _Snapshot) -> Iterator[LintFinding]:
         actual = hashlib.sha256(d.body.encode("utf-8")).hexdigest()
         if actual != stored:
             yield LintFinding(
-                "RAW_BODY_MUTATED", "warning", d.rel,
+                "RAW_BODY_MUTATED",
+                "warning",
+                d.rel,
                 "body changed after status=reviewed (immutability violation)",
             )
 
@@ -334,11 +383,13 @@ def _broken_citation(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
     for d in snap.by_kind("wiki"):
         for ref in _CITATION_RE.findall(d.body):
             if not (root / ref).exists():
-                yield LintFinding("BROKEN_CITATION", "warning", d.rel,
-                                  f"citation path doesn't exist: {ref}")
+                yield LintFinding(
+                    "BROKEN_CITATION", "warning", d.rel, f"citation path doesn't exist: {ref}"
+                )
 
 
 # --------- Orchestrator ---------
+
 
 def collect_findings(root: Path) -> list[LintFinding]:
     """Run every rule against the root and return findings sorted by (path, code)."""

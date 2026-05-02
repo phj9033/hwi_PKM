@@ -1,4 +1,5 @@
 """Tests for M3 additions to `pkm doctor`."""
+
 from __future__ import annotations
 
 import json
@@ -68,6 +69,7 @@ def test_doctor_download_invokes_snapshot(tmp_path: Path, monkeypatch):
         return str(cache)
 
     import huggingface_hub
+
     monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot)
 
     runner = CliRunner()

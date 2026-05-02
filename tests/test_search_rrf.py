@@ -1,4 +1,5 @@
 """Tests for pkm.search.rrf."""
+
 from __future__ import annotations
 
 from pkm.search.bm25 import Hit
@@ -6,8 +7,14 @@ from pkm.search.rrf import rrf_fuse
 
 
 def _h(chunk_id, score=0.0):
-    return Hit(chunk_id=chunk_id, doc_id=chunk_id, path=f"p{chunk_id}",
-               bucket="wiki", score=score, chunk_text="t")
+    return Hit(
+        chunk_id=chunk_id,
+        doc_id=chunk_id,
+        path=f"p{chunk_id}",
+        bucket="wiki",
+        score=score,
+        chunk_text="t",
+    )
 
 
 def test_empty_inputs_return_empty():
@@ -40,7 +47,7 @@ def test_k_constant():
 
 
 def test_score_is_sum_of_reciprocal_ranks():
-    listA = [_h(1)]            # doc 1 rank 1 → 1/(60+1)
-    listB = [_h(1)]            # doc 1 rank 1 → 1/(60+1)
+    listA = [_h(1)]  # doc 1 rank 1 → 1/(60+1)
+    listB = [_h(1)]  # doc 1 rank 1 → 1/(60+1)
     fused = rrf_fuse(listA, listB, k=60)
     assert abs(fused[0].score - (2.0 / 61.0)) < 1e-9

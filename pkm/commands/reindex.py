@@ -13,6 +13,7 @@ Master spec §3.2, §5.1 (scope policy), §5.6 (model mgmt).
 This command IS itself the side-effect chokepoint for indexing. It does NOT
 call `_post_mutation` (which would recurse into a reindex on every reindex).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -32,16 +33,16 @@ from pkm.store.index_db import connect
 
 # Bucket prefixes match master spec §2 layout.
 _BUCKETS = {
-    "wiki":     "data/wiki",
+    "wiki": "data/wiki",
     "captures": "data/raw/captures",
-    "chunks":   "data/raw/chunks",
-    "writing":  "data/writing",
+    "chunks": "data/raw/chunks",
+    "writing": "data/writing",
 }
 _SCOPE_BUCKETS = {
-    "wiki":    ("wiki",),
-    "raw":     ("captures", "chunks"),
+    "wiki": ("wiki",),
+    "raw": ("captures", "chunks"),
     "writing": ("writing",),
-    "all":     ("wiki", "captures", "chunks", "writing"),
+    "all": ("wiki", "captures", "chunks", "writing"),
 }
 
 
@@ -81,8 +82,7 @@ def _walk_files(root: Path, buckets: Iterable[str]) -> list[tuple[str, Path]]:
     return out
 
 
-def _index_one(conn, root: Path, bucket: str, abs_path: Path,
-               embedder, vec_opted_in: bool) -> bool:
+def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opted_in: bool) -> bool:
     """Index a single file. Returns True if (re)indexed, False if skipped."""
     rel = str(abs_path.relative_to(root))
     text = abs_path.read_text(encoding="utf-8")
@@ -112,8 +112,12 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path,
           content_hash=excluded.content_hash, indexed_at=excluded.indexed_at
         """,
         (
-            rel, bucket,
-            fm.get("title"), fm.get("lang"), fm.get("status"), fm.get("source_url"),
+            rel,
+            bucket,
+            fm.get("title"),
+            fm.get("lang"),
+            fm.get("status"),
+            fm.get("source_url"),
             json.dumps(fm, ensure_ascii=False, default=_json_default) if fm else None,
             chash,
         ),
@@ -124,13 +128,11 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path,
     # FTS5 + vec0 are virtual tables — they do NOT honor SQLite FK CASCADE.
     # Delete from them BEFORE chunks (otherwise we lose the chunk_id list).
     conn.execute(
-        "DELETE FROM chunks_fts WHERE rowid IN "
-        "(SELECT id FROM chunks WHERE doc_id = ?)",
+        "DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE doc_id = ?)",
         (doc_id,),
     )
     conn.execute(
-        "DELETE FROM chunks_vec WHERE chunk_id IN "
-        "(SELECT id FROM chunks WHERE doc_id = ?)",
+        "DELETE FROM chunks_vec WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?)",
         (doc_id,),
     )
     conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
@@ -147,12 +149,16 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path,
             INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count)
             VALUES (?,?,?,?,?)
             """,
-            (doc_id, ch.chunk_idx, json.dumps(ch.heading_path, ensure_ascii=False),
-             ch.text, ch.token_count),
+            (
+                doc_id,
+                ch.chunk_idx,
+                json.dumps(ch.heading_path, ensure_ascii=False),
+                ch.text,
+                ch.token_count,
+            ),
         )
         chunk_id = cur.lastrowid
-        conn.execute("INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)",
-                     (chunk_id, ch.text))
+        conn.execute("INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)", (chunk_id, ch.text))
         if embeddings is not None:
             conn.execute(
                 "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",
@@ -200,14 +206,14 @@ def register(app: typer.Typer) -> None:
         scope: str = typer.Option(
             "all", "--scope", help="Bucket filter: wiki | raw | writing | all."
         ),
-        low_memory: bool = typer.Option(False, "--low-memory",
-                                        help="Use batch_size=4 for embedder."),
+        low_memory: bool = typer.Option(
+            False, "--low-memory", help="Use batch_size=4 for embedder."
+        ),
         root: Path = typer.Option(Path("."), "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
     ) -> None:
         if scope not in _SCOPE_BUCKETS:
-            raise PKMError(f"unknown scope: {scope!r}",
-                           hint=f"Choose from: {list(_SCOPE_BUCKETS)}")
+            raise PKMError(f"unknown scope: {scope!r}", hint=f"Choose from: {list(_SCOPE_BUCKETS)}")
 
         conn = connect(root)
         try:
@@ -248,8 +254,7 @@ def register(app: typer.Typer) -> None:
                 typer.echo(json.dumps({"ok": True, "stats": stats}, ensure_ascii=False))
             else:
                 typer.echo(
-                    f"reindex db: {indexed} indexed, {skipped} skipped "
-                    f"(scope={scope}, full={full})"
+                    f"reindex db: {indexed} indexed, {skipped} skipped (scope={scope}, full={full})"
                 )
         finally:
             conn.close()

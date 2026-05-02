@@ -6,6 +6,7 @@ Stages omitted in M3 (deferred to M5):
 
 So the M3 search() is fully deterministic given a fixed embedder.
 """
+
 from __future__ import annotations
 
 import json
@@ -40,8 +41,9 @@ def _frontmatter_for(conn, doc_id: int) -> dict:
     return {"title": row["title"], "lang": row["lang"]}
 
 
-def search(root: Path, query: str, *, scope: str = "wiki", n: int = 10,
-           explain: bool = False) -> dict:
+def search(
+    root: Path, query: str, *, scope: str = "wiki", n: int = 10, explain: bool = False
+) -> dict:
     """Run the full M3 search pipeline. Returns a JSON-able dict."""
     conn = connect(root)
     try:
@@ -76,19 +78,21 @@ def search(root: Path, query: str, *, scope: str = "wiki", n: int = 10,
                 heading_path = json.loads(chunk_meta["heading_path"]) if chunk_meta else []
             except (TypeError, json.JSONDecodeError):
                 heading_path = []
-            results.append({
-                "path": h.path,
-                "chunk_idx": chunk_meta["chunk_idx"] if chunk_meta else 0,
-                "heading_path": heading_path,
-                "snippet": _snippet(h.chunk_text),
-                "scores": {
-                    "bm25":   round(bm25_by_id.get(h.chunk_id, 0.0), 6),
-                    "vector": round(vec_by_id.get(h.chunk_id, 0.0), 6),
-                    "rrf":    round(h.score, 6),
-                    "final":  round(h.score, 6),
-                },
-                "frontmatter": _frontmatter_for(conn, h.doc_id),
-            })
+            results.append(
+                {
+                    "path": h.path,
+                    "chunk_idx": chunk_meta["chunk_idx"] if chunk_meta else 0,
+                    "heading_path": heading_path,
+                    "snippet": _snippet(h.chunk_text),
+                    "scores": {
+                        "bm25": round(bm25_by_id.get(h.chunk_id, 0.0), 6),
+                        "vector": round(vec_by_id.get(h.chunk_id, 0.0), 6),
+                        "rrf": round(h.score, 6),
+                        "final": round(h.score, 6),
+                    },
+                    "frontmatter": _frontmatter_for(conn, h.doc_id),
+                }
+            )
 
         return {
             "ok": True,

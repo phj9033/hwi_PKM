@@ -4,6 +4,7 @@ M4 ships only `wiki edit`. Future `wiki list/show/rm` etc. land here.
 
 Spec reference: §3.2 (wiki edit), §4.3 (escape valve), §6.1 (schema).
 """
+
 from __future__ import annotations
 
 import json
@@ -76,7 +77,9 @@ def register(app: typer.Typer) -> None:
     @wiki_app.command("edit")
     def edit_cmd(
         ref: str = typer.Argument(..., help="Wiki page (full path, bucket/slug, or unique slug)."),
-        replace: bool = typer.Option(False, "--replace", help="Read stdin as the full file content."),
+        replace: bool = typer.Option(
+            False, "--replace", help="Read stdin as the full file content."
+        ),
         patch: bool = typer.Option(False, "--patch", help="Read stdin as a unified diff."),
         root: Path = typer.Option(Path("."), "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
@@ -93,6 +96,7 @@ def register(app: typer.Typer) -> None:
             else:
                 # --patch — implemented in Task 6
                 from pkm.commands.wiki_patch import _patch
+
                 result = _patch(root, target, stdin)
         except PKMError as e:
             if json_out:

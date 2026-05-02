@@ -1,4 +1,5 @@
 """Tests that capture.set-status records body_hash on transition to reviewed."""
+
 from __future__ import annotations
 
 import hashlib
@@ -15,8 +16,19 @@ runner = CliRunner()
 def _init_with_capture(tmp_path: Path, body: str) -> Path:
     runner.invoke(app, ["init", "--root", str(tmp_path), "-f"])
     runner.invoke(
-        app, ["capture", "create", "--slug", "x", "--title", "X",
-              "--lang", "ko", "--root", str(tmp_path)],
+        app,
+        [
+            "capture",
+            "create",
+            "--slug",
+            "x",
+            "--title",
+            "X",
+            "--lang",
+            "ko",
+            "--root",
+            str(tmp_path),
+        ],
         input=body,
     )
     return tmp_path
@@ -35,8 +47,7 @@ def test_draft_capture_has_no_body_hash(tmp_path: Path):
 def test_set_status_reviewed_writes_body_hash(tmp_path: Path):
     body = "한국어 본문\n"
     repo = _init_with_capture(tmp_path, body)
-    runner.invoke(app, ["capture", "set-status", "x", "reviewed",
-                        "--root", str(repo)])
+    runner.invoke(app, ["capture", "set-status", "x", "reviewed", "--root", str(repo)])
     fm, parsed_body = parse(_cap_path(repo).read_text(encoding="utf-8"))
     assert fm.get("body_hash") == hashlib.sha256(parsed_body.encode("utf-8")).hexdigest()
 

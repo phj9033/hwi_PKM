@@ -1,4 +1,5 @@
 """`pkm index rebuild` — regenerate data/index.md."""
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,8 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         rebuild_index(root)
         if json_out:
-            typer.echo(json.dumps({"ok": True, "stats": {"path": "data/index.md"}}, ensure_ascii=False))
+            typer.echo(
+                json.dumps({"ok": True, "stats": {"path": "data/index.md"}}, ensure_ascii=False)
+            )
         else:
             typer.echo("rebuilt data/index.md")

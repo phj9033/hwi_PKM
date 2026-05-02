@@ -1,4 +1,5 @@
 """Tests for `pkm wiki edit --patch`."""
+
 from __future__ import annotations
 
 import json
@@ -55,8 +56,8 @@ diff --git a/data/wiki/concepts/oauth.md b/data/wiki/concepts/oauth.md
 
 def test_wiki_edit_patch_applies_and_commits(repo_with_oauth: Path):
     result = runner.invoke(
-        app, ["wiki", "edit", "concepts/oauth", "--patch",
-              "--root", str(repo_with_oauth), "--json"],
+        app,
+        ["wiki", "edit", "concepts/oauth", "--patch", "--root", str(repo_with_oauth), "--json"],
         input=VALID_PATCH,
     )
     assert result.exit_code == 0, result.stdout + result.stderr
@@ -71,8 +72,8 @@ def test_wiki_edit_patch_applies_and_commits(repo_with_oauth: Path):
 def test_wiki_edit_patch_invalid_diff_reverts(repo_with_oauth: Path):
     bad_patch = "this is not a unified diff at all"
     result = runner.invoke(
-        app, ["wiki", "edit", "concepts/oauth", "--patch",
-              "--root", str(repo_with_oauth), "--json"],
+        app,
+        ["wiki", "edit", "concepts/oauth", "--patch", "--root", str(repo_with_oauth), "--json"],
         input=bad_patch,
     )
     assert result.exit_code == 1
@@ -94,8 +95,8 @@ diff --git a/data/wiki/concepts/oauth.md b/data/wiki/concepts/oauth.md
  lang: ko
 """
     result = runner.invoke(
-        app, ["wiki", "edit", "concepts/oauth", "--patch",
-              "--root", str(repo_with_oauth), "--json"],
+        app,
+        ["wiki", "edit", "concepts/oauth", "--patch", "--root", str(repo_with_oauth), "--json"],
         input=bad_patch,
     )
     assert result.exit_code == 1
@@ -106,8 +107,8 @@ diff --git a/data/wiki/concepts/oauth.md b/data/wiki/concepts/oauth.md
 def test_wiki_edit_patch_no_op_returns_null_commit(repo_with_oauth: Path):
     # An empty patch: no-op. The CLI should report success but git_commit=None.
     result = runner.invoke(
-        app, ["wiki", "edit", "concepts/oauth", "--patch",
-              "--root", str(repo_with_oauth), "--json"],
+        app,
+        ["wiki", "edit", "concepts/oauth", "--patch", "--root", str(repo_with_oauth), "--json"],
         input="",
     )
     # Empty stdin → git apply fails → exit 1 (we don't model this as success)

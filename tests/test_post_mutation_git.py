@@ -1,4 +1,5 @@
 """Integration: post_mutation calls commit_paths after log/TOC/reindex."""
+
 from __future__ import annotations
 
 import subprocess
@@ -48,8 +49,11 @@ def test_post_mutation_returns_commit_sha(tmp_path: Path):
 
     # Verify the commit message
     out = subprocess.run(
-        ["git", "log", "-1", "--format=%s"], cwd=root,
-        capture_output=True, text=True, check=True,
+        ["git", "log", "-1", "--format=%s"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     assert out.stdout.strip() == "pkm capture.create: 2026-05-01-foo"
 
@@ -75,8 +79,7 @@ def test_post_mutation_no_git_repo_returns_none_and_warns(tmp_path: Path, capsys
     sha = post_mutation(tmp_path, event, paths=[rel])
     assert sha is None
     captured = capsys.readouterr()
-    assert "not a git repo" in captured.err.lower() or \
-           "skipping commit" in captured.err.lower()
+    assert "not a git repo" in captured.err.lower() or "skipping commit" in captured.err.lower()
 
 
 def test_post_mutation_commits_log_and_index_too(tmp_path: Path):
@@ -95,7 +98,10 @@ def test_post_mutation_commits_log_and_index_too(tmp_path: Path):
 
     files = subprocess.run(
         ["git", "show", "--name-only", "--format=", sha],
-        cwd=root, capture_output=True, text=True, check=True,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     assert rel in files
     assert "data/log.md" in files

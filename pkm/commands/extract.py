@@ -6,6 +6,7 @@ URL fetches use `pkm capture create --url ...` instead.
 
 Spec reference: §3.2 (extract), §6 (V2 docx deferral).
 """
+
 from __future__ import annotations
 
 import json
@@ -21,9 +22,11 @@ def _extract(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         from pkm.extract.pdf import pdf_to_markdown
+
         return pdf_to_markdown(path)
     if suffix in (".html", ".htm"):
         from pkm.extract.html import html_to_markdown
+
         return html_to_markdown(path)
     raise PKMValidationError(
         f"unsupported extension {suffix!r}",
@@ -34,10 +37,15 @@ def _extract(path: Path) -> str:
 def register(app: typer.Typer) -> None:
     @app.command("extract")
     def extract_cmd(
-        path: Path = typer.Argument(..., exists=True, readable=True,
-                                    help="Source file (.pdf, .html, .htm)."),
-        out: Path | None = typer.Option(None, "--out", help="Write markdown to this path (default: stdout)."),
-        json_out: bool = typer.Option(False, "--json", help="Emit JSON summary instead of raw markdown."),
+        path: Path = typer.Argument(
+            ..., exists=True, readable=True, help="Source file (.pdf, .html, .htm)."
+        ),
+        out: Path | None = typer.Option(
+            None, "--out", help="Write markdown to this path (default: stdout)."
+        ),
+        json_out: bool = typer.Option(
+            False, "--json", help="Emit JSON summary instead of raw markdown."
+        ),
     ) -> None:
         """Convert a local PDF or HTML file to markdown."""
         try:
@@ -61,13 +69,24 @@ def register(app: typer.Typer) -> None:
         if out is not None:
             atomic_write(out, md)
             if json_out:
-                typer.echo(json.dumps(
-                    {"ok": True, "out": out.relative_to(Path.cwd()).as_posix() if out.is_absolute() else str(out),
-                     "chars": len(md)}, ensure_ascii=False))
+                typer.echo(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "out": out.relative_to(Path.cwd()).as_posix()
+                            if out.is_absolute()
+                            else str(out),
+                            "chars": len(md),
+                        },
+                        ensure_ascii=False,
+                    )
+                )
             else:
                 typer.echo(f"Wrote {len(md)} chars → {out}")
         else:
             if json_out:
-                typer.echo(json.dumps({"ok": True, "chars": len(md), "markdown": md}, ensure_ascii=False))
+                typer.echo(
+                    json.dumps({"ok": True, "chars": len(md), "markdown": md}, ensure_ascii=False)
+                )
             else:
                 typer.echo(md)

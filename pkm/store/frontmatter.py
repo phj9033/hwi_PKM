@@ -12,6 +12,7 @@ parse() returns an empty dict and the full text as body.
 
 Spec reference: §6.1 (frontmatter schemas).
 """
+
 from __future__ import annotations
 
 import yaml
@@ -38,8 +39,8 @@ def parse(text: str) -> tuple[dict, str]:
             "Frontmatter not closed",
             hint="Add a '---' line to close the frontmatter block.",
         ) from None
-    fm_text = text[len(_DELIM):end]
-    body = text[end + len(_DELIM):]
+    fm_text = text[len(_DELIM) : end]
+    body = text[end + len(_DELIM) :]
     try:
         fm = yaml.safe_load(fm_text) or {}
     except yaml.YAMLError as e:

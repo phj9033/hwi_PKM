@@ -3,6 +3,7 @@
 Five wiki documents covering distinct topics + one captures doc that exists
 only to verify FTS-only path. Frontmatter is minimal but valid for each schema.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -49,7 +50,7 @@ CAPTURE_DOCS = {
     "data/raw/captures/2026-05-01-rrf-paper.md": (
         "RRF 논문 요약",
         "ko",
-        "---\ntitle: \"RRF 논문 요약\"\nslug: 2026-05-01-rrf-paper\n"
+        '---\ntitle: "RRF 논문 요약"\nslug: 2026-05-01-rrf-paper\n'
         "status: draft\nsource_type: text\nlang: ko\n"
         "created_at: 2026-05-01T00:00:00+00:00\n---\n\n"
         "# RRF\n\nReciprocal Rank Fusion combines BM25 and vector retrieval "
@@ -63,7 +64,7 @@ def install_corpus(root: Path) -> None:
     for rel, (title, lang, body) in WIKI_DOCS.items():
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        fm = f"---\ntitle: \"{title}\"\nlang: {lang}\nstatus: active\n---\n\n"
+        fm = f'---\ntitle: "{title}"\nlang: {lang}\nstatus: active\n---\n\n'
         p.write_text(fm + body, encoding="utf-8")
     for rel, (_, _, full_text) in CAPTURE_DOCS.items():
         p = root / rel

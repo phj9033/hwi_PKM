@@ -2,6 +2,7 @@
 
 Run: `pytest -m slow -n 1`. Default CI uses `pytest -m "not slow"` and skips this.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -12,6 +13,7 @@ import pytest
 def test_real_embedder_korean(monkeypatch):
     monkeypatch.delenv("PKM_TEST_STUB_EMBEDDER", raising=False)
     from pkm.store.embedder import RealEmbedder
+
     e = RealEmbedder(batch_size=4)
     v = e.embed(["한국어 텍스트", "English text"])
     assert v.shape == (2, 1024)

@@ -4,6 +4,7 @@ Read-only by default. With --fix, dispatches the 2 spec-marked auto-fixers.
 
 Spec reference: §6.5.
 """
+
 from __future__ import annotations
 
 import json
@@ -63,7 +64,9 @@ def register(app: typer.Typer) -> None:
     @app.command("lint")
     def lint_cmd(
         fix: bool = typer.Option(False, "--fix", help="Apply auto-fixes for fixable findings."),
-        errors_only: bool = typer.Option(False, "--errors-only", help="Hide warnings; gate exit on errors only."),
+        errors_only: bool = typer.Option(
+            False, "--errors-only", help="Hide warnings; gate exit on errors only."
+        ),
         json_out: bool = typer.Option(False, "--json", help="Emit JSON output."),
         root: Path = typer.Option(Path("."), "--root", "-r"),
     ) -> None:

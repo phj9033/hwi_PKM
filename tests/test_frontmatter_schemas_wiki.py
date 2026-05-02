@@ -1,4 +1,5 @@
 """Tests for wiki frontmatter schema."""
+
 from __future__ import annotations
 
 import pytest
@@ -17,8 +18,9 @@ def test_wiki_defaults_includes_required_fields():
 
 
 def test_wiki_defaults_optional_promoted_from():
-    fm = wiki_defaults(slug="x", title="X", bucket="notes",
-                       promoted_from="data/raw/captures/2026-05-01-x.md")
+    fm = wiki_defaults(
+        slug="x", title="X", bucket="notes", promoted_from="data/raw/captures/2026-05-01-x.md"
+    )
     assert fm["promoted_from"] == "data/raw/captures/2026-05-01-x.md"
 
 

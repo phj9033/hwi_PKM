@@ -1,4 +1,5 @@
 """Tests for pkm.store.index_db."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,6 +39,7 @@ def test_connect_idempotent(tmp_path: Path):
 def test_schema_version_zero_on_empty(tmp_path: Path):
     """A bare DB without init_schema reports version 0."""
     import sqlite3
+
     db = tmp_path / ".pkm" / "index.db"
     db.parent.mkdir(parents=True)
     conn = sqlite3.connect(db)

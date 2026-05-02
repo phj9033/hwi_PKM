@@ -22,6 +22,7 @@ Regenerated whole on every mutation. Layout:
 
 Spec reference: §2 (index.md), §6.6 (auto-update).
 """
+
 from __future__ import annotations
 
 from pathlib import Path

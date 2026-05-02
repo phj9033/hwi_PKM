@@ -14,6 +14,7 @@ Korean. Good enough for batching; semantic accuracy comes from the embedder.
 Sentence boundaries: English [.!?。] followed by whitespace, OR Korean
 종결어미 endings 다라네요까 followed by '.' and whitespace.
 """
+
 from __future__ import annotations
 
 import re

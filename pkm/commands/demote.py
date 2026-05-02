@@ -6,6 +6,7 @@ return DEMOTE_TO_WRITING_NOT_YET (M5).
 
 Spec reference: §6.4 (demote).
 """
+
 from __future__ import annotations
 
 import json
@@ -61,9 +62,11 @@ def _do_demote(root: Path, *, ref: str) -> dict:
 
     sha = post_mutation(
         root,
-        LogEvent(type="wiki.demote",
-                 ref=fm_w.get("slug", wiki_p.stem),
-                 message=f"← restored {fm_s['slug']}"),
+        LogEvent(
+            type="wiki.demote",
+            ref=fm_w.get("slug", wiki_p.stem),
+            message=f"← restored {fm_s['slug']}",
+        ),
         paths=[wiki_rel, str(src_p.relative_to(root))],
     )
     return {

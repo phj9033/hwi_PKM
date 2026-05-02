@@ -8,6 +8,7 @@ Everything else is detect-only in V1. Each fixer returns True if it
 changed anything, False otherwise. All file writes go through atomic_write
 + post_mutation so reindex + git commit happen.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -49,9 +50,11 @@ def fix_missing_field(root: Path, finding: LintFinding) -> bool:
     atomic_write(target, serialize(fm, body))
     post_mutation(
         root,
-        LogEvent(type="lint.fix",
-                 ref=fm.get("slug") or target.stem,
-                 message=f"missing_field {finding.field}"),
+        LogEvent(
+            type="lint.fix",
+            ref=fm.get("slug") or target.stem,
+            message=f"missing_field {finding.field}",
+        ),
         paths=[finding.path],
     )
     return True
@@ -78,9 +81,11 @@ def fix_orphan_promoted_source(root: Path, finding: LintFinding) -> bool:
     atomic_write(src, serialize(fm_s, body_s))
     post_mutation(
         root,
-        LogEvent(type="lint.fix",
-                 ref=fm_s.get("slug") or src.stem,
-                 message="orphan_promoted_source → archived"),
+        LogEvent(
+            type="lint.fix",
+            ref=fm_s.get("slug") or src.stem,
+            message="orphan_promoted_source → archived",
+        ),
         paths=[src_rel],
     )
     return True

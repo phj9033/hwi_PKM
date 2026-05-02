@@ -2,6 +2,7 @@
 
 Spec reference: §2 (layout), §3.2 (init command).
 """
+
 from __future__ import annotations
 
 import json
@@ -69,12 +70,19 @@ def _do_init(root: Path, force: bool) -> dict:
 
     # M3.5: bootstrap git so future mutations can auto-commit.
     from pkm.store import git as gitmod
+
     gitmod.git_init(root)
     gitmod.commit_paths(
         root,
-        ["SCHEMA.md", ".gitignore", ".pkm/config.toml",
-         ".claude/settings.json", ".claude/commands",
-         "data/log.md", "data/index.md"],
+        [
+            "SCHEMA.md",
+            ".gitignore",
+            ".pkm/config.toml",
+            ".claude/settings.json",
+            ".claude/commands",
+            "data/log.md",
+            "data/index.md",
+        ],
         f"pkm init: {root.resolve().name}",
     )
 

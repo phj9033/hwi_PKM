@@ -1,4 +1,5 @@
 """Local HTML → markdown via markdownify."""
+
 from __future__ import annotations
 
 from pathlib import Path

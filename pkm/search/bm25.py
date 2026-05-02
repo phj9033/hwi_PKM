@@ -4,6 +4,7 @@
 filter joins back to documents.bucket: 'wiki' / 'raw' / 'writing' / 'all'.
 'raw' covers both 'captures' and 'chunks' buckets per master spec §5.1.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -11,10 +12,10 @@ from dataclasses import dataclass
 
 _RAW_BUCKETS = ("captures", "chunks")
 _BUCKET_MAP: dict[str, tuple[str, ...]] = {
-    "wiki":    ("wiki",),
-    "raw":     _RAW_BUCKETS,
+    "wiki": ("wiki",),
+    "raw": _RAW_BUCKETS,
     "writing": ("writing",),
-    "all":     ("wiki", "captures", "chunks", "writing"),
+    "all": ("wiki", "captures", "chunks", "writing"),
 }
 
 
@@ -50,8 +51,9 @@ def _build_fts_query(query: str) -> str:
     return " OR ".join(fts_tokens)
 
 
-def query_bm25(conn: sqlite3.Connection, query: str, scope: str = "wiki",
-               top: int = 50) -> list[Hit]:
+def query_bm25(
+    conn: sqlite3.Connection, query: str, scope: str = "wiki", top: int = 50
+) -> list[Hit]:
     if not query.strip():
         return []
     buckets = _BUCKET_MAP.get(scope)

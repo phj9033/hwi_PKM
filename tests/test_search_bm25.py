@@ -1,4 +1,5 @@
 """Tests for pkm.search.bm25."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,9 +11,9 @@ from pkm.store.index_db import connect
 def _seed_three_docs(conn):
     """Seed 3 docs in different buckets with deterministic chunks."""
     rows = [
-        ("data/wiki/concepts/oauth.md",       "wiki",     "OAuth 토큰 저장 방식"),
-        ("data/wiki/concepts/transformer.md", "wiki",     "Transformer attention 메커니즘"),
-        ("data/raw/captures/foo.md",          "captures", "BM25 RRF 융합 논문 요약"),
+        ("data/wiki/concepts/oauth.md", "wiki", "OAuth 토큰 저장 방식"),
+        ("data/wiki/concepts/transformer.md", "wiki", "Transformer attention 메커니즘"),
+        ("data/raw/captures/foo.md", "captures", "BM25 RRF 융합 논문 요약"),
     ]
     for path, bucket, text in rows:
         cur = conn.execute(

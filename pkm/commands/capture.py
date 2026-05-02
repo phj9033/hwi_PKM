@@ -2,6 +2,7 @@
 
 Spec reference: §3.2 (commands), §6.1 (capture frontmatter), §6.6 (auto log/index).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -77,22 +78,26 @@ def _list_captures(root: Path) -> list[dict]:
     for p in sorted(cap_dir.glob("*.md")):
         try:
             from pkm.store.frontmatter import parse
+
             fm, _ = parse(p.read_text(encoding="utf-8"))
         except Exception:
             fm = {}
-        out.append({
-            "slug": fm.get("slug") or p.stem,
-            "title": fm.get("title") or "",
-            "status": fm.get("status") or "?",
-            "lang": fm.get("lang") or "?",
-            "path": p.relative_to(root).as_posix(),
-        })
+        out.append(
+            {
+                "slug": fm.get("slug") or p.stem,
+                "title": fm.get("title") or "",
+                "status": fm.get("status") or "?",
+                "lang": fm.get("lang") or "?",
+                "path": p.relative_to(root).as_posix(),
+            }
+        )
     return out
 
 
 def _do_show(root: Path, ref: str) -> dict:
     from pkm.store.frontmatter import parse
     from pkm.store.refs import resolve_capture
+
     p = resolve_capture(root, ref)
     fm, body = parse(p.read_text(encoding="utf-8"))
     return {
@@ -107,6 +112,7 @@ def _do_show(root: Path, ref: str) -> dict:
 def _do_set_status(root: Path, ref: str, status: str) -> dict:
     from pkm.store.frontmatter import parse
     from pkm.store.refs import resolve_capture
+
     p = resolve_capture(root, ref)
     fm, body = parse(p.read_text(encoding="utf-8"))
     fm["status"] = status
@@ -124,6 +130,7 @@ def _do_set_status(root: Path, ref: str, status: str) -> dict:
 
 def _do_rm(root: Path, ref: str) -> dict:
     from pkm.store.refs import resolve_capture
+
     p = resolve_capture(root, ref)
     slug = p.stem
     rel_path = p.relative_to(root)
@@ -137,15 +144,23 @@ def _do_rm(root: Path, ref: str) -> dict:
 
 
 def register(app: typer.Typer) -> None:
-    capture_app = typer.Typer(name="capture", help="Manage captures (raw/captures/).", no_args_is_help=True)
+    capture_app = typer.Typer(
+        name="capture", help="Manage captures (raw/captures/).", no_args_is_help=True
+    )
     app.add_typer(capture_app, name="capture")
 
     @capture_app.command("create")
     def create_cmd(
-        slug: str = typer.Option(..., "--slug", help="Stem for the capture filename. Date prefix YYYY-MM-DD- added automatically if absent."),
+        slug: str = typer.Option(
+            ...,
+            "--slug",
+            help="Stem for the capture filename. Date prefix YYYY-MM-DD- added automatically if absent.",
+        ),
         title: str = typer.Option(..., "--title", help="Capture title."),
         url: str | None = typer.Option(None, "--url", help="Source URL."),
-        from_file: Path | None = typer.Option(None, "--from-file", help="Read body from this file (else stdin)."),
+        from_file: Path | None = typer.Option(
+            None, "--from-file", help="Read body from this file (else stdin)."
+        ),
         status: str = typer.Option("draft", "--status", help="draft | reviewed"),
         lang: str = typer.Option("ko", "--lang", help="ko | en | mixed"),
         root: Path = typer.Option(Path("."), "--root", "-r", help="PKM root."),
@@ -154,8 +169,13 @@ def register(app: typer.Typer) -> None:
         """Create a new capture under data/raw/captures/."""
         try:
             result = _do_create(
-                root, slug=slug, title=title, url=url, from_file=from_file,
-                status=status, lang=lang,
+                root,
+                slug=slug,
+                title=title,
+                url=url,
+                from_file=from_file,
+                status=status,
+                lang=lang,
             )
         except PKMError as e:  # PKMStateError (existing) | PKMValidationError (bad enum)
             if json_out:

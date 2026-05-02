@@ -1,4 +1,5 @@
 """Tests for git initialization at the end of `pkm init`."""
+
 from __future__ import annotations
 
 import subprocess
@@ -21,8 +22,11 @@ def test_init_creates_initial_commit(tmp_path: Path):
     res = runner.invoke(app, ["init", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     out = subprocess.run(
-        ["git", "log", "-1", "--format=%s"], cwd=tmp_path,
-        capture_output=True, text=True, check=True,
+        ["git", "log", "-1", "--format=%s"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     assert out.stdout.strip().startswith("pkm init")
 
@@ -52,7 +56,10 @@ def test_init_initial_commit_includes_scaffold(tmp_path: Path):
 
     out = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", "HEAD"],
-        cwd=tmp_path, capture_output=True, text=True, check=True,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     assert "SCHEMA.md" in out
     assert ".gitignore" in out

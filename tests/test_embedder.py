@@ -1,4 +1,5 @@
 """Tests for pkm.store.embedder (Stub embedder + cache root resolution)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,6 +10,7 @@ import pytest
 from pkm.store import embedder as emb
 
 # --- model_cache_root -----------
+
 
 def test_cache_root_default(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("PKM_MODEL_CACHE", raising=False)
@@ -22,6 +24,7 @@ def test_cache_root_env_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 
 
 # --- StubEmbedder -----------
+
 
 def test_stub_dim():
     e = emb.StubEmbedder()
@@ -58,6 +61,7 @@ def test_stub_different_text_different_vector():
 
 
 # --- get_embedder -----------
+
 
 def test_get_embedder_returns_stub_when_env_set(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")

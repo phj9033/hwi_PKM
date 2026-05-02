@@ -1,4 +1,5 @@
 """Tests for pkm.search.pipeline."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -31,8 +32,10 @@ def _seed_two_wiki(conn, embedder):
         )
         chunk_id = cur.lastrowid
         conn.execute("INSERT INTO chunks_fts(rowid, text) VALUES (?,?)", (chunk_id, text))
-        conn.execute("INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?,?)",
-                     (chunk_id, vec.astype(np.float32).tobytes()))
+        conn.execute(
+            "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?,?)",
+            (chunk_id, vec.astype(np.float32).tobytes()),
+        )
     conn.commit()
 
 
@@ -69,6 +72,7 @@ def test_pipeline_top_n_respected(tmp_path: Path):
 def test_pipeline_empty_index_raises(tmp_path: Path):
     """Empty .pkm/index.db → INDEX_EMPTY error."""
     from pkm.errors import PKMStateError
+
     # Make the DB but seed nothing
     conn = connect(tmp_path)
     conn.close()

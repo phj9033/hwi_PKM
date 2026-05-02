@@ -1,4 +1,5 @@
 """Tests for `pkm search`."""
+
 from __future__ import annotations
 
 import json

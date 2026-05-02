@@ -5,6 +5,7 @@ breaking change bumps SCHEMA_VERSION and adds a migration step in index_db.
 
 All CREATE statements use IF NOT EXISTS so re-applying is a no-op.
 """
+
 from __future__ import annotations
 
 SCHEMA_VERSION = 1

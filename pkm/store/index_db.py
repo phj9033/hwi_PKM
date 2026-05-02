@@ -7,6 +7,7 @@ The schema is idempotent (all CREATE statements use IF NOT EXISTS).
 Heavy imports (`sqlite_vec`) are inside functions so importing this module
 does not pull in the native extension.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -32,6 +33,7 @@ def connect(root: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.enable_load_extension(True)
     import sqlite_vec  # lazy
+
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)
 
@@ -47,8 +49,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Insert version row only if not present
     cur = conn.execute("SELECT version FROM schema_version LIMIT 1")
     if cur.fetchone() is None:
-        conn.execute("INSERT INTO schema_version(version) VALUES (?)",
-                     (index_schema.SCHEMA_VERSION,))
+        conn.execute(
+            "INSERT INTO schema_version(version) VALUES (?)", (index_schema.SCHEMA_VERSION,)
+        )
     conn.commit()
 
 

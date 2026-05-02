@@ -11,6 +11,7 @@ Spec §3.2 (wiki edit --patch). Master spec uses `git apply` deliberately —
 unified diff is the lingua franca and `git apply` is already a dep
 (M3.5).
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -27,10 +28,19 @@ from pkm.store.log import LogEvent
 
 
 def _git(
-    args: list[str], *, cwd: Path, check: bool, stdin: str | None = None,
+    args: list[str],
+    *,
+    cwd: Path,
+    check: bool,
+    stdin: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        args, cwd=cwd, input=stdin, check=check, capture_output=True, text=True,
+        args,
+        cwd=cwd,
+        input=stdin,
+        check=check,
+        capture_output=True,
+        text=True,
     )
 
 

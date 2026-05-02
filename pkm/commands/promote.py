@@ -5,6 +5,7 @@ PROMOTE_FROM_WRITING_NOT_YET (M5 fills in).
 
 Spec reference: §6.3 (gate), §6.6 (auto side-effects).
 """
+
 from __future__ import annotations
 
 import json
@@ -111,9 +112,7 @@ def _do_promote(
 
     sha = post_mutation(
         root,
-        LogEvent(type="capture.promote",
-                 ref=fm_src["slug"],
-                 message=f"→ {bucket}/{dst_slug}"),
+        LogEvent(type="capture.promote", ref=fm_src["slug"], message=f"→ {bucket}/{dst_slug}"),
         paths=paths,
     )
     return {
@@ -130,9 +129,15 @@ def register(app: typer.Typer) -> None:
     @app.command("promote")
     def promote_cmd(
         ref: str = typer.Argument(..., help="Capture ref (slug, full slug, or path)."),
-        to: str = typer.Option(..., "--to", help="Wiki bucket: concepts | entities | notes | reports."),
-        slug: str | None = typer.Option(None, "--slug", help="Override the wiki slug (default: capture slug minus date prefix)."),
-        keep_source: bool = typer.Option(False, "--keep-source", help="Don't archive the source capture."),
+        to: str = typer.Option(
+            ..., "--to", help="Wiki bucket: concepts | entities | notes | reports."
+        ),
+        slug: str | None = typer.Option(
+            None, "--slug", help="Override the wiki slug (default: capture slug minus date prefix)."
+        ),
+        keep_source: bool = typer.Option(
+            False, "--keep-source", help="Don't archive the source capture."
+        ),
         root: Path = typer.Option(Path("."), "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
     ) -> None:

@@ -1,4 +1,5 @@
 """Tests for pkm.commands.doctor (M1 scope: structure + python only)."""
+
 from __future__ import annotations
 
 import json
@@ -69,10 +70,8 @@ def test_doctor_json_output_contract(tmp_path: Path, monkeypatch):
         assert set(item.keys()) <= {"name", "status", "detail"}
         # No absolute paths in detail
         if item["detail"]:
-            assert not item["detail"].startswith("/"), \
-                f"absolute path leaked: {item['detail']}"
-            assert "Users/" not in item["detail"], \
-                f"home dir leaked: {item['detail']}"
+            assert not item["detail"].startswith("/"), f"absolute path leaked: {item['detail']}"
+            assert "Users/" not in item["detail"], f"home dir leaked: {item['detail']}"
             assert "exec" not in item["detail"].lower()
     # System block — only allowed numeric/derived fields
     if "system" in payload:

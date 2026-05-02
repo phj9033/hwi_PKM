@@ -7,6 +7,7 @@ We post-filter by bucket (joining back to documents) rather than partitioning
 the vec0 table. For thousands of chunks this is fast enough; if it ever
 becomes a bottleneck, add a per-bucket vec0 partition in M3.x.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -16,8 +17,9 @@ import numpy as np
 from pkm.search.bm25 import _BUCKET_MAP, Hit
 
 
-def query_vector(conn: sqlite3.Connection, query_vec: np.ndarray,
-                 scope: str = "wiki", top: int = 50) -> list[Hit]:
+def query_vector(
+    conn: sqlite3.Connection, query_vec: np.ndarray, scope: str = "wiki", top: int = 50
+) -> list[Hit]:
     if query_vec.ndim != 1:
         query_vec = query_vec.reshape(-1)
     buckets = _BUCKET_MAP.get(scope)
@@ -58,7 +60,7 @@ def query_vector(conn: sqlite3.Connection, query_vec: np.ndarray,
             doc_id=row["doc_id"],
             path=row["path"],
             bucket=row["bucket"],
-            score=1.0 - dist_by_id[row["chunk_id"]],   # → similarity, higher better
+            score=1.0 - dist_by_id[row["chunk_id"]],  # → similarity, higher better
             chunk_text=row["text"],
         )
         for row in meta_rows

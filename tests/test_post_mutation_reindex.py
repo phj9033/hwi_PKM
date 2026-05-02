@@ -1,4 +1,5 @@
 """Tests for the M3 reindex step inside _mutations.post_mutation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -40,9 +41,7 @@ def test_post_mutation_indexes_new_capture(tmp_path: Path):
 
     conn = connect(root)
     try:
-        cnt = conn.execute(
-            "SELECT COUNT(*) FROM documents WHERE path = ?", (rel,)
-        ).fetchone()[0]
+        cnt = conn.execute("SELECT COUNT(*) FROM documents WHERE path = ?", (rel,)).fetchone()[0]
         assert cnt == 1
     finally:
         conn.close()
@@ -65,8 +64,10 @@ def test_post_mutation_swallows_index_error(tmp_path: Path, monkeypatch, capsys)
 
     # Force an exception inside reindex_changed_paths
     import pkm._mutations as M
+
     monkeypatch.setattr(
-        M, "reindex_changed_paths",
+        M,
+        "reindex_changed_paths",
         lambda root, paths: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     event = LogEvent(type="manual", ref="r", message="m")

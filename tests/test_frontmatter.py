@@ -1,4 +1,5 @@
 """Tests for pkm.store.frontmatter."""
+
 from __future__ import annotations
 
 import pytest

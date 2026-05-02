@@ -5,6 +5,7 @@ module is the single source of truth). We re-export it here so callers
 that already think in path terms (`promote.py`, `demote.py`, etc.) don't
 need to reach into the schemas module.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterator

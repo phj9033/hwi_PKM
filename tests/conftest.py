@@ -8,6 +8,7 @@ Goals (spec §8.3):
 
 This conftest runs before any test session — see pytest's discovery order.
 """
+
 from __future__ import annotations
 
 import os

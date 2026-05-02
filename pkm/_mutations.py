@@ -11,6 +11,7 @@ reindex side-effect AND for staging the right files in the git commit.
 Returns the new git commit SHA, or None when no commit was created (no-git
 repo, or nothing to commit). Callers fold this into their JSON output.
 """
+
 from __future__ import annotations
 
 import os
@@ -28,8 +29,7 @@ _LOG_REL = "data/log.md"
 _INDEX_REL = "data/index.md"
 
 
-def post_mutation(root: Path, event: LogEvent,
-                  paths: list[str] | None = None) -> str | None:
+def post_mutation(root: Path, event: LogEvent, paths: list[str] | None = None) -> str | None:
     """Append event → rebuild TOC → reindex paths → git commit.
 
     Returns the 40-char commit SHA, or None if no commit was made (no git

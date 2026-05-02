@@ -1,4 +1,5 @@
 """Golden snapshot tests for `pkm search` over the Korean fixture corpus."""
+
 from __future__ import annotations
 
 import json
@@ -57,15 +58,24 @@ def _check_or_write(name: str, slim: dict) -> None:
 @pytest.mark.parametrize(
     "query,scope,snapshot",
     [
-        ("OAuth 토큰 저장",  "wiki", "search_oauth.json"),
-        ("한국어 형태소",    "wiki", "search_korean.json"),
-        ("BM25 RRF",         "raw",  "search_rrf.json"),
+        ("OAuth 토큰 저장", "wiki", "search_oauth.json"),
+        ("한국어 형태소", "wiki", "search_korean.json"),
+        ("BM25 RRF", "raw", "search_rrf.json"),
     ],
 )
 def test_golden_search(indexed_root: Path, query: str, scope: str, snapshot: str):
     runner = CliRunner()
-    res = runner.invoke(app, [
-        "search", query, "--scope", scope, "--json", "--root", str(indexed_root),
-    ])
+    res = runner.invoke(
+        app,
+        [
+            "search",
+            query,
+            "--scope",
+            scope,
+            "--json",
+            "--root",
+            str(indexed_root),
+        ],
+    )
     assert res.exit_code == 0, res.output
     _check_or_write(snapshot, _slim(json.loads(res.output)))

@@ -5,6 +5,7 @@ suitable for JSON output and a `hint` field for actionable user guidance.
 
 Spec reference: §3.1 (error JSON shape), §5.7 (failure mode codes).
 """
+
 from __future__ import annotations
 
 
@@ -28,31 +29,37 @@ class PKMError(Exception):
 
 class PKMConfigError(PKMError):
     """Configuration is invalid or contradictory."""
+
     code = "CONFIG_ERROR"
 
 
 class PKMValidationError(PKMError):
     """User input or persisted data fails validation."""
+
     code = "VALIDATION_ERROR"
 
 
 class PKMStateError(PKMError):
     """System is in an unexpected state (file missing, invalid status, etc.)."""
+
     code = "STATE_ERROR"
 
 
 class PKMNotFoundError(PKMError):
     """Requested resource (file, slug, topic) does not exist."""
+
     code = "NOT_FOUND"
 
 
 class PKMNotImplementedError(PKMError):
     """Code path is reserved for a future milestone."""
+
     code = "NOT_IMPLEMENTED"
 
 
 class PKMStatusError(PKMError):
     """A status-transition gate failed (e.g. promote requires reviewed)."""
+
     code = "STATUS_NOT_REVIEWED"
 
 

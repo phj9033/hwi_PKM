@@ -12,6 +12,7 @@ Atomic write uses tempfile + os.replace, which is atomic on POSIX.
 
 Spec reference: §3.2 (slug semantics), §8.6 (atomicity).
 """
+
 from __future__ import annotations
 
 import os

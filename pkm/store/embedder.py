@@ -14,6 +14,7 @@ the stub exists to exercise the search pipeline shape under the M1 RAM cap.
 
 Master spec §5.6, §8.2.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -37,6 +38,7 @@ def model_cache_root() -> Path:
 
 class Embedder(Protocol):
     dim: int
+
     def embed(self, texts: list[str]) -> np.ndarray: ...  # (N, dim) L2-normalized
 
 
@@ -82,6 +84,7 @@ class RealEmbedder:
     def _load(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer  # lazy
+
             self._model = SentenceTransformer(
                 MODEL_NAME,
                 cache_folder=str(model_cache_root()),

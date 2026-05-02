@@ -1,4 +1,5 @@
 """Tests for pkm.commands.chunks."""
+
 from __future__ import annotations
 
 import json
@@ -18,8 +19,7 @@ def _init(tmp_path):
 
 def test_new_creates_topic_with_readme(tmp_path):
     _init(tmp_path)
-    res = runner.invoke(app, ["chunks", "new", "oauth-deep-dive",
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["chunks", "new", "oauth-deep-dive", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     readme = tmp_path / "data/raw/chunks/oauth-deep-dive/README.md"
     assert readme.exists()
@@ -30,9 +30,9 @@ def test_new_creates_topic_with_readme(tmp_path):
 
 def test_new_with_description(tmp_path):
     _init(tmp_path)
-    runner.invoke(app, ["chunks", "new", "x",
-                        "--description", "deep dive on x",
-                        "--root", str(tmp_path)])
+    runner.invoke(
+        app, ["chunks", "new", "x", "--description", "deep dive on x", "--root", str(tmp_path)]
+    )
     fm, _ = parse((tmp_path / "data/raw/chunks/x/README.md").read_text(encoding="utf-8"))
     assert fm["description"] == "deep dive on x"
 
@@ -49,8 +49,7 @@ def test_add_copies_file_and_records_source(tmp_path):
     runner.invoke(app, ["chunks", "new", "t", "--root", str(tmp_path)])
     src = tmp_path / "src.md"
     src.write_text("source content", encoding="utf-8")
-    res = runner.invoke(app, ["chunks", "add", "t", str(src),
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["chunks", "add", "t", str(src), "--root", str(tmp_path)])
     assert res.exit_code == 0
     copied = tmp_path / "data/raw/chunks/t/src.md"
     assert copied.read_text(encoding="utf-8") == "source content"
@@ -65,8 +64,7 @@ def test_add_multiple_files(tmp_path):
     a.write_text("a")
     b = tmp_path / "b.md"
     b.write_text("b")
-    res = runner.invoke(app, ["chunks", "add", "t", str(a), str(b),
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["chunks", "add", "t", str(a), str(b), "--root", str(tmp_path)])
     assert res.exit_code == 0
     fm, _ = parse((tmp_path / "data/raw/chunks/t/README.md").read_text(encoding="utf-8"))
     assert "a.md" in fm["sources"] and "b.md" in fm["sources"]
@@ -76,8 +74,7 @@ def test_add_refuses_missing_topic(tmp_path):
     _init(tmp_path)
     src = tmp_path / "x.md"
     src.write_text("x")
-    res = runner.invoke(app, ["chunks", "add", "absent", str(src),
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["chunks", "add", "absent", str(src), "--root", str(tmp_path)])
     assert res.exit_code != 0
 
 
@@ -106,8 +103,7 @@ def test_show_returns_readme_and_files(tmp_path):
 def test_set_status_changes_state(tmp_path):
     _init(tmp_path)
     runner.invoke(app, ["chunks", "new", "x", "--root", str(tmp_path)])
-    res = runner.invoke(app, ["chunks", "set-status", "x", "ready",
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["chunks", "set-status", "x", "ready", "--root", str(tmp_path)])
     assert res.exit_code == 0
     fm, _ = parse((tmp_path / "data/raw/chunks/x/README.md").read_text(encoding="utf-8"))
     assert fm["status"] == "ready"
@@ -116,8 +112,7 @@ def test_set_status_changes_state(tmp_path):
 def test_set_status_invalid_enum(tmp_path):
     _init(tmp_path)
     runner.invoke(app, ["chunks", "new", "x", "--root", str(tmp_path)])
-    res = runner.invoke(app, ["chunks", "set-status", "x", "wat",
-                              "--root", str(tmp_path)])
+    res = runner.invoke(app, ["chunks", "set-status", "x", "wat", "--root", str(tmp_path)])
     assert res.exit_code != 0
 
 
@@ -137,8 +132,7 @@ def test_chunks_new_json_has_git_commit(tmp_path: Path):
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     res = runner.invoke(
         app,
-        ["chunks", "new", "oauth-deep-dive",
-         "--root", str(tmp_path), "--json"],
+        ["chunks", "new", "oauth-deep-dive", "--root", str(tmp_path), "--json"],
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None and len(payload["git_commit"]) == 40
@@ -152,8 +146,7 @@ def test_chunks_add_json_has_git_commit(tmp_path: Path):
     src.write_text("hello")
     res = runner.invoke(
         app,
-        ["chunks", "add", "oauth", str(src),
-         "--root", str(tmp_path), "--json"],
+        ["chunks", "add", "oauth", str(src), "--root", str(tmp_path), "--json"],
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None
@@ -165,8 +158,7 @@ def test_chunks_set_status_json_has_git_commit(tmp_path: Path):
     runner.invoke(app, ["chunks", "new", "oauth", "--root", str(tmp_path)])
     res = runner.invoke(
         app,
-        ["chunks", "set-status", "oauth", "curating",
-         "--root", str(tmp_path), "--json"],
+        ["chunks", "set-status", "oauth", "curating", "--root", str(tmp_path), "--json"],
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None
@@ -178,8 +170,7 @@ def test_chunks_rm_json_has_git_commit(tmp_path: Path):
     runner.invoke(app, ["chunks", "new", "oauth", "--root", str(tmp_path)])
     res = runner.invoke(
         app,
-        ["chunks", "rm", "oauth",
-         "--root", str(tmp_path), "--json"],
+        ["chunks", "rm", "oauth", "--root", str(tmp_path), "--json"],
     )
     payload = json.loads(res.output.splitlines()[-1])
     assert payload["git_commit"] is not None

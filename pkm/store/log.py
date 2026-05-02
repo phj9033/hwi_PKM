@@ -6,6 +6,7 @@ so the table never breaks.
 
 Spec reference: §2 (layout — log.md), §6.6 (auto-update).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

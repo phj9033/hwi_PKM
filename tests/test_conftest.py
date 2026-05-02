@@ -1,4 +1,5 @@
 """Verify conftest.py scaffolding is active."""
+
 import os
 
 
@@ -9,6 +10,7 @@ def test_stub_embedder_env_is_set():
 def test_rss_cap_applied_on_unix():
     """Best-effort check; Unix only."""
     import resource
+
     if not hasattr(resource, "RLIMIT_AS"):
         return
     soft, _ = resource.getrlimit(resource.RLIMIT_AS)

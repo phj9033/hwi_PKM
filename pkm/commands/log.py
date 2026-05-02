@@ -1,4 +1,5 @@
 """`pkm log {append,show}` — manual access to data/log.md."""
+
 from __future__ import annotations
 
 import json
@@ -35,13 +36,23 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         events = read_events(root, type_filter=type_filter)
         if json_out:
-            typer.echo(json.dumps(
-                {"ok": True, "events": [
-                    {"timestamp": e.timestamp, "type": e.type, "ref": e.ref, "message": e.message}
-                    for e in events
-                ]},
-                ensure_ascii=False,
-            ))
+            typer.echo(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "events": [
+                            {
+                                "timestamp": e.timestamp,
+                                "type": e.type,
+                                "ref": e.ref,
+                                "message": e.message,
+                            }
+                            for e in events
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+            )
         else:
             for e in events:
                 typer.echo(f"{e.timestamp}  {e.type:<24}  {e.ref:<32}  {e.message}")

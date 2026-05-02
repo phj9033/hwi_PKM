@@ -10,6 +10,7 @@ For each kind we expose:
 Validation is **shape-only** here — referential checks (e.g. derived_from
 exists) live in `pkm lint` (M4).
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -169,7 +170,17 @@ def validate_wiki(fm: dict) -> None:
 
 # --- writing ---
 
-_WRITING_REQUIRED = ("title", "slug", "created_at", "updated_at", "status", "purpose", "derived_from", "lang", "tags")
+_WRITING_REQUIRED = (
+    "title",
+    "slug",
+    "created_at",
+    "updated_at",
+    "status",
+    "purpose",
+    "derived_from",
+    "lang",
+    "tags",
+)
 _WRITING_PURPOSES = ("guideline", "report", "summary", "essay")
 _WRITING_STATUSES = ("draft", "final", "promoted", "abandoned")
 _WRITING_LANGS = ("ko", "en", "mixed")

@@ -1,4 +1,5 @@
 """Tests for pkm.store.chunker."""
+
 from __future__ import annotations
 
 from pkm.store.chunker import split_markdown

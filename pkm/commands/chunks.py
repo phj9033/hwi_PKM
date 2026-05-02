@@ -2,6 +2,7 @@
 
 Spec reference: §3.2 (chunks commands), §6.1 (chunk frontmatter).
 """
+
 from __future__ import annotations
 
 import json
@@ -88,12 +89,14 @@ def _do_list(root: Path) -> list[dict]:
                 fm, _ = parse(readme.read_text(encoding="utf-8"))
             except Exception:
                 fm = {}
-        out.append({
-            "topic": fm.get("topic") or d.name,
-            "status": fm.get("status") or "?",
-            "lang": fm.get("lang") or "?",
-            "path": d.relative_to(root).as_posix(),
-        })
+        out.append(
+            {
+                "topic": fm.get("topic") or d.name,
+                "status": fm.get("status") or "?",
+                "lang": fm.get("lang") or "?",
+                "path": d.relative_to(root).as_posix(),
+            }
+        )
     return out
 
 
@@ -150,7 +153,9 @@ def _emit_or_raise(json_out: bool, exc: PKMError) -> None:
 
 
 def register(app: typer.Typer) -> None:
-    chunks_app = typer.Typer(name="chunks", help="Manage chunks (raw/chunks/).", no_args_is_help=True)
+    chunks_app = typer.Typer(
+        name="chunks", help="Manage chunks (raw/chunks/).", no_args_is_help=True
+    )
     app.add_typer(chunks_app, name="chunks")
 
     @chunks_app.command("new")

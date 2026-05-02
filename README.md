@@ -12,13 +12,26 @@ pkm init                  # scaffold a fresh PKM (data/, .pkm/, SCHEMA.md, .clau
 pkm doctor                # check environment + structure
 ```
 
+## Commands
+
+After `pkm init`:
+
+- **Capture / chunks (M2):** `pkm capture {create,list,show,set-status,rm}`, `pkm chunks {new,add,list,show,set-status}`.
+- **Indexing & search (M3):** `pkm reindex db [--full]`, `pkm search <query>`.
+- **Git auto-commit (M3.5):** every mutation commits via `pkm <type>: <ref>`.
+- **Extract (M4):** `pkm extract <file> [--out PATH]` — PDF/HTML → markdown. Install: `pip install -e '.[extract]'` (`pdfplumber` + `markdownify`).
+- **Promote / demote (M4):** `pkm promote <ref> --to <bucket> [--slug NEW] [--keep-source]`, `pkm demote <wiki-ref>`.
+- **Wiki edit (M4):** `pkm wiki edit <ref> {--replace|--patch}` — strict-mode escape valve.
+- **Lint (M4):** `pkm lint [--fix] [--json] [--errors-only]` — 13 rules (6 errors, 7 warnings); `--fix` handles `MISSING_FIELD` + `ORPHAN_PROMOTED_SOURCE`.
+- **Slash templates seeded by init:** `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`.
+
 ## Status
 
 - [x] M1 — Foundation (this milestone)
 - [x] M2 — Capture & Chunks
 - [x] M3 — Indexing & Search
 - [x] M3.5 — Git Auto-commit
-- [ ] M4 — Promote & Lint
+- [x] M4 — Promote, Lint & Extract
 - [ ] M5 — AI bridge & Writing
 - [ ] M6 — Dashboard
 - [ ] M7 — Hardening

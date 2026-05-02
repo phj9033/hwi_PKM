@@ -4,6 +4,7 @@ M3 omits --expand (AI CLI shellout) and --no-rerank (cross-encoder); both
 land in M5. The flags are not even registered here so accidental use surfaces
 as a Typer error rather than silently doing nothing.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,11 +22,11 @@ def register(app: typer.Typer) -> None:
         query: str = typer.Argument(..., help="Search query string."),
         n: int = typer.Option(10, "-n", "--top-n", help="Top-N results."),
         scope: str = typer.Option(
-            "wiki", "--scope",
+            "wiki",
+            "--scope",
             help="Bucket filter: wiki | raw | writing | all.",
         ),
-        explain: bool = typer.Option(False, "--explain",
-                                     help="Include per-stage scoring detail."),
+        explain: bool = typer.Option(False, "--explain", help="Include per-stage scoring detail."),
         json_out: bool = typer.Option(False, "--json"),
         root: Path = typer.Option(Path("."), "--root", "-r"),
     ) -> None:
@@ -43,8 +44,6 @@ def register(app: typer.Typer) -> None:
         else:
             typer.echo(f"Found {len(out['results'])} results for {query!r} (scope={scope}):")
             for r in out["results"]:
-                typer.echo(
-                    f"  {r['scores']['final']:.4f}  {r['path']}  [chunk {r['chunk_idx']}]"
-                )
+                typer.echo(f"  {r['scores']['final']:.4f}  {r['path']}  [chunk {r['chunk_idx']}]")
                 if r["snippet"]:
                     typer.echo(f"    {r['snippet']}")

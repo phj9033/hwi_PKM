@@ -1,4 +1,5 @@
 """Tests for the M4-seeded slash templates."""
+
 from __future__ import annotations
 
 from pathlib import Path

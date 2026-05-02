@@ -13,6 +13,7 @@ Output contract (per spec §5.7):
 M1 scope: python version + repo structure. Models, AI CLI, and index checks
 land in M3 / M5 / M6.
 """
+
 from __future__ import annotations
 
 import json
@@ -99,6 +100,7 @@ def _check_index_db(root: Path) -> _Item:
         return _Item("index.db", "missing", "run: pkm reindex db --full")
     try:
         import sqlite3
+
         conn = sqlite3.connect(db)
         try:
             cnt = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
@@ -115,10 +117,13 @@ def _check_git(root: Path) -> _Item:
 
     # only for symmetry with _check_index_db's lazy sqlite3.
     from pkm.store import git as gitmod
+
     try:
         subprocess.run(["git", "--version"], capture_output=True, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError):
-        return _Item("git", "missing", "install: brew install git (macOS) / apt-get install git (Linux)")
+        return _Item(
+            "git", "missing", "install: brew install git (macOS) / apt-get install git (Linux)"
+        )
     if gitmod.is_git_repo(root):
         return _Item("git", "ok", "repo present")
     return _Item("git", "missing", "run: pkm init  (or git init)")
@@ -126,6 +131,7 @@ def _check_git(root: Path) -> _Item:
 
 def _check_model_cache() -> _Item:
     from pkm.store.embedder import model_cache_root
+
     cache = model_cache_root() / "bge-m3"
     if cache.exists() or any(model_cache_root().glob("models--BAAI--bge-m3*")):
         return _Item("bge-m3", "ok", None)
@@ -136,6 +142,7 @@ def _do_download() -> None:
     from huggingface_hub import snapshot_download
 
     from pkm.store.embedder import MODEL_NAME, model_cache_root
+
     cache = model_cache_root()
     cache.mkdir(parents=True, exist_ok=True)
     snapshot_download(MODEL_NAME, cache_dir=str(cache))
@@ -197,8 +204,7 @@ def register(app: typer.Typer) -> None:
             payload = {
                 "ok": not any_bad,
                 "items": [
-                    {"name": it.name, "status": it.status, "detail": it.detail}
-                    for it in items
+                    {"name": it.name, "status": it.status, "detail": it.detail} for it in items
                 ],
                 "system": system,
             }

@@ -58,3 +58,7 @@ class PKMStatusError(PKMError):
 
 class PKMPromoteFromWritingNotYet(PKMNotImplementedError):
     code = "PROMOTE_FROM_WRITING_NOT_YET"
+
+
+class PKMDemoteToWritingNotYet(PKMNotImplementedError):
+    code = "DEMOTE_TO_WRITING_NOT_YET"

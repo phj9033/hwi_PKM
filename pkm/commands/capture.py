@@ -4,6 +4,7 @@ Spec reference: §3.2 (commands), §6.1 (capture frontmatter), §6.6 (auto log/i
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -109,6 +110,8 @@ def _do_set_status(root: Path, ref: str, status: str) -> dict:
     p = resolve_capture(root, ref)
     fm, body = parse(p.read_text(encoding="utf-8"))
     fm["status"] = status
+    if status == "reviewed" and "body_hash" not in fm:
+        fm["body_hash"] = hashlib.sha256(body.encode("utf-8")).hexdigest()
     validate_capture(fm)  # raises PKMValidationError on bad enum
     atomic_write(p, serialize(fm, body))
     sha = post_mutation(

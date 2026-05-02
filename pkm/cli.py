@@ -71,6 +71,8 @@ def _register_all() -> None:
     promote_cmd.register(app)
     from pkm.commands import demote as demote_cmd
     demote_cmd.register(app)
+    from pkm.commands import lint as lint_cmd
+    lint_cmd.register(app)
 
 
 _register_all()

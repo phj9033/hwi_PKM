@@ -85,6 +85,10 @@ def _register_all() -> None:
 
     lint_cmd.register(app)
 
+    from pkm.commands import related as related_cmd
+
+    related_cmd.register(app)
+
 
 _register_all()
 

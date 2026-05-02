@@ -76,6 +76,7 @@ def search(
     explain: bool = False,
     rerank: bool = True,
     expand: bool = False,
+    with_related: bool = False,
 ) -> dict:
     """Run the full search pipeline. Returns a JSON-able dict.
 
@@ -156,12 +157,20 @@ def search(
             for r in results:
                 r["scores"]["final"] = r["scores"]["rerank"]
 
+        final = results[:n]
+
+        if with_related:
+            from pkm.search.related import related_for
+
+            for hit in final:
+                hit["related"] = related_for(conn, hit["path"], mode="both", n=5)
+
         return {
             "ok": True,
             "query": query,
             "expanded": queries[1:] if expand else [],
             "scope": scope,
-            "results": results[:n],
+            "results": final,
         }
     finally:
         conn.close()

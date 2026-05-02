@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import tomllib
 from collections.abc import Iterable
 from datetime import date, datetime
@@ -30,6 +31,8 @@ from pkm.store.chunker import split_markdown
 from pkm.store.embedder import get_embedder
 from pkm.store.frontmatter import parse as parse_fm
 from pkm.store.index_db import connect
+
+_WIKILINK_RE = re.compile(r"\[\[([^\]\n]+?)\]\]")
 
 # Bucket prefixes match master spec §2 layout.
 _BUCKETS = {
@@ -164,6 +167,53 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opte
                 "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",
                 (chunk_id, embeddings[i].astype("float32").tobytes()),
             )
+
+    # Insert doc-level embedding into docs_vec (mean-pool over chunk embeddings).
+    if embeddings is not None and len(embeddings) > 0:
+        import numpy as np
+
+        doc_vec = embeddings.mean(axis=0).astype(np.float32)
+        norm = np.linalg.norm(doc_vec)
+        if norm > 0.0:
+            doc_vec = doc_vec / norm
+        conn.execute(
+            "INSERT INTO docs_vec(doc_id, embedding) VALUES (?, ?)",
+            (doc_id, doc_vec.tobytes()),
+        )
+
+    # Extract and insert links (wikilinks, derived_from, tags) from this doc.
+    link_rows: list[tuple[int, None, str, str]] = []
+
+    for m in _WIKILINK_RE.finditer(body):
+        target = m.group(1).strip()
+        link_rows.append((doc_id, None, target, "wikilink"))
+
+    for ref in fm.get("derived_from") or []:
+        if isinstance(ref, str):
+            link_rows.append((doc_id, None, ref, "derived_from"))
+
+    for tag in fm.get("tags") or []:
+        if isinstance(tag, str):
+            link_rows.append((doc_id, None, tag, "tag"))
+
+    if link_rows:
+        conn.executemany(
+            "INSERT INTO links(src_doc_id, dst_doc_id, dst_path, kind) VALUES (?,?,?,?)",
+            link_rows,
+        )
+        # Resolve dst_doc_id where dst_path matches documents.path exactly.
+        # Bare slugs (e.g. "oauth-token-storage") stay unresolved (dst_doc_id NULL).
+        # The BROKEN_WIKILINK lint rule surfaces unresolved wikilinks separately.
+        conn.execute(
+            """
+            UPDATE links SET dst_doc_id = (
+                SELECT id FROM documents WHERE documents.path = links.dst_path
+            )
+            WHERE src_doc_id = ? AND dst_doc_id IS NULL AND dst_path IS NOT NULL
+            """,
+            (doc_id,),
+        )
+
     return True
 
 

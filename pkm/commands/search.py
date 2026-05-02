@@ -28,13 +28,23 @@ def register(app: typer.Typer) -> None:
         explain: bool = typer.Option(False, "--explain", help="Include per-stage scoring detail."),
         no_rerank: bool = typer.Option(False, "--no-rerank", help="Skip cross-encoder reranking."),
         expand: bool = typer.Option(False, "--expand", help="Query expansion via llm_bridge."),
+        with_related: bool = typer.Option(
+            False, "--with-related", help="Add backlinks + semantic neighbors per hit."
+        ),
         json_out: bool = typer.Option(False, "--json"),
         root: Path = typer.Option(Path("."), "--root", "-r"),
     ) -> None:
         """Search across the indexed corpus."""
         try:
             out = pipeline.search(
-                root, query, scope=scope, n=n, explain=explain, rerank=not no_rerank, expand=expand
+                root,
+                query,
+                scope=scope,
+                n=n,
+                explain=explain,
+                rerank=not no_rerank,
+                expand=expand,
+                with_related=with_related,
             )
         except PKMError as e:
             typer.echo(f"Error [{e.code}]: {e.message}", err=True)

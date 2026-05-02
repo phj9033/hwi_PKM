@@ -81,3 +81,9 @@ class PKMRerankModelMissing(PKMError):
     """Raised when bge-reranker-v2-m3 is not in the local cache."""
 
     code = "RERANK_MODEL_MISSING"
+
+
+class PKMExpandFailed(PKMError):
+    """Raised when AI CLI query expansion fails (--expand path)."""
+
+    code = "EXPAND_FAILED"

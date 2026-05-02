@@ -1,8 +1,6 @@
 """End-to-end search pipeline: BM25 + vector + RRF + rerank (spec §5.4).
 
-Stages omitted (deferred to a later milestone):
-  - [1] query expansion via AI CLI (--expand)
-
+Stage [1] query expansion via AI CLI (--expand) added in M5.7.
 Stage [4] cross-encoder reranking is default ON; pass rerank=False to skip.
 """
 
@@ -11,12 +9,41 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pkm.errors import PKMStateError
+from pkm.errors import PKMExpandFailed, PKMStateError
 from pkm.search.bm25 import query_bm25
 from pkm.search.rrf import rrf_fuse
 from pkm.search.vector import query_vector
 from pkm.store.embedder import get_embedder
 from pkm.store.index_db import connect
+
+
+def _expand_query(root: Path, query: str) -> list[str]:
+    """Expand query using AI CLI, dedup, and cap at 3 total (original + 2 variants).
+
+    Returns [original_query, *expansion_variants] up to 3 items.
+    Raises PKMExpandFailed if the AI CLI is unavailable or fails.
+    """
+    from pkm.llm_bridge import BridgeError, run_task
+
+    try:
+        out = run_task(root, "expand_query", query)
+    except BridgeError as e:
+        raise PKMExpandFailed(
+            str(e),
+            hint="Drop --expand or fix .pkm/config.local.toml",
+        ) from e
+
+    # Parse expansions from output (newline-separated).
+    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+    # Dedup while preserving order; cap at 3 total (original first, then variants).
+    seen: list[str] = []
+    for q in [query, *lines]:
+        if q not in seen:
+            seen.append(q)
+        if len(seen) >= 3:
+            break
+    return seen
 
 
 def _snippet(text: str, max_chars: int = 240) -> str:
@@ -48,8 +75,14 @@ def search(
     n: int = 10,
     explain: bool = False,
     rerank: bool = True,
+    expand: bool = False,
 ) -> dict:
-    """Run the full search pipeline. Returns a JSON-able dict."""
+    """Run the full search pipeline. Returns a JSON-able dict.
+
+    If expand=True, queries the original query + AI CLI expansions in parallel
+    via BM25 and vector search, then fuses results via RRF. Reranking (if enabled)
+    scores against the ORIGINAL query only.
+    """
     conn = connect(root)
     try:
         # Cheap empty-index probe — better error than zero results.
@@ -60,18 +93,29 @@ def search(
                 hint="Run: pkm reindex db --full",
             )
 
+        # Stage [1] Query expansion (optional).
+        queries = _expand_query(root, query) if expand else [query]
+
         embedder = get_embedder()
-        query_vec = embedder.embed([query])[0]
 
-        bm25_hits = query_bm25(conn, query, scope=scope, top=50)
-        vec_hits = query_vector(conn, query_vec, scope=scope, top=50)
+        # Retrieve from all queries and collect results.
+        bm25_lists: list = []
+        vec_lists: list = []
 
-        # Stage [3] RRF fusion — keep top 30 for the reranker.
-        fused = rrf_fuse(bm25_hits, vec_hits, k=60)[:30]
+        for q in queries:
+            bm25_hits = query_bm25(conn, q, scope=scope, top=50)
+            bm25_lists.append(bm25_hits)
 
-        # Look up per-stage scores for each fused chunk.
-        bm25_by_id = {h.chunk_id: h.score for h in bm25_hits}
-        vec_by_id = {h.chunk_id: h.score for h in vec_hits}
+            query_vec = embedder.embed([q])[0]
+            vec_hits = query_vector(conn, query_vec, scope=scope, top=50)
+            vec_lists.append(vec_hits)
+
+        # Stage [3] RRF fusion across all query variants — keep top 30 for the reranker.
+        fused = rrf_fuse(*bm25_lists, *vec_lists, k=60)[:30]
+
+        # Look up per-stage scores for each fused chunk (from BM25/vector of first query).
+        bm25_by_id = {h.chunk_id: h.score for h in bm25_lists[0]}
+        vec_by_id = {h.chunk_id: h.score for h in vec_lists[0]}
 
         results: list[dict] = []
         for h in fused:
@@ -103,6 +147,7 @@ def search(
             )
 
         # Stage [4] Cross-encoder reranking (default ON).
+        # CRITICAL: Rerank uses ORIGINAL query only, not expansion variants.
         if rerank:
             from pkm.search.rerank import rerank as _rerank
 
@@ -114,6 +159,7 @@ def search(
         return {
             "ok": True,
             "query": query,
+            "expanded": queries[1:] if expand else [],
             "scope": scope,
             "results": results[:n],
         }

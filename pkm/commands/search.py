@@ -1,7 +1,7 @@
 """`pkm search` — hybrid BM25 + vector + RRF + cross-encoder reranking.
 
+Stage [1] query expansion via AI CLI (--expand) added in M5.7.
 Stage [4] cross-encoder reranking is default ON; pass --no-rerank to skip.
---expand (AI CLI query expansion) is deferred to a later milestone.
 """
 
 from __future__ import annotations
@@ -27,13 +27,14 @@ def register(app: typer.Typer) -> None:
         ),
         explain: bool = typer.Option(False, "--explain", help="Include per-stage scoring detail."),
         no_rerank: bool = typer.Option(False, "--no-rerank", help="Skip cross-encoder reranking."),
+        expand: bool = typer.Option(False, "--expand", help="Query expansion via llm_bridge."),
         json_out: bool = typer.Option(False, "--json"),
         root: Path = typer.Option(Path("."), "--root", "-r"),
     ) -> None:
         """Search across the indexed corpus."""
         try:
             out = pipeline.search(
-                root, query, scope=scope, n=n, explain=explain, rerank=not no_rerank
+                root, query, scope=scope, n=n, explain=explain, rerank=not no_rerank, expand=expand
             )
         except PKMError as e:
             typer.echo(f"Error [{e.code}]: {e.message}", err=True)

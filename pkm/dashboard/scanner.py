@@ -69,12 +69,12 @@ class Neighbor:
 
 @dataclass
 class DocRegistry:
-    docs_by_category: dict = field(default_factory=dict)
-    by_rel_path: dict = field(default_factory=dict)
-    by_slug: dict = field(default_factory=dict)
-    outgoing: dict = field(default_factory=dict)
-    backlinks: dict = field(default_factory=dict)
-    semantic: dict = field(default_factory=dict)
+    docs_by_category: dict[str, list[Doc]] = field(default_factory=dict)
+    by_rel_path: dict[str, Doc] = field(default_factory=dict)
+    by_slug: dict[str, Doc] = field(default_factory=dict)
+    outgoing: dict[str, list[str]] = field(default_factory=dict)
+    backlinks: dict[str, list[str]] = field(default_factory=dict)
+    semantic: dict[str, list[Neighbor]] = field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------- #

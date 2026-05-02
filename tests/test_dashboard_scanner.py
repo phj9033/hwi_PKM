@@ -59,6 +59,21 @@ def test_scan_no_data_dir(tmp_path: Path) -> None:
     assert reg.semantic == {}
 
 
+def test_scan_corrupt_index_db_returns_empty_graphs(tmp_path: Path) -> None:
+    """A non-SQLite file at .pkm/index.db must not crash scan(); graphs remain empty."""
+    (tmp_path / ".pkm").mkdir()
+    (tmp_path / ".pkm" / "index.db").write_bytes(b"not a sqlite database\n")
+    (tmp_path / "data" / "wiki" / "concepts").mkdir(parents=True)
+    (tmp_path / "data" / "wiki" / "concepts" / "foo.md").write_text(
+        "---\ntitle: Foo\nslug: foo\n---\nbody\n", encoding="utf-8"
+    )
+    reg = scan(tmp_path)
+    assert len(reg.docs_by_category["wiki"]) == 1
+    assert reg.outgoing == {}
+    assert reg.backlinks == {}
+    assert reg.semantic == {}
+
+
 def test_scan_link_graph_from_index_db(tmp_path: Path) -> None:
     """When .pkm/index.db has links rows, scanner populates outgoing/backlinks."""
     seed(tmp_path)

@@ -63,6 +63,8 @@ def _register_all() -> None:
     reindex_cmd.register(app)
     from pkm.commands import search as search_cmd
     search_cmd.register(app)
+    from pkm.commands import extract as extract_cmd
+    extract_cmd.register(app)
 
 
 _register_all()

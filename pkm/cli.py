@@ -67,6 +67,8 @@ def _register_all() -> None:
     extract_cmd.register(app)
     from pkm.commands import wiki as wiki_cmd
     wiki_cmd.register(app)
+    from pkm.commands import promote as promote_cmd
+    promote_cmd.register(app)
 
 
 _register_all()

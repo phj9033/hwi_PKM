@@ -44,3 +44,17 @@ class PKMStateError(PKMError):
 class PKMNotFoundError(PKMError):
     """Requested resource (file, slug, topic) does not exist."""
     code = "NOT_FOUND"
+
+
+class PKMNotImplementedError(PKMError):
+    """Code path is reserved for a future milestone."""
+    code = "NOT_IMPLEMENTED"
+
+
+class PKMStatusError(PKMError):
+    """A status-transition gate failed (e.g. promote requires reviewed)."""
+    code = "STATUS_NOT_REVIEWED"
+
+
+class PKMPromoteFromWritingNotYet(PKMNotImplementedError):
+    code = "PROMOTE_FROM_WRITING_NOT_YET"

@@ -75,9 +75,33 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 - `pkm lint --json` for the full report.
 - `pkm lint --fix` to apply the 2 spec-marked auto-fixes.
 
+### Ask
+- `/ask <question>` runs `pkm search --json`, Reads top hits, synthesizes with citations `[<path>]`.
+- No general knowledge — if wiki is silent, say so.
+- (Optional) save the answer as a capture with `derived_from: [...cited paths]`.
+
+### Write
+- `/write <topic>` orchestrates `pkm write new` → fill body via Edit → `pkm write set-status <s> final` → `pkm promote <path> --to <bucket>`.
+- `pkm write new` seeds frontmatter only (empty body); the AI fills the body using search hits or chunk sources, citing inline.
+
+### Chunk → Wiki Synthesis
+1. `pkm chunks new <topic>` and gather sources via `/research` or `pkm chunks add <topic> <file>`.
+2. `pkm chunks set-status <topic> ready`.
+3. `pkm write new --slug <s> --from-chunks <topic> --purpose summary` (frontmatter pre-seeds derived_from).
+4. AI Reads each derived_from path (PDF? `pkm extract` first), synthesizes into the body, cites.
+5. `pkm write set-status <s> final && pkm promote data/writing/<s>.md --to concepts`.
+
 ## 5. CLI Reference
 
-(Empty in M1. `pkm --help` is authoritative.)
+- **Search enhancements (M5):**
+  - `pkm search ... --no-rerank` to skip cross-encoder rerank.
+  - `pkm search ... --expand` for AI-mediated query expansion (requires AI CLI on PATH or in `.pkm/config.local.toml`).
+  - `pkm search ... --with-related` adds backlinks + semantic neighbors per hit.
+- **Relations (M5):** `pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]`.
+- **Writing (M5):** `pkm write {new,list,set-status}`. `pkm promote` and `pkm demote` accept `data/writing/*` sources.
+- **Models (M5):** `pkm doctor --download` fetches embedder + reranker into `~/.cache/pkm/models/`.
+
+(`pkm --help` remains authoritative for full CLI surface.)
 
 ## 6. Invariants
 

@@ -23,7 +23,15 @@ After `pkm init`:
 - **Promote / demote (M4):** `pkm promote <ref> --to <bucket> [--slug NEW] [--keep-source]`, `pkm demote <wiki-ref>`.
 - **Wiki edit (M4):** `pkm wiki edit <ref> {--replace|--patch}` — strict-mode escape valve.
 - **Lint (M4):** `pkm lint [--fix] [--json] [--errors-only]` — 13 rules (6 errors, 7 warnings); `--fix` handles `MISSING_FIELD` + `ORPHAN_PROMOTED_SOURCE`.
-- **Slash templates seeded by init:** `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`.
+- **Search enhancements (M5):**
+  - `pkm search ... --no-rerank` skips the cross-encoder.
+  - `pkm search ... --expand` enables LLM-mediated query expansion.
+  - `pkm search ... --with-related` adds backlinks + semantic neighbors per hit.
+- **Relations (M5):** `pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]`.
+- **Writing (M5):** `pkm write {new,list,set-status}`. `pkm promote` and `pkm demote` accept `data/writing/*` sources.
+- **AI bridge (M5):** `pkm/llm_bridge.py` autodetects `claude/codex/gemini/ollama` on PATH or follows TOML config in `.pkm/config.{toml,local.toml}`. `.pkm/hooks/<task>.sh` is an escape valve.
+- **Models (M5):** `pkm doctor --download` fetches embedder + reranker (~1.2GB) into `~/.cache/pkm/models/`.
+- **Slash templates seeded by init:** `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`.
 
 ## Status
 
@@ -32,7 +40,7 @@ After `pkm init`:
 - [x] M3 — Indexing & Search
 - [x] M3.5 — Git Auto-commit
 - [x] M4 — Promote, Lint & Extract
-- [ ] M5 — AI bridge & Writing
+- [x] M5 — AI bridge & Writing
 - [ ] M6 — Dashboard
 - [ ] M7 — Hardening
 

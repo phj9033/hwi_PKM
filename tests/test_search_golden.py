@@ -72,6 +72,7 @@ def test_golden_search(indexed_root: Path, query: str, scope: str, snapshot: str
             query,
             "--scope",
             scope,
+            "--no-rerank",
             "--json",
             "--root",
             str(indexed_root),

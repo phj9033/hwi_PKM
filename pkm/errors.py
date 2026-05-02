@@ -75,3 +75,9 @@ class PKMPromoteFromWritingNotYet(PKMNotImplementedError):
 
 class PKMDemoteToWritingNotYet(PKMNotImplementedError):
     code = "DEMOTE_TO_WRITING_NOT_YET"
+
+
+class PKMRerankModelMissing(PKMError):
+    """Raised when bge-reranker-v2-m3 is not in the local cache."""
+
+    code = "RERANK_MODEL_MISSING"

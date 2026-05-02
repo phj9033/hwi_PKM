@@ -45,8 +45,9 @@ def _apply_rss_cap() -> None:
         pass
 
 
-# Default the stub embedder ON — real models must be opt-in via slow tests.
+# Default the stub embedder and reranker ON — real models must be opt-in via slow tests.
 os.environ.setdefault("PKM_TEST_STUB_EMBEDDER", "1")
 os.environ.setdefault("PKM_TEST_SKIP_DOWNLOAD", "1")
+os.environ.setdefault("PKM_TEST_STUB_RERANKER", "1")
 
 _apply_rss_cap()

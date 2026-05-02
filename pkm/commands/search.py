@@ -1,8 +1,7 @@
-"""`pkm search` — hybrid BM25 + vector + RRF search.
+"""`pkm search` — hybrid BM25 + vector + RRF + cross-encoder reranking.
 
-M3 omits --expand (AI CLI shellout) and --no-rerank (cross-encoder); both
-land in M5. The flags are not even registered here so accidental use surfaces
-as a Typer error rather than silently doing nothing.
+Stage [4] cross-encoder reranking is default ON; pass --no-rerank to skip.
+--expand (AI CLI query expansion) is deferred to a later milestone.
 """
 
 from __future__ import annotations
@@ -27,16 +26,19 @@ def register(app: typer.Typer) -> None:
             help="Bucket filter: wiki | raw | writing | all.",
         ),
         explain: bool = typer.Option(False, "--explain", help="Include per-stage scoring detail."),
+        no_rerank: bool = typer.Option(False, "--no-rerank", help="Skip cross-encoder reranking."),
         json_out: bool = typer.Option(False, "--json"),
         root: Path = typer.Option(Path("."), "--root", "-r"),
     ) -> None:
         """Search across the indexed corpus."""
         try:
-            out = pipeline.search(root, query, scope=scope, n=n, explain=explain)
+            out = pipeline.search(
+                root, query, scope=scope, n=n, explain=explain, rerank=not no_rerank
+            )
         except PKMError as e:
-            typer.echo(f"Error [{e.code}]: {e.message}")
+            typer.echo(f"Error [{e.code}]: {e.message}", err=True)
             if e.hint:
-                typer.echo(f"  hint: {e.hint}")
+                typer.echo(f"  hint: {e.hint}", err=True)
             raise typer.Exit(1) from None
 
         if json_out:

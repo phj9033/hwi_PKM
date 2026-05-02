@@ -1,10 +1,9 @@
-"""End-to-end search pipeline: BM25 + vector + RRF (M3 subset of master spec §5.4).
+"""End-to-end search pipeline: BM25 + vector + RRF + rerank (spec §5.4).
 
-Stages omitted in M3 (deferred to M5):
+Stages omitted (deferred to a later milestone):
   - [1] query expansion via AI CLI (--expand)
-  - [4] cross-encoder reranking (--no-rerank flag, default ON in spec)
 
-So the M3 search() is fully deterministic given a fixed embedder.
+Stage [4] cross-encoder reranking is default ON; pass rerank=False to skip.
 """
 
 from __future__ import annotations
@@ -42,9 +41,15 @@ def _frontmatter_for(conn, doc_id: int) -> dict:
 
 
 def search(
-    root: Path, query: str, *, scope: str = "wiki", n: int = 10, explain: bool = False
+    root: Path,
+    query: str,
+    *,
+    scope: str = "wiki",
+    n: int = 10,
+    explain: bool = False,
+    rerank: bool = True,
 ) -> dict:
-    """Run the full M3 search pipeline. Returns a JSON-able dict."""
+    """Run the full search pipeline. Returns a JSON-able dict."""
     conn = connect(root)
     try:
         # Cheap empty-index probe — better error than zero results.
@@ -61,7 +66,8 @@ def search(
         bm25_hits = query_bm25(conn, query, scope=scope, top=50)
         vec_hits = query_vector(conn, query_vec, scope=scope, top=50)
 
-        fused = rrf_fuse(bm25_hits, vec_hits, k=60)[:n]
+        # Stage [3] RRF fusion — keep top 30 for the reranker.
+        fused = rrf_fuse(bm25_hits, vec_hits, k=60)[:30]
 
         # Look up per-stage scores for each fused chunk.
         bm25_by_id = {h.chunk_id: h.score for h in bm25_hits}
@@ -80,9 +86,11 @@ def search(
                 heading_path = []
             results.append(
                 {
+                    "chunk_id": h.chunk_id,
                     "path": h.path,
                     "chunk_idx": chunk_meta["chunk_idx"] if chunk_meta else 0,
                     "heading_path": heading_path,
+                    "text": h.chunk_text,
                     "snippet": _snippet(h.chunk_text),
                     "scores": {
                         "bm25": round(bm25_by_id.get(h.chunk_id, 0.0), 6),
@@ -94,11 +102,20 @@ def search(
                 }
             )
 
+        # Stage [4] Cross-encoder reranking (default ON).
+        if rerank:
+            from pkm.search.rerank import rerank as _rerank
+
+            results = _rerank(query, results)
+            # Update final score to reflect rerank ordering.
+            for r in results:
+                r["scores"]["final"] = r["scores"]["rerank"]
+
         return {
             "ok": True,
             "query": query,
             "scope": scope,
-            "results": results,
+            "results": results[:n],
         }
     finally:
         conn.close()

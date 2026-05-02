@@ -27,6 +27,12 @@ class PKMError(Exception):
         }
 
 
+# M5 error codes — constants used by future raisers (M5.6/M5.7) and by tests.
+EMBED_MODEL_MISSING = "EMBED_MODEL_MISSING"
+RERANK_MODEL_MISSING = "RERANK_MODEL_MISSING"
+EXPAND_FAILED = "EXPAND_FAILED"
+
+
 class PKMConfigError(PKMError):
     """Configuration is invalid or contradictory."""
 

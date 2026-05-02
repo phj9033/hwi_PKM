@@ -148,14 +148,6 @@ def _check_model_cache() -> _Item:
     return _Item("bge-m3", "missing", "run: pkm doctor --download")
 
 
-def _do_download() -> None:
-    from huggingface_hub import snapshot_download
-
-    from pkm.store.embedder import MODEL_NAME, model_cache_root
-
-    cache = model_cache_root()
-    cache.mkdir(parents=True, exist_ok=True)
-    snapshot_download(MODEL_NAME, cache_dir=str(cache))
 
 
 def _render_human(items: list[_Item], system: dict[str, object]) -> str:
@@ -199,7 +191,20 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Report PKM environment & structure status."""
         if download:
-            _do_download()
+            from pkm.store.model_cache import cache_dir, download_models
+            results = download_models()
+            if json_out:
+                typer.echo(json.dumps({
+                    "ok": True,
+                    "cache_dir": str(cache_dir()),
+                    "models": [r.__dict__ for r in results],
+                }, ensure_ascii=False))
+            else:
+                typer.echo(f"Cache: {cache_dir()}")
+                for r in results:
+                    state = "cached" if r.cached else "downloaded"
+                    typer.echo(f"  {state}: {r.name}")
+            return  # short-circuit
         items: list[_Item] = []
         items.append(_check_python())
         items.extend(_check_paths(root))

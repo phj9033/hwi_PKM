@@ -54,13 +54,14 @@ def test_doctor_default_exit_zero_even_when_missing(tmp_path: Path, monkeypatch)
 
 
 def test_doctor_download_invokes_snapshot(tmp_path: Path, monkeypatch):
-    """--download triggers huggingface_hub.snapshot_download (mocked)."""
+    """--download triggers huggingface_hub.snapshot_download for both models (mocked)."""
     _scaffold_full(tmp_path)
     monkeypatch.setenv("PKM_MODEL_CACHE", str(tmp_path / "cache"))
-    called: dict = {}
+    monkeypatch.setenv("PKM_TEST_SKIP_DOWNLOAD", "0")  # actually call snapshot_download
+    called_models: list = []
 
     def fake_snapshot(repo_id, **kwargs):
-        called["repo_id"] = repo_id
+        called_models.append(repo_id)
         cache_dir = kwargs.get("cache_dir") or kwargs.get("local_dir")
         assert cache_dir is not None
         cache = Path(cache_dir)
@@ -75,7 +76,9 @@ def test_doctor_download_invokes_snapshot(tmp_path: Path, monkeypatch):
     runner = CliRunner()
     res = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--download"])
     assert res.exit_code == 0
-    assert called["repo_id"] == "BAAI/bge-m3"
+    # Both models should be downloaded
+    assert "BAAI/bge-m3" in called_models
+    assert "BAAI/bge-reranker-v2-m3" in called_models
 
 
 def test_doctor_lists_git_item(tmp_path: Path):

@@ -13,7 +13,9 @@ The public surface this module commits to:
 
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -148,3 +150,105 @@ def _coerce_cli_spec(alias: str, blob: dict[str, Any]) -> CLISpec:
         timeout=int(blob.get("timeout", 30)),
         env=dict(blob["env"]) if blob.get("env") else None,
     )
+
+
+# ==== Tier 3: Task Resolution & Execution ====
+
+
+class BridgeError(Exception):
+    """Raised when no resolvable AI CLI is available, or subprocess fails."""
+
+
+def run_task(root: Path, task: str, prompt: str) -> str:
+    """Resolve and execute an AI CLI task. Returns the CLI's stdout (stripped).
+
+    Resolution order: hook > config tasks > config default > PATH autodetect.
+    Honors PKM_AI_CLI_FAKE=1 (returns canned strings) and
+    PKM_AI_CLI=<alias> (overrides task → alias mapping).
+    """
+    if os.environ.get("PKM_AI_CLI_FAKE") == "1":
+        return _fake_response(task, prompt)
+
+    hook = root / ".pkm" / "hooks" / f"{task}.sh"
+    if hook.exists() and os.access(hook, os.X_OK):
+        return _run_hook(hook, prompt, timeout=60)
+
+    cfg = load_config(root)
+    alias = os.environ.get("PKM_AI_CLI") or cfg.tasks.get(task) or cfg.default
+    spec = cfg.commands.get(alias) if alias else None
+
+    if spec is None:
+        detected = detect_ai_cli()
+        if detected is None:
+            raise BridgeError(
+                f"No AI CLI configured for task={task!r}. "
+                f"Install claude/codex/gemini/ollama, or define one in "
+                f".pkm/config.local.toml."
+            )
+        spec = CLISpec(exec=[detected.path, "-p", "{prompt}"], input="arg")
+
+    return _run_spec(spec, prompt)
+
+
+def _run_spec(spec: CLISpec, prompt: str) -> str:
+    argv: list[str] = []
+    stdin_data: str | None = None
+    for tok in spec.exec:
+        if "{prompt}" in tok and spec.input == "arg":
+            argv.append(tok.replace("{prompt}", prompt))
+        else:
+            argv.append(tok)
+    if spec.input == "stdin":
+        stdin_data = prompt
+    elif spec.input.startswith("file:"):
+        target = Path(spec.input.split(":", 1)[1])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(prompt, encoding="utf-8")
+
+    env = dict(os.environ)
+    if spec.env:
+        env.update(spec.env)
+
+    try:
+        proc = subprocess.run(
+            argv,
+            input=stdin_data,
+            capture_output=True,
+            text=True,
+            timeout=spec.timeout,
+            env=env,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise BridgeError(f"AI CLI timeout after {spec.timeout}s: {' '.join(argv)}") from e
+
+    if proc.returncode != 0:
+        raise BridgeError(
+            f"AI CLI exit {proc.returncode}: {' '.join(argv)} :: {proc.stderr.strip()}"
+        )
+    return proc.stdout.strip()
+
+
+def _run_hook(hook: Path, prompt: str, timeout: int) -> str:
+    try:
+        proc = subprocess.run(
+            [str(hook)],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise BridgeError(f"hook timeout: {hook}") from e
+    if proc.returncode != 0:
+        raise BridgeError(f"hook {hook} exit {proc.returncode}: {proc.stderr.strip()}")
+    return proc.stdout.strip()
+
+
+def _fake_response(task: str, prompt: str) -> str:
+    if task == "expand_query":
+        return f"{prompt}\n{prompt} en\n{prompt} alt"
+    if task == "lint_summary":
+        return f"FAKE-LINT-SUMMARY({prompt[:40]})"
+    return f"FAKE({task}):{prompt[:80]}"

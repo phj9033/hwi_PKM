@@ -11,6 +11,12 @@ from pkm.cli import app
 _runner = CliRunner()
 
 
+def init_repo(root: Path) -> None:
+    """Run `pkm init` to scaffold a fresh PKM repo at root."""
+    result = _runner.invoke(app, ["init", "--root", str(root)])
+    assert result.exit_code == 0, f"init failed: {result.output}"
+
+
 def seed_wiki_for_search(root: Path, n: int = 5, with_links: bool = False) -> None:
     """Write n wiki docs into root and run reindex so the search pipeline works.
 

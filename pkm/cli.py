@@ -89,6 +89,10 @@ def _register_all() -> None:
 
     related_cmd.register(app)
 
+    from pkm.commands import write as write_cmd
+
+    write_cmd.register(app)
+
 
 _register_all()
 

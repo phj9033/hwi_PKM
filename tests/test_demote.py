@@ -78,7 +78,8 @@ def test_demote_missing_promoted_from(tmp_path: Path):
     assert payload["error"]["code"] in ("STATE_ERROR", "VALIDATION_ERROR")
 
 
-def test_demote_writing_origin_returns_carve_error(tmp_path: Path):
+def test_demote_writing_origin_with_missing_source(tmp_path: Path):
+    """Demoting a writing-origin wiki page fails if the writing source vanished."""
     runner.invoke(app, ["init", "--root", str(tmp_path), "-f"])
     p = tmp_path / "data" / "wiki" / "concepts" / "writing-origin.md"
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -101,7 +102,7 @@ def test_demote_writing_origin_returns_carve_error(tmp_path: Path):
     )
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
-    assert payload["error"]["code"] == "DEMOTE_TO_WRITING_NOT_YET"
+    assert payload["error"]["code"] == "NOT_FOUND"
 
 
 def test_demote_unknown_wiki_ref(tmp_path: Path):

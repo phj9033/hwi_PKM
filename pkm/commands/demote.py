@@ -1,8 +1,8 @@
-"""`pkm demote <wiki-ref>` — wiki → capture (or writing in M5).
+"""`pkm demote <wiki-ref>` — wiki → capture or writing.
 
 If the wiki page has `promoted_from: data/raw/captures/...`, restore that
-capture to status=reviewed and delete the wiki file. Writing-origin pages
-return DEMOTE_TO_WRITING_NOT_YET (M5).
+capture to status=reviewed and delete the wiki file. If `promoted_from:
+data/writing/...`, restore writing to status=final and delete the wiki file.
 
 Spec reference: §6.4 (demote).
 """
@@ -16,8 +16,8 @@ import typer
 
 from pkm._mutations import post_mutation
 from pkm.errors import (
-    PKMDemoteToWritingNotYet,
     PKMError,
+    PKMNotFoundError,
     PKMStateError,
 )
 from pkm.store.files import atomic_write
@@ -25,6 +25,42 @@ from pkm.store.frontmatter import parse, serialize
 from pkm.store.frontmatter_schemas import validate_capture
 from pkm.store.log import LogEvent
 from pkm.store.wiki_paths import resolve_wiki
+
+
+def _demote_to_writing(root: Path, wiki_target: Path, src_rel: str) -> dict:
+    """Demote a writing-origin wiki page back to writing (status: promoted → final)."""
+    src = root / src_rel
+    if not src.exists():
+        raise PKMNotFoundError(
+            f"writing source vanished: {src_rel}",
+            hint="Recreate via `pkm write new` or restore from git.",
+        )
+
+    src_text = src.read_text(encoding="utf-8")
+    src_fm, src_body = parse(src_text)
+    src_fm["status"] = "final"
+    atomic_write(src, serialize(src_fm, src_body))
+
+    paths = [str(src.relative_to(root)), str(wiki_target.relative_to(root))]
+    wiki_target.unlink()
+
+    sha = post_mutation(
+        root,
+        LogEvent(
+            type="writing.demote",
+            ref=src_fm.get("slug", src.stem),
+            message=f"wiki → writing/{src_fm.get('slug', src.stem)}",
+        ),
+        paths=paths,
+    )
+    return {
+        "ok": True,
+        "wiki_path": wiki_target.relative_to(root).as_posix(),
+        "source_path": src.relative_to(root).as_posix(),
+        "source_kind": "writing",
+        "writing_status_after": "final",
+        "git_commit": sha,
+    }
 
 
 def _do_demote(root: Path, *, ref: str) -> dict:
@@ -38,10 +74,7 @@ def _do_demote(root: Path, *, ref: str) -> dict:
         )
 
     if promoted_from.startswith("data/writing/"):
-        raise PKMDemoteToWritingNotYet(
-            "demoting writing-origin pages lands in M5 alongside `pkm write new`",
-            hint="Delete by hand or wait for M5.",
-        )
+        return _demote_to_writing(root, wiki_p, promoted_from)
 
     src_p = root / promoted_from
     if not src_p.exists():

@@ -1,0 +1,59 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<h1>hwi_PKM</h1>
+
+<section class="stat-strip">
+  <span class="stat" data-stat="captures">{{ counts.captures }}</span>
+  <span class="stat-label">captures</span>
+  <span class="stat" data-stat="chunks">{{ counts.chunks }}</span>
+  <span class="stat-label">chunks</span>
+  <span class="stat" data-stat="wiki">{{ counts.wiki }}</span>
+  <span class="stat-label">wiki</span>
+  <span class="stat" data-stat="writing">{{ counts.writing }}</span>
+  <span class="stat-label">writing</span>
+</section>
+
+<section class="card lint-card">
+  <h2>lint summary</h2>
+  {% if lint is none %}
+    <p class="empty">(unavailable — run pkm lint)</p>
+  {% else %}
+    <div class="lint-summary">
+      <span class="lint-error">errors: {{ lint.errors }}</span>
+      <span class="lint-warn">warnings: {{ lint.warnings }}</span>
+    </div>
+    {% if lint.top_codes %}
+      <ul class="lint-top-codes">
+        {% for code, n in lint.top_codes %}
+          <li><code>{{ code }}</code> &times; {{ n }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No findings.</p>
+    {% endif %}
+  {% endif %}
+</section>
+
+<section class="card log-card">
+  <h2>recent log</h2>
+  {% if not recent_log %}
+    <p class="empty">No log entries yet.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr><th>at</th><th>type</th><th>ref</th></tr>
+      </thead>
+      <tbody>
+        {% for ev in recent_log %}
+          <tr>
+            <td>{{ ev.at }}</td>
+            <td>{{ ev.type }}</td>
+            <td>{{ ev.ref }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

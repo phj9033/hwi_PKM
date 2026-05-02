@@ -1,0 +1,2 @@
+[ai_cli.commands.my-claude]
+exec = ["claude", "-p", "{prompt}"]

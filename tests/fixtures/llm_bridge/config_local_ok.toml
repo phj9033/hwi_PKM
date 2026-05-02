@@ -1,0 +1,12 @@
+[ai_cli.commands.my-claude]
+exec = ["claude", "--model", "haiku", "-p", "{prompt}"]
+input = "arg"
+timeout = 30
+
+[ai_cli.commands.ollama-local]
+exec = ["ollama", "run", "qwen2.5:3b"]
+input = "stdin"
+timeout = 120
+
+[ai_cli.tasks]
+expand_query = "ollama-local"

@@ -1,0 +1,3 @@
+[ai_cli]
+default = "my-claude"
+fallback_order = ["my-claude", "ollama-local"]

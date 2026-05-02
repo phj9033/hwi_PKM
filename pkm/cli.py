@@ -93,6 +93,10 @@ def _register_all() -> None:
 
     write_cmd.register(app)
 
+    from pkm.commands import dashboard as dashboard_cmd
+
+    dashboard_cmd.register(app)
+
 
 _register_all()
 

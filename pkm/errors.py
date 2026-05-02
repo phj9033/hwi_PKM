@@ -87,3 +87,12 @@ class PKMExpandFailed(PKMError):
     """Raised when AI CLI query expansion fails (--expand path)."""
 
     code = "EXPAND_FAILED"
+
+
+BOOTSTRAP_STEP_FAILED = "BOOTSTRAP_STEP_FAILED"
+
+
+class PKMBootstrapStepFailed(PKMError):
+    """A step inside `pkm bootstrap` exited non-zero."""
+
+    code = "BOOTSTRAP_STEP_FAILED"

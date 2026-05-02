@@ -1,0 +1,35 @@
+"""`pkm dashboard <subcommand>` — static dashboard builder.
+
+Spec reference: §7.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import typer
+
+dashboard_app = typer.Typer(
+    name="dashboard",
+    help="Static dashboard builder.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+
+@dashboard_app.command("build")
+def build_cmd(
+    out: Path = typer.Option(
+        Path("dashboard"),
+        "--out",
+        help="Output directory for the rendered dashboard.",
+    ),
+) -> None:
+    """Build the static HTML dashboard into OUT (default: ./dashboard/)."""
+    out.mkdir(parents=True, exist_ok=True)
+    # TODO(M6.11): replace with real orchestrator.
+    (out / "index.html").write_text("<!doctype html><title>WIP</title>\n", encoding="utf-8")
+
+
+def register(app: typer.Typer) -> None:
+    app.add_typer(dashboard_app, name="dashboard")

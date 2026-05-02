@@ -1,0 +1,68 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<h1>{{ category }}</h1>
+
+{% if rows %}
+<section class="filter-bar">
+  <input id="filter-q" type="search" placeholder="filter…">
+  <select id="filter-status">
+    <option value="">(any status)</option>
+    {% for s in statuses %}
+      <option value="{{ s }}">{{ s }}</option>
+    {% endfor %}
+  </select>
+</section>
+
+<table class="list-table">
+  <thead>
+    <tr>
+      {% for col in columns %}
+        <th>{{ col.label }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+      <tr data-status="{{ row.status }}">
+        {% for col in columns %}
+          {%- set val = row[col.key] -%}
+          {%- if col.linkable and row.url_path -%}
+          <td><a href="{{ row.url_path }}">{{ val }}</a></td>
+          {%- else -%}
+          <td>{{ val }}</td>
+          {%- endif %}
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No documents yet.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if rows %}
+<script>
+(function(){
+  const q = document.getElementById("filter-q");
+  const s = document.getElementById("filter-status");
+  const rows = document.querySelectorAll("tbody tr");
+  function apply(){
+    const qs = (q.value||"").toLowerCase();
+    const ss = (s.value||"");
+    rows.forEach(r => {
+      const text = r.textContent.toLowerCase();
+      const status = r.dataset.status||"";
+      const passQ = !qs || text.includes(qs);
+      const passS = !ss || status === ss;
+      r.style.display = (passQ && passS) ? "" : "none";
+    });
+  }
+  q.addEventListener("input", apply);
+  s.addEventListener("change", apply);
+})();
+</script>
+{% endif %}
+{% endblock %}

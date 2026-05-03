@@ -1,0 +1,20 @@
+{% extends "base.html.j2" %}
+
+{% block head_extra %}
+<link rel="preload" href="{{ '../' * depth }}search-index.json" as="fetch" crossorigin="anonymous">
+{% endblock %}
+
+{% block content %}
+<h1>search</h1>
+
+<section class="filter-bar">
+  <input id="q" type="search" placeholder="search title + snippet…">
+  <input id="tag" type="search" placeholder="tag filter…">
+</section>
+
+<ul id="results" class="search-results"></ul>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ '../' * depth }}assets/search.js" defer></script>
+{% endblock %}

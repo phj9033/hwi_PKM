@@ -26,9 +26,9 @@ def build_cmd(
     ),
 ) -> None:
     """Build the static HTML dashboard into OUT (default: ./dashboard/)."""
-    out.mkdir(parents=True, exist_ok=True)
-    # TODO(M6.11): replace with real orchestrator.
-    (out / "index.html").write_text("<!doctype html><title>WIP</title>\n", encoding="utf-8")
+    from pkm.dashboard.builder import build_dashboard
+
+    build_dashboard(Path.cwd(), out)
 
 
 def register(app: typer.Typer) -> None:

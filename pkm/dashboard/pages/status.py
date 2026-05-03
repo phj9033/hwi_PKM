@@ -60,15 +60,20 @@ def _doctor_view(doctor: dict[str, Any] | None) -> list[dict[str, Any]] | None:
 def _flatten_config(d: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
     """Flatten nested dicts into ``[("a.b.c", value), ...]`` pairs.
 
-    Lists/tuples and scalars are emitted verbatim — only nested dicts get
-    walked. Order follows ``dict`` insertion order so the rendered config
-    table mirrors the source TOML layout.
+    Nested dicts are walked recursively. TOML *arrays-of-tables*
+    (``list[dict]``, e.g. ``[[ai_cli.tasks]]``) are also walked so each entry
+    contributes its own dot-keys with an ``[i]`` index. Other lists, tuples,
+    and scalars are emitted verbatim. Order follows ``dict`` insertion order
+    so the rendered config table mirrors the source TOML layout.
     """
     rows: list[tuple[str, Any]] = []
     for k, v in d.items():
         key = f"{prefix}.{k}" if prefix else str(k)
         if isinstance(v, dict):
             rows.extend(_flatten_config(v, key))
+        elif isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+            for i, entry in enumerate(v):
+                rows.extend(_flatten_config(entry, f"{key}[{i}]"))
         else:
             rows.append((key, v))
     return rows

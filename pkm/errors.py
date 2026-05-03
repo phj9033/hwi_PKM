@@ -96,3 +96,21 @@ class PKMBootstrapStepFailed(PKMError):
     """A step inside `pkm bootstrap` exited non-zero."""
 
     code = "BOOTSTRAP_STEP_FAILED"
+
+
+def all_error_codes() -> dict[str, type[PKMError]]:
+    """Return ``{code: cls}`` for every PKMError subclass reachable from this module.
+
+    Walks the subclass tree recursively. The base ``PKMError`` itself is
+    included (its code is ``"PKM_ERROR"``). Used by the registry test and the
+    failure-mode matrix to enumerate the stable code surface.
+    """
+    out: dict[str, type[PKMError]] = {}
+
+    def _walk(cls: type[PKMError]) -> None:
+        out.setdefault(cls.code, cls)
+        for sub in cls.__subclasses__():
+            _walk(sub)
+
+    _walk(PKMError)
+    return out

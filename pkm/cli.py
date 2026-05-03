@@ -97,6 +97,10 @@ def _register_all() -> None:
 
     dashboard_cmd.register(app)
 
+    from pkm.commands import bootstrap as bootstrap_cmd
+
+    bootstrap_cmd.register(app)
+
 
 _register_all()
 

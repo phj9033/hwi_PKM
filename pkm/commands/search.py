@@ -47,9 +47,13 @@ def register(app: typer.Typer) -> None:
                 with_related=with_related,
             )
         except PKMError as e:
-            typer.echo(f"Error [{e.code}]: {e.message}", err=True)
-            if e.hint:
-                typer.echo(f"  hint: {e.hint}", err=True)
+            if json_out:
+                # Spec §3.1: failure JSON shape.
+                typer.echo(json.dumps({"ok": False, "error": e.to_dict()}, ensure_ascii=False))
+            else:
+                typer.echo(f"Error [{e.code}]: {e.message}", err=True)
+                if e.hint:
+                    typer.echo(f"  hint: {e.hint}", err=True)
             raise typer.Exit(1) from None
 
         if json_out:

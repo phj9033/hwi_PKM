@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pkm.errors import PKMConfigError
+
 _DETECT_ORDER: tuple[str, ...] = ("claude", "codex", "gemini", "ollama")
 
 
@@ -66,8 +68,14 @@ _FORBIDDEN_KEYS_IN_COMMIT = ("exec", "env", "timeout")
 _CREDENTIAL_KEY_PATTERNS = ("api_key", "apikey", "token", "secret", "password")
 
 
-class BridgeConfigError(Exception):
-    """Raised for malformed config.toml / config.local.toml."""
+class BridgeConfigError(PKMConfigError):
+    """Raised for malformed config.toml / config.local.toml.
+
+    Inherits from :class:`pkm.errors.PKMConfigError` so it surfaces with a
+    stable ``CONFIG_ERROR`` code through the global :func:`pkm.cli.main`
+    wrapper while remaining catchable via ``BridgeConfigError`` for callers
+    that already special-case it.
+    """
 
 
 def load_config(root: Path) -> BridgeConfig:

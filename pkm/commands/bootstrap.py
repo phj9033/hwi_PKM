@@ -21,12 +21,18 @@ underlying steps are intentionally long-running (``pkm doctor --download``
 fetches HuggingFace models, ``pkm reindex db --full`` rebuilds the entire
 index); the user is expected to interrupt with Ctrl-C if needed.
 
+Test hook: ``PKM_BOOTSTRAP_FORCE_FAIL_STEP=<step-name>`` short-circuits
+``_run_step`` to a synthetic failed :class:`StepResult`, used by
+``tests/test_failure_mode_matrix.py`` to provoke ``BOOTSTRAP_STEP_FAILED``
+without spawning the real (multi-minute) doctor/reindex/dashboard subprocesses.
+
 Spec reference: §7.6 (fresh-clone bootstrap).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -60,6 +66,15 @@ def _run_step(name: str, args: list[str]) -> StepResult:
     stderr regardless of outcome but only surfaces it on failure to keep
     success output quiet.
     """
+    # Test hook (see module docstring): force this step to fail without
+    # actually spawning the (potentially multi-minute) child subprocess.
+    if os.environ.get("PKM_BOOTSTRAP_FORCE_FAIL_STEP") == name:
+        return StepResult(
+            name=name,
+            ok=False,
+            duration_s=0.0,
+            hint=f"forced failure for step {name!r} (PKM_BOOTSTRAP_FORCE_FAIL_STEP)",
+        )
     start = time.monotonic()
     proc = subprocess.run(
         [sys.executable, "-m", "pkm", *args],

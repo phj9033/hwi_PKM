@@ -20,6 +20,7 @@ Spec reference: M6 plan, Task 9.
 
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 
 import click
@@ -30,17 +31,15 @@ from pkm.dashboard.context import DashboardContext
 from pkm.dashboard.renderer import render_markdown
 from pkm.dashboard.templates import render
 
-_SCHEMA_TEMPLATE = (
-    Path(__file__).resolve().parent.parent.parent / "templates" / "SCHEMA.md.template"
-)
-
 
 def _load_schema_markdown(root: Path) -> str:
     """Return SCHEMA markdown — project copy if present, else package template."""
     project = root / "SCHEMA.md"
     if project.exists():
         return project.read_text(encoding="utf-8")
-    return _SCHEMA_TEMPLATE.read_text(encoding="utf-8")
+    return (
+        resources.files("pkm.templates").joinpath("SCHEMA.md.template").read_text(encoding="utf-8")
+    )
 
 
 def _cli_entries() -> list[dict[str, str]]:

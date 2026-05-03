@@ -1,0 +1,122 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<article class="doc">
+  <header class="doc-header">
+    <h1>{{ doc.title }}</h1>
+    <div class="doc-meta">
+      {% if doc.status %}
+        <span class="status-pill status-{{ doc.status }}">{{ doc.status }}</span>
+      {% endif %}
+      {% if doc.lang %}
+        <span class="lang">{{ doc.lang }}</span>
+      {% endif %}
+      {% if doc.tags %}
+        <span class="tags">
+          {% for t in doc.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+        </span>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="doc-body">
+    {{ body_html | safe }}
+  </section>
+</article>
+
+<aside class="doc-sidebar">
+  <section class="frontmatter">
+    <h2>frontmatter</h2>
+    {% if frontmatter_rows %}
+      <table>
+        <tbody>
+          {% for k, v in frontmatter_rows %}
+            <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No frontmatter.</p>
+    {% endif %}
+  </section>
+
+  <section class="backlinks">
+    <h2>backlinks</h2>
+    {% if backlinks %}
+      <ul>
+        {% for link in backlinks %}
+          <li>
+            {% if link.href %}
+              <a href="{{ link.href }}">{{ link.title }}</a>
+            {% else %}
+              <span>{{ link.title }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No backlinks yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="outgoing">
+    <h2>outgoing</h2>
+    {% if outgoing %}
+      <ul>
+        {% for link in outgoing %}
+          <li>
+            {% if link.href %}
+              <a href="{{ link.href }}">{{ link.title }}</a>
+            {% else %}
+              <span>{{ link.title }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No outgoing links.</p>
+    {% endif %}
+  </section>
+
+  <section class="semantic-neighbors">
+    <h2>semantic neighbors</h2>
+    {% if not db_present %}
+      <p class="empty">{{ reindex_hint }}</p>
+    {% elif semantic %}
+      <ul>
+        {% for n in semantic %}
+          <li>
+            {% if n.href %}
+              <a href="{{ n.href }}">{{ n.title }}</a>
+            {% else %}
+              <span>{{ n.title }}</span>
+            {% endif %}
+            <span class="score">{{ n.score }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No semantic neighbors found.</p>
+    {% endif %}
+  </section>
+
+  <section class="provenance">
+    <h2>provenance ({{ provenance.kind }})</h2>
+    {% if provenance.entries %}
+      <ul>
+        {% for item in provenance.entries %}
+          <li>
+            {% if item.href %}
+              <a href="{{ item.href }}">{{ item.text }}</a>
+            {% else %}
+              <span>{{ item.text }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No provenance.</p>
+    {% endif %}
+  </section>
+</aside>
+{% endblock %}

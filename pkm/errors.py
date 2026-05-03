@@ -83,6 +83,12 @@ class PKMRerankModelMissing(PKMError):
     code = "RERANK_MODEL_MISSING"
 
 
+class PKMEmbedModelMissing(PKMError):
+    """Raised when bge-m3 is not in the local cache (used by `pkm bench --real`)."""
+
+    code = "EMBED_MODEL_MISSING"
+
+
 class PKMExpandFailed(PKMError):
     """Raised when AI CLI query expansion fails (--expand path)."""
 

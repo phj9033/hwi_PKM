@@ -101,6 +101,10 @@ def _register_all() -> None:
 
     bootstrap_cmd.register(app)
 
+    from pkm.commands import bench as bench_cmd
+
+    bench_cmd.register(app)
+
 
 _register_all()
 

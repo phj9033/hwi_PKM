@@ -26,6 +26,7 @@ from pkm.errors import (
     PKMBootstrapStepFailed,
     PKMConfigError,
     PKMDemoteToWritingNotYet,
+    PKMEmbedModelMissing,
     PKMError,
     PKMExpandFailed,
     PKMNotFoundError,
@@ -53,6 +54,7 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "PROMOTE_FROM_WRITING_NOT_YET": lambda: PKMPromoteFromWritingNotYet("future"),
     "DEMOTE_TO_WRITING_NOT_YET": lambda: PKMDemoteToWritingNotYet("future"),
     "RERANK_MODEL_MISSING": lambda: PKMRerankModelMissing("model missing"),
+    "EMBED_MODEL_MISSING": lambda: PKMEmbedModelMissing("model missing"),
     "EXPAND_FAILED": lambda: PKMExpandFailed("expand failed"),
     "BOOTSTRAP_STEP_FAILED": lambda: PKMBootstrapStepFailed("step failed"),
 }

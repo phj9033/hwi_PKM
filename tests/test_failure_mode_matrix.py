@@ -193,6 +193,11 @@ def _scenario_rerank_model_missing(repo: Path) -> list[str]:
     return ["search", "x"]
 
 
+def _scenario_embed_model_missing(repo: Path) -> list[str]:
+    """`pkm bench --real` against an empty model cache → EMBED_MODEL_MISSING."""
+    return ["bench", "--real", "--docs", "1"]
+
+
 def _scenario_expand_failed(repo: Path) -> list[str]:
     """Configure a fake CLI exec that exits non-zero → BridgeError → PKMExpandFailed."""
     _create_capture(repo, "indexed-expand")
@@ -223,6 +228,7 @@ SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "PROMOTE_FROM_WRITING_NOT_YET": _scenario_pkm_error,  # deferred
     "DEMOTE_TO_WRITING_NOT_YET": _scenario_pkm_error,  # deferred
     "RERANK_MODEL_MISSING": _scenario_rerank_model_missing,
+    "EMBED_MODEL_MISSING": _scenario_embed_model_missing,
     "EXPAND_FAILED": _scenario_expand_failed,
     "BOOTSTRAP_STEP_FAILED": _scenario_bootstrap_step_failed,
 }
@@ -238,6 +244,11 @@ SCENARIO_ENV: dict[str, dict[str, str]] = {
         # The reranker looks under `Path.home() / ".cache" / "pkm" / "models"`;
         # set HOME to a tmp dir filled in by the test runner.
         # Actual HOME injection happens in the test (depends on tmp_path).
+    },
+    "EMBED_MODEL_MISSING": {
+        # bench --real disables both stubs internally; we still need HOME (and
+        # PKM_MODEL_CACHE) pointed at an empty dir so the cache pre-check misses.
+        # HOME/PKM_MODEL_CACHE injection happens in the test (depends on tmp_path).
     },
     "BOOTSTRAP_STEP_FAILED": {
         "PKM_BOOTSTRAP_FORCE_FAIL_STEP": "doctor",
@@ -276,6 +287,13 @@ def test_code_is_reachable(code: str, tmp_path: Path) -> None:
     # satisfy the loader).
     if code == "RERANK_MODEL_MISSING":
         env["HOME"] = str(tmp_path / "fake-home")
+    # EMBED_MODEL_MISSING (bench --real): same reasoning, but bench reads
+    # PKM_MODEL_CACHE first so we point both at an empty dir.
+    if code == "EMBED_MODEL_MISSING":
+        fake_home = tmp_path / "fake-home"
+        fake_home.mkdir(exist_ok=True)
+        env["HOME"] = str(fake_home)
+        env["PKM_MODEL_CACHE"] = str(fake_home / ".cache" / "pkm" / "models")
 
     proc = subprocess.run(
         [sys.executable, "-m", "pkm", *argv],

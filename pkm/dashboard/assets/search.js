@@ -3,14 +3,33 @@
 // and tag intersection, renders top-50 results.
 
 (async function () {
-  const data = await (await fetch("search-index.json")).json();
+  let data;
+  try {
+    const resp = await fetch("search-index.json");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    data = await resp.json();
+  } catch (e) {
+    console.error("search: failed to load index", e);
+    const el = document.getElementById("results");
+    if (el) {
+      el.innerHTML =
+        '<li class="empty">no index available — run pkm dashboard build</li>';
+    }
+    return;
+  }
   const q = document.getElementById("q");
   const tag = document.getElementById("tag");
   const results = document.getElementById("results");
 
   function escapeHtml(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[c];
     });
   }
 
@@ -19,7 +38,7 @@
       .slice(0, 50)
       .map(function (d) {
         const title = d.url
-          ? '<a href="' + d.url + '">' + escapeHtml(d.title) + "</a>"
+          ? '<a href="' + escapeHtml(d.url) + '">' + escapeHtml(d.title) + "</a>"
           : escapeHtml(d.title);
         const tags = (d.tags || [])
           .map(function (t) {

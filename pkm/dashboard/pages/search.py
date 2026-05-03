@@ -56,13 +56,6 @@ def _entry(doc: Doc) -> dict:
     }
 
 
-def _all_docs(ctx: DashboardContext) -> list[Doc]:
-    docs: list[Doc] = []
-    for category in ("captures", "chunks", "wiki", "writing"):
-        docs.extend(ctx.registry.docs_by_category.get(category, []))
-    return docs
-
-
 def build_search(out: Path, ctx: DashboardContext) -> tuple[Path, Path]:
     """Render ``search.html`` + ``search-index.json`` into ``out``.
 
@@ -70,7 +63,7 @@ def build_search(out: Path, ctx: DashboardContext) -> tuple[Path, Path]:
     """
     out.mkdir(parents=True, exist_ok=True)
 
-    index = [_entry(d) for d in _all_docs(ctx)]
+    index = [_entry(d) for d in ctx.registry.by_rel_path.values()]
     json_path = out / "search-index.json"
     json_path.write_text(
         json.dumps(index, ensure_ascii=False, indent=2) + "\n",

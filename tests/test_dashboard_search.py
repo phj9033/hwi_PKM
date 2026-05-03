@@ -62,6 +62,8 @@ def test_search_index_snippet_truncated(tmp_path, ctx_with_long_body):
     out.mkdir()
     _, json_path = build_search(out, ctx_with_long_body)
     data = json.loads(json_path.read_text(encoding="utf-8"))
+    long = next(d for d in data if d["path"] == "writing/long-doc.md")
+    assert len(long["snippet"]) == 200
     assert all(len(d["snippet"]) <= 200 for d in data)
 
 

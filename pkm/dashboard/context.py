@@ -22,6 +22,7 @@ Grown in M6.11; the seed shape lands here so M6.5-M6.10 can build against it.
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import sys
 import tomllib
@@ -34,6 +35,8 @@ from pkm.dashboard.scanner import DocRegistry, scan
 from pkm.store.log import LogEvent, read_events
 
 _RECENT_LOG_LIMIT = 20
+_SUBPROCESS_TIMEOUT_S = 30
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,18 +65,33 @@ def _run_pkm_json(args: list[str], *, cwd: Path) -> dict | list | None:
     Always pass ``--json`` explicitly at the call site
     (e.g. ``_run_pkm_json(["lint", "--json"], cwd=root)``); we do not auto-inject.
     """
-    result = subprocess.run(
-        [sys.executable, "-m", "pkm", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pkm", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=_SUBPROCESS_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        _logger.warning("pkm %s timed out after %ss", " ".join(args), _SUBPROCESS_TIMEOUT_S)
+        return None
+    except (subprocess.SubprocessError, OSError) as e:
+        _logger.warning("pkm %s failed: %s", " ".join(args), e)
+        return None
     out = (result.stdout or "").strip()
     if not out:
+        if result.stderr:
+            _logger.debug(
+                "pkm %s produced empty stdout; stderr: %s",
+                " ".join(args),
+                result.stderr[:500],
+            )
         return None
     try:
         return json.loads(out)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        _logger.debug("pkm %s stdout was not JSON: %s", " ".join(args), e)
         return None
 
 
@@ -99,6 +117,8 @@ def _adapt_lint(raw: dict | None) -> dict | None:
             "errors": len(errors),
             "warnings": len(warnings),
         },
+        "fixed": int(raw.get("fixed", 0) or 0),
+        "ok": bool(raw.get("ok", not (errors or warnings))),
         "items": [*errors, *warnings],
     }
 

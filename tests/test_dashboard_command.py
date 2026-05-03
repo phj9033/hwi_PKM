@@ -135,4 +135,4 @@ def test_build_dashboard_idempotent(tmp_path: Path, seeded_data: Path, stub_pkm_
     sizes_1 = {str(p.relative_to(out)): p.stat().st_size for p in out.rglob("*.html")}
     build_dashboard(seeded_data, out)
     sizes_2 = {str(p.relative_to(out)): p.stat().st_size for p in out.rglob("*.html")}
-    assert sizes_1.keys() == sizes_2.keys()
+    assert sizes_1 == sizes_2

@@ -29,6 +29,7 @@ def build_cmd(
     from pkm.dashboard.builder import build_dashboard
 
     build_dashboard(Path.cwd(), out)
+    typer.echo(f"dashboard: wrote {out}")
 
 
 def register(app: typer.Typer) -> None:

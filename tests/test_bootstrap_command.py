@@ -123,6 +123,27 @@ def test_bootstrap_json_mode(tmp_path, monkeypatch):
         assert isinstance(s["duration_s"], int | float)
 
 
+def test_bootstrap_json_mode_on_failure(tmp_path, monkeypatch):
+    """--json on a failed run still emits a structured report; first failure has hint."""
+
+    def fake_run(cmd, **kw):
+        class R:
+            returncode = 1
+            stdout = ""
+            stderr = "boom"
+
+        return R()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["bootstrap", "--json"])
+    assert result.exit_code != 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["steps"][0]["ok"] is False
+    assert "boom" in payload["steps"][0]["hint"]
+
+
 def test_bootstrap_help_lists_steps():
     """`pkm bootstrap --help` mentions all three sub-steps so the user knows."""
     result = runner.invoke(app, ["bootstrap", "--help"])

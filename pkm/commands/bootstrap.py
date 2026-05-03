@@ -16,6 +16,11 @@ The ``_run_step`` helper here is intentionally **distinct** from
 (no JSON parsing); the dashboard helper parses JSON. The two should not be
 unified — the contracts are different.
 
+No ``timeout=`` is passed to ``subprocess.run`` in ``_run_step`` because the
+underlying steps are intentionally long-running (``pkm doctor --download``
+fetches HuggingFace models, ``pkm reindex db --full`` rebuilds the entire
+index); the user is expected to interrupt with Ctrl-C if needed.
+
 Spec reference: §7.6 (fresh-clone bootstrap).
 """
 

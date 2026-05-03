@@ -118,16 +118,21 @@ def _build_doc(category: str, bucket: str | None, abs_path: Path, data_root: Pat
     raw_tags = fm.get("tags") or ()
     tags: tuple[str, ...] = tuple(t for t in raw_tags if isinstance(t, str))
 
+    fm_slug = fm.get("slug")
+    fm_title = fm.get("title")
+    fm_status = fm.get("status")
+    fm_lang = fm.get("lang")
+
     return Doc(
         category=category,
         bucket=bucket,
         path=abs_path,
         rel_path=rel,
         url_path=_url_path(category, bucket, abs_path.stem),
-        slug=fm.get("slug") if isinstance(fm.get("slug"), str) else None,
-        title=fm.get("title") if isinstance(fm.get("title"), str) else abs_path.stem,
-        status=fm.get("status") if isinstance(fm.get("status"), str) else None,
-        lang=fm.get("lang") if isinstance(fm.get("lang"), str) else None,
+        slug=fm_slug if isinstance(fm_slug, str) else None,
+        title=fm_title if isinstance(fm_title, str) else abs_path.stem,
+        status=fm_status if isinstance(fm_status, str) else None,
+        lang=fm_lang if isinstance(fm_lang, str) else None,
         tags=tags,
         frontmatter=fm,
         body=body,

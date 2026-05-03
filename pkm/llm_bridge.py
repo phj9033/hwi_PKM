@@ -26,8 +26,8 @@ _DETECT_ORDER: tuple[str, ...] = ("claude", "codex", "gemini", "ollama")
 
 @dataclass(frozen=True)
 class DetectedCLI:
-    name: str   # alias as found on PATH (e.g., "claude")
-    path: str   # absolute path returned by shutil.which
+    name: str  # alias as found on PATH (e.g., "claude")
+    path: str  # absolute path returned by shutil.which
 
 
 def detect_ai_cli() -> DetectedCLI | None:

@@ -99,8 +99,7 @@ def test_promote_writing_keep_source(tmp_path, monkeypatch):
     p = tmp_path / "data" / "writing" / "draft1.md"
     _set_derived_from(p, "data/wiki/concepts/dep.md")
     runner.invoke(app, ["write", "set-status", "draft1", "final"])
-    runner.invoke(app, ["promote", "data/writing/draft1.md", "--to", "notes",
-                        "--keep-source"])
+    runner.invoke(app, ["promote", "data/writing/draft1.md", "--to", "notes", "--keep-source"])
     txt2 = p.read_text(encoding="utf-8")
     assert "status: final" in txt2  # not flipped
 

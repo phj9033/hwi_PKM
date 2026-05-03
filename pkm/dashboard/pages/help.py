@@ -50,6 +50,9 @@ def _cli_entries() -> list[dict[str, str]]:
     alphabetically for stable output.
     """
     cmd = typer.main.get_command(_cli_app)
+    # The Typer-generated top-level command is a click Group; pyright sees the
+    # base Command class on the return type, so narrow explicitly.
+    assert isinstance(cmd, click.Group)
     entries: list[dict[str, str]] = []
     for name, sub in sorted(cmd.commands.items()):
         info_name = f"pkm {name}"

@@ -22,8 +22,9 @@ def test_write_new_creates_file(tmp_path, monkeypatch):
 def test_write_new_records_search_seed(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     init_repo(tmp_path)
-    res = runner.invoke(app, ["write", "new", "--slug", "foo",
-                              "--from-search", "OAuth 토큰", "--json"])
+    res = runner.invoke(
+        app, ["write", "new", "--slug", "foo", "--from-search", "OAuth 토큰", "--json"]
+    )
     out = json.loads(res.stdout)
     assert out["frontmatter"]["search_seed"] == "OAuth 토큰"
 
@@ -35,8 +36,9 @@ def test_write_new_from_chunks_fills_derived_from(tmp_path, monkeypatch):
     chunks = tmp_path / "data" / "raw" / "chunks" / "oauth"
     (chunks / "src1.md").write_text("a", encoding="utf-8")
     (chunks / "src2.md").write_text("b", encoding="utf-8")
-    res = runner.invoke(app, ["write", "new", "--slug", "draft1",
-                              "--from-chunks", "oauth", "--json"])
+    res = runner.invoke(
+        app, ["write", "new", "--slug", "draft1", "--from-chunks", "oauth", "--json"]
+    )
     out = json.loads(res.stdout)
     derived = out["frontmatter"]["derived_from"]
     assert any("src1.md" in p for p in derived)
@@ -56,8 +58,9 @@ def test_write_new_body_is_empty(tmp_path, monkeypatch):
 def test_write_new_rejects_dual_seed_flags(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     init_repo(tmp_path)
-    res = runner.invoke(app, ["write", "new", "--slug", "x",
-                              "--from-search", "q", "--from-chunks", "t"])
+    res = runner.invoke(
+        app, ["write", "new", "--slug", "x", "--from-search", "q", "--from-chunks", "t"]
+    )
     assert res.exit_code == 2
 
 

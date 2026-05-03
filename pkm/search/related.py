@@ -83,9 +83,7 @@ def _tags_for(db: sqlite3.Connection, doc_id: int) -> list[str]:
 
 
 def _semantic(db: sqlite3.Connection, doc_id: int, n: int) -> list[dict]:
-    me = db.execute(
-        "SELECT embedding FROM docs_vec WHERE doc_id = ?", (doc_id,)
-    ).fetchone()
+    me = db.execute("SELECT embedding FROM docs_vec WHERE doc_id = ?", (doc_id,)).fetchone()
     if not me:
         return []
     # vec0 KNN queries require a literal LIMIT (not a parameter) and do NOT

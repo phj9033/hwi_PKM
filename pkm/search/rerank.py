@@ -5,6 +5,7 @@ on first call so `pkm --help` and tests that don't exercise rerank stay
 sub-second. Test-time stub: PKM_TEST_STUB_RERANKER=1 returns scores
 derived from chunk_id (descending) — deterministic and dependency-free.
 """
+
 from __future__ import annotations
 
 import os

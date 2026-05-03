@@ -56,7 +56,8 @@ def _do_promote(
     # Writing → wiki branch (M5.11)
     if ref.startswith("data/writing/") or ref.startswith("writing/"):
         return _promote_from_writing(
-            root, ref,
+            root,
+            ref,
             bucket=bucket,
             new_slug=new_slug,
             keep_source=keep_source,
@@ -141,6 +142,7 @@ def _promote_from_writing(
         )
 
     from pkm.store.writing_paths import resolve_writing
+
     src = resolve_writing(root, ref)
     if not src.exists():
         raise PKMNotFoundError(

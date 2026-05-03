@@ -31,6 +31,9 @@ After `pkm init`:
 - **Writing (M5):** `pkm write {new,list,set-status}`. `pkm promote` and `pkm demote` accept `data/writing/*` sources.
 - **AI bridge (M5):** `pkm/llm_bridge.py` autodetects `claude/codex/gemini/ollama` on PATH or follows TOML config in `.pkm/config.{toml,local.toml}`. `.pkm/hooks/<task>.sh` is an escape valve.
 - **Models (M5):** `pkm doctor --download` fetches embedder + reranker (~1.2GB) into `~/.cache/pkm/models/`.
+- **Dashboard (M6):**
+  - `pkm dashboard build [--out PATH]` — 8-page static HTML dashboard with per-doc backlinks, semantic neighbors, lint summary, and client-side search.
+  - `pkm bootstrap` — fresh-clone setup chain: `pkm doctor --download` → `pkm reindex db` → `pkm dashboard build`.
 - **Slash templates seeded by init:** `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`.
 
 ## Status
@@ -41,7 +44,7 @@ After `pkm init`:
 - [x] M3.5 — Git Auto-commit
 - [x] M4 — Promote, Lint & Extract
 - [x] M5 — AI bridge & Writing
-- [ ] M6 — Dashboard
+- [x] M6 — Dashboard
 - [ ] M7 — Hardening
 
 (See spec §9.3 for milestone definitions.)

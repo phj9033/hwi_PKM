@@ -63,9 +63,7 @@ def test_related_unknown_path_returns_empty_block(tmp_path, monkeypatch):
     """An unknown document path returns ok=True with empty related block."""
     monkeypatch.chdir(tmp_path)
     seed_wiki_for_search(tmp_path, n=2)
-    res = runner.invoke(
-        app, ["related", "data/wiki/concepts/nonexistent.md", "--json"]
-    )
+    res = runner.invoke(app, ["related", "data/wiki/concepts/nonexistent.md", "--json"])
     assert res.exit_code == 0, res.output
     out = json.loads(res.stdout)
     assert out["related"] == {}

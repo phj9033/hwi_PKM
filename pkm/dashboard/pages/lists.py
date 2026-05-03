@@ -20,6 +20,7 @@ Spec reference: §7 (dashboard) — list pages.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from pkm.dashboard.context import DashboardContext
 from pkm.dashboard.scanner import Doc
@@ -80,10 +81,10 @@ def _topic_from_rel(rel_path: str) -> str:
     return ""
 
 
-def _row_for(doc: Doc, category: str) -> dict:
+def _row_for(doc: Doc, category: str) -> dict[str, Any]:
     """Project a `Doc` into a flat row dict the template iterates."""
     fm = doc.frontmatter or {}
-    base = {
+    base: dict[str, Any] = {
         "title": doc.title,
         "slug": doc.slug or "",
         "status": doc.status or "",

@@ -30,9 +30,15 @@ def register(app: typer.Typer) -> None:
 def write_new(
     slug: str = typer.Option(..., "--slug", help="Writing slug."),
     title: str | None = typer.Option(None, "--title", help="Title (default = humanized slug)."),
-    from_search: str | None = typer.Option(None, "--from-search", help="Record search seed in frontmatter."),
-    from_chunks: str | None = typer.Option(None, "--from-chunks", help="Topic name; pre-fills derived_from from chunks/<topic>/."),
-    purpose: str = typer.Option("summary", "--purpose", help="guideline | report | summary | essay."),
+    from_search: str | None = typer.Option(
+        None, "--from-search", help="Record search seed in frontmatter."
+    ),
+    from_chunks: str | None = typer.Option(
+        None, "--from-chunks", help="Topic name; pre-fills derived_from from chunks/<topic>/."
+    ),
+    purpose: str = typer.Option(
+        "summary", "--purpose", help="guideline | report | summary | essay."
+    ),
     lang: str = typer.Option("ko", "--lang"),
     json_out: bool = typer.Option(False, "--json"),
     root: Path = typer.Option(Path("."), "--root", "-r"),
@@ -114,13 +120,15 @@ def write_list(
         fm, _ = parse(text)
         if status and fm.get("status") != status:
             continue
-        items.append({
-            "slug": fm.get("slug"),
-            "title": fm.get("title"),
-            "status": fm.get("status"),
-            "purpose": fm.get("purpose"),
-            "path": str(p.relative_to(root)),
-        })
+        items.append(
+            {
+                "slug": fm.get("slug"),
+                "title": fm.get("title"),
+                "status": fm.get("status"),
+                "purpose": fm.get("purpose"),
+                "path": str(p.relative_to(root)),
+            }
+        )
     out = {"ok": True, "items": items}
     if json_out:
         typer.echo(json.dumps(out, ensure_ascii=False))
@@ -159,8 +167,11 @@ def write_set_status(
 
     sha = post_mutation(
         root,
-        LogEvent(type="write-set-status", ref=fm.get("slug", ref),
-                 message=f"writing status {old} → {new_status}"),
+        LogEvent(
+            type="write-set-status",
+            ref=fm.get("slug", ref),
+            message=f"writing status {old} → {new_status}",
+        ),
         paths=[str(target.relative_to(root))],
     )
     out = {"ok": True, "slug": fm.get("slug"), "status": new_status, "git_commit": sha}

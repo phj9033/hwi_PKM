@@ -91,6 +91,9 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 4. AI Reads each derived_from path (PDF? `pkm extract` first), synthesizes into the body, cites.
 5. `pkm write set-status <s> final && pkm promote data/writing/<s>.md --to concepts`.
 
+### Browse the dashboard
+- `pkm dashboard build && open dashboard/index.html` — static HTML overview of all docs, link graph, lint, and status.
+
 ## 5. CLI Reference
 
 - **Search enhancements (M5):**
@@ -100,6 +103,9 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 - **Relations (M5):** `pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]`.
 - **Writing (M5):** `pkm write {new,list,set-status}`. `pkm promote` and `pkm demote` accept `data/writing/*` sources.
 - **Models (M5):** `pkm doctor --download` fetches embedder + reranker into `~/.cache/pkm/models/`.
+- **Dashboard (M6):**
+  - `pkm dashboard build [--out PATH]` — write the static HTML dashboard (default `./dashboard/`).
+  - `pkm bootstrap` — fresh-clone setup: `pkm doctor --download` → `pkm reindex db` → `pkm dashboard build`.
 
 (`pkm --help` remains authoritative for full CLI surface.)
 

@@ -32,9 +32,7 @@ def test_default_search_applies_rerank_stub(tmp_path, monkeypatch):
 def test_no_rerank_skips_stage(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _seed(tmp_path)
-    res = runner.invoke(
-        app, ["search", "test", "--no-rerank", "--json", "--root", str(tmp_path)]
-    )
+    res = runner.invoke(app, ["search", "test", "--no-rerank", "--json", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     out = json.loads(res.stdout)
     for hit in out["results"]:

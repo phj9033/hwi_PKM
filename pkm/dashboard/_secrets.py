@@ -7,7 +7,7 @@ Mask policy:
 
 - Apply the regex to **leaf key names** (case-insensitive).
 - For nested dicts, recurse so deeper structures stay structurally identical.
-- Lists/tuples are walked element-wise; non-dict values pass through unchanged.
+- Lists are walked element-wise; non-dict values pass through unchanged.
 - Replacement value is the literal string `"***"`.
 
 The regex matches:
@@ -49,6 +49,4 @@ def _mask_value(v: Any) -> Any:
         return mask(v)
     if isinstance(v, list):
         return [_mask_value(x) for x in v]
-    if isinstance(v, tuple):
-        return tuple(_mask_value(x) for x in v)
     return v

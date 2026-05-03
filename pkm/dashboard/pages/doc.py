@@ -32,7 +32,7 @@ from typing import Any
 from pkm.dashboard._secrets import mask
 from pkm.dashboard.context import DashboardContext
 from pkm.dashboard.renderer import render_markdown
-from pkm.dashboard.scanner import Doc
+from pkm.dashboard.scanner import Doc, DocRegistry, Neighbor
 from pkm.dashboard.templates import render
 
 _REINDEX_HINT = "(index missing — run pkm reindex db)"
@@ -56,7 +56,7 @@ def _link(prefix: str, target: Doc) -> dict[str, Any]:
     }
 
 
-def _link_list(rels: list[str], registry, prefix: str) -> list[dict[str, Any]]:
+def _link_list(rels: list[str], registry: DocRegistry, prefix: str) -> list[dict[str, Any]]:
     """Map a list of rel_paths to render-ready link dicts.
 
     Targets without a ``url_path`` (captures/chunks) are still represented but
@@ -72,7 +72,9 @@ def _link_list(rels: list[str], registry, prefix: str) -> list[dict[str, Any]]:
     return out
 
 
-def _semantic_links(neighbors, registry, prefix: str) -> list[dict[str, Any]]:
+def _semantic_links(
+    neighbors: list[Neighbor], registry: DocRegistry, prefix: str
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for n in neighbors:
         target = registry.by_rel_path.get(n.rel_path)
@@ -88,7 +90,7 @@ def _semantic_links(neighbors, registry, prefix: str) -> list[dict[str, Any]]:
     return out
 
 
-def _provenance_for(doc: Doc, registry, prefix: str) -> dict[str, Any]:
+def _provenance_for(doc: Doc, registry: DocRegistry, prefix: str) -> dict[str, Any]:
     """Compute provenance section for the sidebar.
 
     - wiki + ``promoted_from``: a single source path string (typically a

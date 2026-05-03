@@ -46,9 +46,7 @@ def test_local_overrides_commit_for_same_alias(tmp_path):
     """Local config overrides commit config at the same key."""
     pkm = tmp_path / ".pkm"
     pkm.mkdir()
-    (pkm / "config.toml").write_text(
-        "[ai_cli]\ndefault = 'a'\n", encoding="utf-8"
-    )
+    (pkm / "config.toml").write_text("[ai_cli]\ndefault = 'a'\n", encoding="utf-8")
     (pkm / "config.local.toml").write_text(
         "[ai_cli]\ndefault = 'b'\n[ai_cli.commands.b]\nexec = ['echo']\n",
         encoding="utf-8",

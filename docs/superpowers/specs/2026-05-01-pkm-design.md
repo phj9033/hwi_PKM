@@ -284,6 +284,7 @@ pkm lint [--fix] [--errors-only] [--json]
 pkm dashboard build [--out PATH]
 pkm dashboard open                    # 빌드 + open
 pkm dashboard clean
+pkm bench [--docs N] [--real] [--json] # M7: 합성 N문서 인덱싱 + 검색 latency 측정 (soft 임계, 출력만)
 ```
 
 ### 3.3 의도적으로 추가하지 않은 명령

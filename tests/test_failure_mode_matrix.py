@@ -104,16 +104,11 @@ def _create_capture(repo: Path, slug: str, body: str = "indexed body content") -
 
 
 def _reindex(repo: Path) -> None:
-    """Run `pkm reindex db --full` and assert chunks > 0.
-
-    Note: the current reindex path raises an OperationalError on the
-    contentless fts5 ``DELETE`` after the chunks have already been inserted
-    (existing repo bug, unrelated to M7.2). The chunks land regardless,
-    which is what we need.
-    """
+    """Run `pkm reindex db --full` and assert chunks > 0."""
     subprocess.run(
         [sys.executable, "-m", "pkm", "reindex", "db", "--full"],
         cwd=repo,
+        check=True,
         capture_output=True,
         env=_base_env(),
     )

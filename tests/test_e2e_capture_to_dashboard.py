@@ -45,12 +45,8 @@ def _pkm(
 
 
 def _reindex(repo: Path) -> None:
-    """Run `pkm reindex db --full`. Tolerates the known fts5-contentless DELETE
-    OperationalError documented in tests/test_failure_mode_matrix.py — chunks
-    still land on the inserts before the cleanup raises (pre-existing bug,
-    unrelated to M7.6). We verify success via index.db side-effects below.
-    """
-    _pkm(repo, "reindex", "db", "--full", check=False)
+    """Run `pkm reindex db --full`."""
+    _pkm(repo, "reindex", "db", "--full")
 
 
 def test_full_flow_capture_through_dashboard(tmp_path: Path) -> None:
@@ -79,7 +75,7 @@ def test_full_flow_capture_through_dashboard(tmp_path: Path) -> None:
     for slug in ("alpha", "beta", "gamma"):
         _pkm(tmp_path, "capture", "set-status", slug, "reviewed")
 
-    # 4. reindex (tolerate fts5 contentless-DELETE bug; chunks still land)
+    # 4. reindex
     _reindex(tmp_path)
     assert (tmp_path / ".pkm" / "index.db").exists()
     with sqlite3.connect(tmp_path / ".pkm" / "index.db") as c:

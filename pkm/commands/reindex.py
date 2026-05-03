@@ -222,8 +222,12 @@ def _drop_all(conn) -> None:
 
     Virtual tables (chunks_fts, chunks_vec, docs_vec) do NOT honor SQLite FK
     cascade, so each gets an explicit DELETE.
+
+    chunks_fts is a *contentless* FTS5 table (`content=''` in index_schema.py),
+    which does NOT support row DELETE. The supported idiom is the special
+    'delete-all' command insert. See SQLite FTS5 docs §4.4.3.
     """
-    conn.execute("DELETE FROM chunks_fts")
+    conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('delete-all')")
     conn.execute("DELETE FROM chunks_vec")
     conn.execute("DELETE FROM docs_vec")
     conn.execute("DELETE FROM chunks")

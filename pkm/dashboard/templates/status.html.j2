@@ -1,0 +1,47 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<h1>status</h1>
+
+<section class="card doctor-card">
+  <h2>doctor</h2>
+  {% if doctor_items is none %}
+    <p class="empty">(unavailable — run pkm doctor)</p>
+  {% elif not doctor_items %}
+    <p class="empty">No checks reported.</p>
+  {% else %}
+    <ul class="doctor-checklist">
+      {% for it in doctor_items %}
+        <li class="doctor-item {{ 'ok' if it.ok else 'fail' }}">
+          <span class="mark" aria-hidden="true">{{ '✓' if it.ok else '✗' }}</span>
+          <span class="name">{{ it.name }}</span>
+          <span class="status">{{ it.status }}</span>
+          {% if it.detail %}<span class="detail">{{ it.detail }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+
+<section class="card config-card">
+  <h2>config</h2>
+  <p class="note"><code>.pkm/config.local.toml</code> is never read by the dashboard.</p>
+  {% if config_rows is none %}
+    <p class="empty">(no config loaded)</p>
+  {% elif not config_rows %}
+    <p class="empty">(empty config)</p>
+  {% else %}
+    <dl class="config">
+      {% for key, value in config_rows %}
+        <dt>{{ key }}</dt>
+        <dd>{{ value }}</dd>
+      {% endfor %}
+    </dl>
+  {% endif %}
+</section>
+
+<section class="card mode-card">
+  <h2>mode</h2>
+  <p>Mode: <code>{{ mode }}</code></p>
+</section>
+{% endblock %}

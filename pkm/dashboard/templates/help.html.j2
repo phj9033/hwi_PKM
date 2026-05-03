@@ -1,0 +1,19 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<h1>help</h1>
+
+<section class="schema">
+  {{ schema_html | safe }}
+</section>
+
+<section class="cli-cheatsheet">
+  <h2>CLI cheatsheet</h2>
+  <dl class="cli">
+    {% for entry in cli_entries %}
+    <dt>{{ entry.name }}</dt>
+    <dd><pre>{{ entry.help }}</pre></dd>
+    {% endfor %}
+  </dl>
+</section>
+{% endblock %}

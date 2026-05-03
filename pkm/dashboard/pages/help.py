@@ -30,6 +30,7 @@ from pkm.cli import app as _cli_app
 from pkm.dashboard.context import DashboardContext
 from pkm.dashboard.renderer import render_markdown
 from pkm.dashboard.templates import render
+from pkm.errors import all_error_codes
 
 
 def _load_schema_markdown(root: Path) -> str:
@@ -40,6 +41,17 @@ def _load_schema_markdown(root: Path) -> str:
     return (
         resources.files("pkm.templates").joinpath("SCHEMA.md.template").read_text(encoding="utf-8")
     )
+
+
+def _error_codes_rows() -> list[dict[str, str]]:
+    """Return ``[{"code": ..., "class": ...}]`` rows sorted by code.
+
+    Used to render the "Failure codes (stable contract)" section so the
+    documented list stays in sync with ``pkm/errors.py``.
+    """
+    return [
+        {"code": code, "class": cls.__name__} for code, cls in sorted(all_error_codes().items())
+    ]
 
 
 def _cli_entries() -> list[dict[str, str]]:
@@ -68,6 +80,7 @@ def build_help(out: Path, ctx: DashboardContext) -> Path:
     schema_md = _load_schema_markdown(ctx.root)
     schema_html = render_markdown(schema_md, ctx.registry, depth=0)
     cli_entries = _cli_entries()
+    error_codes = _error_codes_rows()
 
     html = render(
         "help.html.j2",
@@ -75,6 +88,7 @@ def build_help(out: Path, ctx: DashboardContext) -> Path:
         depth=0,
         schema_html=schema_html,
         cli_entries=cli_entries,
+        error_codes=error_codes,
     )
     target = out / "help.html"
     target.write_text(html, encoding="utf-8")

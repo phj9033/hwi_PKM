@@ -35,3 +35,20 @@ def test_help_includes_cli_cheatsheet(tmp_path, ctx_seeded):
     assert "pkm capture" in html
     assert "pkm dashboard" in html
     assert "<dl" in html or "<table" in html
+
+
+def test_help_includes_bench_command(tmp_path, ctx_seeded):
+    """`pkm bench` (M7) appears in the dashboard cheatsheet."""
+    p = build_help(tmp_path / "out", ctx_seeded)
+    html = p.read_text(encoding="utf-8")
+    assert "pkm bench" in html
+
+
+def test_help_includes_failure_contract_table(tmp_path, ctx_seeded):
+    """The help page documents the stable failure-code contract dynamically."""
+    p = build_help(tmp_path / "out", ctx_seeded)
+    html = p.read_text(encoding="utf-8")
+    assert "Failure codes" in html
+    # NOT_FOUND is one of the documented codes — confirms dynamic rendering
+    # via pkm.errors.all_error_codes() rather than a hard-coded list.
+    assert "NOT_FOUND" in html

@@ -106,8 +106,24 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 - **Dashboard (M6):**
   - `pkm dashboard build [--out PATH]` — write the static HTML dashboard (default `./dashboard/`).
   - `pkm bootstrap` — fresh-clone setup: `pkm doctor --download` → `pkm reindex db` → `pkm dashboard build`.
+- **Benchmark (M7):**
+
+  | Command | Purpose |
+  | --- | --- |
+  | `pkm bench [--docs N --real --json]` | Synth N Korean docs + time reindex/search (soft thresholds). |
 
 (`pkm --help` remains authoritative for full CLI surface.)
+
+## § Failure codes (stable contract)
+
+Every CLI exit ≠ 0 is wrapped in a `PKMError` with a stable `code` field:
+
+- Stderr: `Error [<CODE>]: <message>` (always)
+- Stdout (`--json` mode only): `{"ok": false, "error": {"code", "message", "hint"}}`
+
+The complete list of codes is defined in `pkm/errors.py`. Tests guarantee
+each code is reachable through a real CLI invocation
+(`tests/test_failure_mode_matrix.py`).
 
 ## 6. Invariants
 

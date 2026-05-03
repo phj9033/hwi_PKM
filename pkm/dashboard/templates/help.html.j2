@@ -16,4 +16,28 @@
     {% endfor %}
   </dl>
 </section>
+
+<section class="failure-codes">
+  <h2>Failure codes (stable contract)</h2>
+  <p>
+    Every CLI exit code ≠ 0 raises a <code>PKMError</code> with a stable
+    <code>code</code> field. Stderr always carries
+    <code>Error [&lt;CODE&gt;]: &lt;message&gt;</code>; in <code>--json</code>
+    mode the same code lands in stdout under
+    <code>{"ok": false, "error": {"code", "message", "hint"}}</code>.
+  </p>
+  <table class="error-codes">
+    <thead>
+      <tr><th>Code</th><th>Class</th></tr>
+    </thead>
+    <tbody>
+      {% for row in error_codes %}
+      <tr>
+        <td><code>{{ row.code }}</code></td>
+        <td><code>{{ row.class }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
 {% endblock %}

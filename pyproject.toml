@@ -38,7 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-pkm = "pkm.cli:app"
+pkm = "pkm.cli:main"
 
 [build-system]
 requires = ["hatchling"]

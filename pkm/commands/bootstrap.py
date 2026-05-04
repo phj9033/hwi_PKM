@@ -1,7 +1,12 @@
-"""`pkm bootstrap` — fresh-clone setup chain.
+"""`pkm bootstrap` — fresh-clone / fresh-dir setup chain.
 
-Runs the three commands a brand-new clone needs, in order:
+Runs the commands needed to take a directory from zero to fully-functional PKM,
+in order:
 
+0. ``pkm init`` — **only when neither ``data/`` nor ``.pkm/`` exists**, i.e. the
+   directory is a brand-new empty dir. On a fresh-clone of an existing PKM data
+   repo these markers already came from git, so this step is silently skipped
+   and the chain matches the original 3-step contract.
 1. ``pkm doctor --download`` — fetches the embedder + reranker models.
 2. ``pkm reindex db --full`` — drops and rebuilds the index against the
    current data tree (per spec §7.6 fresh-clone semantics).
@@ -37,6 +42,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import typer
 
@@ -48,6 +54,17 @@ _STEPS: list[tuple[str, list[str]]] = [
     ("reindex", ["reindex", "db", "--full"]),
     ("dashboard", ["dashboard", "build"]),
 ]
+
+
+def _needs_init(root: Path) -> bool:
+    """True if neither ``data/`` nor ``.pkm/`` exists at ``root``.
+
+    Mirrors :mod:`pkm.commands.init`'s own collision check (which refuses to
+    run if either marker is already present) so that bootstrap on an
+    already-initialized repo skips the init step cleanly, while bootstrap on a
+    brand-new empty directory chains init automatically as step 0.
+    """
+    return not (root / "data").exists() and not (root / ".pkm").exists()
 
 
 @dataclass
@@ -104,14 +121,20 @@ def register(app: typer.Typer) -> None:
             help="Emit a structured JSON report instead of human progress text.",
         ),
     ) -> None:
-        """Fresh-clone bootstrap: doctor (download) → reindex db --full → dashboard build.
+        """Fresh-clone / fresh-dir bootstrap: (init →) doctor (download) → reindex db --full → dashboard build.
 
-        Runs the three steps in order and aborts on the first failure. Use
-        ``--json`` for a machine-readable step report.
+        Runs the steps in order and aborts on the first failure. ``pkm init``
+        is prepended automatically if the current directory has neither
+        ``data/`` nor ``.pkm/`` yet, so a brand-new empty dir can reach a
+        fully-working state in a single command. Use ``--json`` for a
+        machine-readable step report.
         """
         results: list[StepResult] = []
         failure: StepResult | None = None
-        for name, args in _STEPS:
+        steps = list(_STEPS)
+        if _needs_init(Path.cwd()):
+            steps.insert(0, ("init", ["init"]))
+        for name, args in steps:
             if not json_out:
                 typer.secho(f"bootstrap: running {name} ({' '.join(args)}) ...", err=True)
             res = _run_step(name, args)

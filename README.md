@@ -34,25 +34,24 @@ uv sync --all-extras
 uv tool install --reinstall -e ".[ml,extract]"
 which pkm                         # 예: ~/.local/bin/pkm
 
-# 4) 데이터 repo 생성 + 스캐폴딩
+# 4) 데이터 repo 생성 + 한 번에 셋업
+#    빈 dir 이면 `pkm bootstrap` 이 자동으로 init → doctor --download (~8 GB)
+#    → reindex → dashboard 까지 한 흐름으로 처리 (이미 init 된 dir 이면 init 단계는 스킵).
 mkdir -p ~/Documents/pkm && cd ~/Documents/pkm
-pkm init                          # data/, .pkm/, SCHEMA.md, .claude/ 생성
+pkm bootstrap
 
-# 5) 모델 다운로드 (한 번만, ~8 GB → ~/.cache/pkm/models/)
-pkm doctor --download
-
-# 6) 인수 검증 — 모든 row 가 ✓ 여야 정상
+# 5) 인수 검증 — 모든 row 가 ✓ 여야 정상
 pkm doctor --strict
 
-# 7) 첫 캡쳐 → 인덱스 → 검색 → 대시보드
+# 6) 첫 캡쳐 → 검색 → 대시보드 미리보기
 pkm capture create --slug hello --title "첫 노트" --url https://example.com <<<"본문"
 pkm capture set-status hello reviewed
 pkm reindex db --full
 pkm search "첫"
-pkm dashboard build && open dashboard/index.html
+open dashboard/index.html
 ```
 
-`pkm bootstrap` 한 줄로 5~7번을 묶어 실행 가능 (`doctor --download → reindex db --full → dashboard build`).
+> 단계를 분리해서 가고 싶다면: `pkm init` → `pkm doctor --download` → `pkm reindex db --full` → `pkm dashboard build`. `pkm bootstrap` 은 이 4단계의 idempotent wrapper.
 
 ## 명령어 한눈에
 

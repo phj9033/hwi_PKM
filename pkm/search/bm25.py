@@ -37,17 +37,26 @@ def _build_fts_query(query: str) -> str:
     on their own.  We wrap them as a phrase with a leading space—'" 토큰"'—which
     matches the trigram ' 토큰' that is indexed for word-boundary positions.
 
+    Every token is phrase-quoted so FTS5 operator characters embedded in the
+    user's query (``?``, ``*``, ``(``, ``)``, ``:``, ``^``, ``+``, ``-``,
+    ``"``) are treated as literal text instead of triggering a syntax error
+    on natural-language inputs like ``손자병법에서 도산 이란?``. Internal
+    double-quotes are escaped per FTS5 phrase syntax (``"`` → ``""``).
+
     All tokens are joined with OR so that a multi-word query hits any document
     that contains at least one of the terms.
     """
     tokens = query.split()
     fts_tokens: list[str] = []
     for tok in tokens:
-        if len(tok) < 3:
-            # Wrap in phrase with leading space to form a valid 3-char trigram
-            fts_tokens.append(f'" {tok}"')
+        # Escape any embedded double-quotes per FTS5 phrase literal syntax.
+        safe = tok.replace('"', '""')
+        if len(safe) < 3:
+            # Leading space tags into the boundary trigram for 2-char CJK words.
+            fts_tokens.append(f'" {safe}"')
         else:
-            fts_tokens.append(tok)
+            # Phrase-quote to neutralize FTS5 operators (?, *, (, ), :, ^, +, -).
+            fts_tokens.append(f'"{safe}"')
     return " OR ".join(fts_tokens)
 
 

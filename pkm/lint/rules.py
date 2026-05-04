@@ -25,6 +25,8 @@ from pkm.store.frontmatter_schemas import (
     CHUNK_LANGS,
     CHUNK_REQUIRED,
     CHUNK_STATUSES,
+    STYLE_LANGS,
+    STYLE_REQUIRED,
     WIKI_BUCKETS,
     WIKI_LANGS,
     WIKI_REQUIRED,
@@ -84,6 +86,8 @@ def _kind_for(rel: str) -> str | None:
         return "wiki"
     if rel.startswith("data/writing/") and rel.endswith(".md"):
         return "writing"
+    if rel.startswith("data/style/") and rel.endswith(".md"):
+        return "style"
     return None
 
 
@@ -123,6 +127,7 @@ _REQUIRED_BY_KIND = {
     "chunk": CHUNK_REQUIRED,
     "wiki": WIKI_REQUIRED,
     "writing": WRITING_REQUIRED,
+    "style": STYLE_REQUIRED,
 }
 
 _ENUMS_BY_KIND = {
@@ -142,6 +147,7 @@ _ENUMS_BY_KIND = {
         ("status", WRITING_STATUSES),
         ("lang", WRITING_LANGS),
     ],
+    "style": [("lang", STYLE_LANGS)],
 }
 
 

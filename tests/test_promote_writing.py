@@ -52,6 +52,69 @@ def test_promote_writing_happy_path(tmp_path, monkeypatch):
     assert (tmp_path / "data" / "wiki" / "notes" / "draft1.md").exists()
 
 
+def test_promote_writing_by_bare_slug(tmp_path, monkeypatch):
+    """`pkm promote <slug> --to <bucket>` routes to writing when the file lives in data/writing/.
+
+    Regression for M2 verification finding: previously the dispatcher only
+    recognized writing artifacts via the `data/writing/` path prefix, so a
+    bare-slug ref fell through to capture-resolution and raised NOT_FOUND.
+    """
+    monkeypatch.chdir(tmp_path)
+    init_repo(tmp_path)
+    _seed_wiki_dep(tmp_path)
+    runner.invoke(app, ["write", "new", "--slug", "summary-draft"])
+    p = tmp_path / "data" / "writing" / "summary-draft.md"
+    _set_derived_from(p, "data/wiki/concepts/dep.md")
+    runner.invoke(app, ["write", "set-status", "summary-draft", "final"])
+
+    # Bare slug — no `data/writing/` prefix, no `.md` suffix.
+    res = runner.invoke(app, ["promote", "summary-draft", "--to", "concepts", "--json"])
+    assert res.exit_code == 0, res.stdout
+    out = json.loads(res.stdout)
+    assert out["ok"] is True
+    assert out["source_kind"] == "writing"
+    assert (tmp_path / "data" / "wiki" / "concepts" / "summary-draft.md").exists()
+
+
+def test_promote_writing_takes_precedence_over_capture_with_same_slug(tmp_path, monkeypatch):
+    """If a bare slug exists in both data/writing/ and data/raw/captures/, writing wins.
+
+    Documents the routing order: explicit writing-path prefix > bare-slug-in-writing
+    > capture resolver. The capture-shadowing case is unlikely in practice (slugs
+    rarely collide) but pinning the rule prevents accidental drift.
+    """
+    monkeypatch.chdir(tmp_path)
+    init_repo(tmp_path)
+    _seed_wiki_dep(tmp_path)
+
+    # Capture with the same slug
+    cap_path = tmp_path / "data" / "raw" / "captures" / "shared-slug.md"
+    cap_path.write_text(
+        "---\n"
+        "title: Cap\n"
+        "slug: shared-slug\n"
+        "status: reviewed\n"
+        "source_type: text\n"
+        "lang: ko\n"
+        "created_at: 2026-05-01T00:00:00+09:00\n"
+        "updated_at: 2026-05-01T00:00:00+09:00\n"
+        "---\nbody\n",
+        encoding="utf-8",
+    )
+
+    # Writing artifact with the same slug
+    runner.invoke(app, ["write", "new", "--slug", "shared-slug"])
+    wp = tmp_path / "data" / "writing" / "shared-slug.md"
+    _set_derived_from(wp, "data/wiki/concepts/dep.md")
+    runner.invoke(app, ["write", "set-status", "shared-slug", "final"])
+
+    res = runner.invoke(app, ["promote", "shared-slug", "--to", "notes", "--json"])
+    assert res.exit_code == 0, res.stdout
+    out = json.loads(res.stdout)
+    # Writing won the routing race.
+    assert out["source_kind"] == "writing"
+
+
 def test_promote_writing_status_gate(tmp_path, monkeypatch):
     """status=draft (not final) should fail."""
     monkeypatch.chdir(tmp_path)

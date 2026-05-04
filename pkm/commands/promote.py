@@ -53,20 +53,29 @@ def _do_promote(
             hint=f"Valid buckets: {', '.join(WIKI_BUCKETS)}.",
         )
 
-    # Writing → wiki branch (M5.11)
-    if ref.startswith("data/writing/") or ref.startswith("writing/"):
+    # Reject chunk dirs explicitly (spec §6.3 says chunks → AI synthesis route)
+    if ref.startswith("data/raw/chunks/") or ref.startswith("chunks/"):
+        raise PKMValidationError(
+            "cannot promote a chunks topic directly",
+            hint="See SCHEMA.md → Chunk → Wiki Synthesis. Synthesize a writing/ file first.",
+        )
+
+    # Writing → wiki branch (M5.11). Routes when:
+    #   1. ref is an explicit writing path (`data/writing/...` or `writing/...`)
+    #   2. OR ref is a bare slug whose `data/writing/<slug>.md` exists on disk.
+    # Capture and writing share the `pkm promote` surface but go through
+    # different validators (writing requires non-empty `derived_from` etc.);
+    # the bare-slug case lets users write `pkm promote my-draft --to concepts`
+    # symmetrically with `pkm promote my-capture-slug --to concepts`.
+    is_writing_path = ref.startswith("data/writing/") or ref.startswith("writing/")
+    is_writing_slug = (root / "data" / "writing" / f"{ref}.md").exists()
+    if is_writing_path or is_writing_slug:
         return _promote_from_writing(
             root,
             ref,
             bucket=bucket,
             new_slug=new_slug,
             keep_source=keep_source,
-        )
-    # Reject chunk dirs explicitly (spec §6.3 says chunks → AI synthesis route)
-    if ref.startswith("data/raw/chunks/") or ref.startswith("chunks/"):
-        raise PKMValidationError(
-            "cannot promote a chunks topic directly",
-            hint="See SCHEMA.md → Chunk → Wiki Synthesis. Synthesize a writing/ file first.",
         )
 
     # Resolve the capture

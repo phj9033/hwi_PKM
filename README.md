@@ -59,7 +59,7 @@ open dashboard/index.html
 |---|---|
 | Setup | `pkm init`, `pkm doctor [--strict] [--download] [--json]`, `pkm bootstrap` |
 | Capture / chunks | `pkm capture {create,list,show,set-status,rm}`, `pkm chunks {new,add,list,show,set-status}` |
-| Index / search | `pkm reindex db [--full] [--low-memory]`, `pkm search <q> [--no-rerank] [--expand] [--with-related] [--json]`, `pkm related <path> [--mode backlinks\|semantic\|both]` |
+| Index / search | `pkm reindex db [--full] [--low-memory]`, `pkm search <q> [--no-rerank] [--expand] [--with-related] [--json]`, `pkm related <path> [--mode backlinks\|semantic\|both]`, `pkm sample [--seed N] [--json]` |
 | Promote / lint | `pkm promote <ref> --to <bucket>`, `pkm demote <ref>`, `pkm wiki edit <ref> {--replace\|--patch}`, `pkm lint [--fix] [--json] [--errors-only]` |
 | Extract | `pkm extract <file>` (PDF/HTML → md, `[extract]` extra 필요) |
 | Writing | `pkm write {new,list,set-status}` (writing → wiki promotion 은 동일하게 `pkm promote` 사용) |
@@ -67,7 +67,7 @@ open dashboard/index.html
 | Bench | `pkm bench [--docs N=100] [--real] [--json]` (M7) |
 | Log | `pkm log` |
 
-`pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` — Claude Code 세션에서 바로 사용 가능.
+`pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` (`/blog --random` 으로 랜덤 wiki 카드 시드 초안 생성) — Claude Code 세션에서 바로 사용 가능.
 
 ## 디렉토리 구조 (데이터 repo 기준)
 

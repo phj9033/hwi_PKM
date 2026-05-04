@@ -227,7 +227,7 @@ pkm index rebuild                    # data/index.md (TOC) 재생성 — 검색 
 
 ## 3. 슬래시 커맨드 (Claude Code 세션용)
 
-`pkm init` 이 데이터 repo 의 `.claude/commands/` 에 7 개 템플릿을 깔아준다. 모두 SCHEMA.md 의 워크플로우를 5~10 줄로 요약한 것.
+`pkm init` 이 데이터 repo 의 `.claude/commands/` 에 9 개 템플릿을 깔아준다. 모두 SCHEMA.md 의 워크플로우를 5~10 줄로 요약한 것.
 
 | 커맨드 | 입력 | 동작 | 결과 |
 |---|---|---|---|
@@ -238,6 +238,9 @@ pkm index rebuild                    # data/index.md (TOC) 재생성 — 검색 
 | `/lint [--fix]` | (옵션) | `pkm lint --json` 보고 + 필요 시 `--fix` 자동수리 + 잔여물 사용자 안내 | 리포트 + 수정 |
 | `/ask <question>` | 질문 | `pkm search --json` → top-K Read → Claude 본인이 인용 합성 (외부 AI CLI 불필요) | 인용 grounded 답변 |
 | `/write <topic>` | 토픽/시드 | `pkm write new` (search/chunks/freeform 시드) → Edit 로 본문 + 인용 → `set-status final` → `pkm promote` | wiki 게시 |
+| `/style-import <url\|file>` | URL 또는 로컬 글 | WebFetch best-effort + manual `raw-imports/style/<slug>.md` fallback → `data/style/<slug>.md` 인덱싱 | 톤 매칭용 style 샘플 |
+| `/blog "<주제>"` | 자연어 주제 | `pkm search` (wiki/raw/style) → outline → 사용자 승인 → `blog/<slug>.md` 작성 | 외부 발행용 초안 |
+| `/blog --random` | (없음) | `pkm sample` (랜덤 wiki 3-5장, 직접 링크 안 됨) → outline → 사용자 승인 → `blog/seeds/<slug>.md` | 영감용 시드 초안 |
 
 ### `/ask` 인용 계약 (Karpathy grounding)
 

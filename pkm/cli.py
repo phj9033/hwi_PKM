@@ -105,6 +105,10 @@ def _register_all() -> None:
 
     bench_cmd.register(app)
 
+    from pkm.commands import sample as sample_cmd
+
+    sample_cmd.register(app)
+
 
 _register_all()
 

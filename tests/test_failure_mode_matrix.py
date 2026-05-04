@@ -213,8 +213,11 @@ def _scenario_bootstrap_step_failed(repo: Path) -> list[str]:
 
 
 def _scenario_sample_insufficient_wiki(repo: Path) -> list[str]:
-    """Empty post-init repo has 0 wiki cards → `pkm sample` must hard-fail."""
-    _reindex(repo)
+    """Empty post-init repo has 0 wiki cards → `pkm sample` must hard-fail.
+
+    `connect()` creates the index db lazily, so no reindex is needed; the
+    documents table is simply empty and sample_wiki raises immediately.
+    """
     return ["sample", "--json"]
 
 

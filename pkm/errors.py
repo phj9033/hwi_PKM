@@ -104,6 +104,12 @@ class PKMBootstrapStepFailed(PKMError):
     code = "BOOTSTRAP_STEP_FAILED"
 
 
+class PKMSampleInsufficientWiki(PKMError):
+    """Raised when `pkm sample` cannot find ≥ 3 wiki notes to sample from."""
+
+    code = "SAMPLE_INSUFFICIENT_WIKI"
+
+
 def all_error_codes() -> dict[str, type[PKMError]]:
     """Return ``{code: cls}`` for every PKMError subclass reachable from this module.
 

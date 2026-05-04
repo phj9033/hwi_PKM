@@ -33,6 +33,7 @@ from pkm.errors import (
     PKMNotImplementedError,
     PKMPromoteFromWritingNotYet,
     PKMRerankModelMissing,
+    PKMSampleInsufficientWiki,
     PKMStateError,
     PKMStatusError,
     PKMValidationError,
@@ -57,6 +58,9 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "EMBED_MODEL_MISSING": lambda: PKMEmbedModelMissing("model missing"),
     "EXPAND_FAILED": lambda: PKMExpandFailed("expand failed"),
     "BOOTSTRAP_STEP_FAILED": lambda: PKMBootstrapStepFailed("step failed"),
+    "SAMPLE_INSUFFICIENT_WIKI": lambda: PKMSampleInsufficientWiki(
+        "wiki 카드 부족", hint="/promote 로 늘리세요"
+    ),
 }
 
 

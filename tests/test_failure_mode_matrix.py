@@ -212,6 +212,12 @@ def _scenario_bootstrap_step_failed(repo: Path) -> list[str]:
     return ["bootstrap"]
 
 
+def _scenario_sample_insufficient_wiki(repo: Path) -> list[str]:
+    """Empty post-init repo has 0 wiki cards → `pkm sample` must hard-fail."""
+    _reindex(repo)
+    return ["sample", "--json"]
+
+
 SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "PKM_ERROR": _scenario_pkm_error,
     "CONFIG_ERROR": _scenario_config_error,
@@ -226,6 +232,7 @@ SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "EMBED_MODEL_MISSING": _scenario_embed_model_missing,
     "EXPAND_FAILED": _scenario_expand_failed,
     "BOOTSTRAP_STEP_FAILED": _scenario_bootstrap_step_failed,
+    "SAMPLE_INSUFFICIENT_WIKI": _scenario_sample_insufficient_wiki,
 }
 
 

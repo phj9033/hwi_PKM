@@ -23,7 +23,7 @@ def register(app: typer.Typer) -> None:
         scope: str = typer.Option(
             "wiki",
             "--scope",
-            help="Bucket filter: wiki | raw | writing | all.",
+            help="Bucket filter: wiki | raw | writing | style | all.",
         ),
         explain: bool = typer.Option(False, "--explain", help="Include per-stage scoring detail."),
         no_rerank: bool = typer.Option(False, "--no-rerank", help="Skip cross-encoder reranking."),

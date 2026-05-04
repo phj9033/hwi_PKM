@@ -15,7 +15,8 @@ _BUCKET_MAP: dict[str, tuple[str, ...]] = {
     "wiki": ("wiki",),
     "raw": _RAW_BUCKETS,
     "writing": ("writing",),
-    "all": ("wiki", "captures", "chunks", "writing"),
+    "style": ("style",),                                          # M8
+    "all": ("wiki", "captures", "chunks", "writing", "style"),    # M8: +style
 }
 
 

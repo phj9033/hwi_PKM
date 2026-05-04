@@ -1,12 +1,17 @@
 """Resolve user-supplied <id-or-slug> tokens to concrete file/dir paths.
 
 Matching policy:
+  0. Path-style ref (contains ``/`` or ends in ``.md``) → reduced to stem so
+     `pkm promote data/raw/captures/foo.md` works the same as `pkm promote foo`.
+     Promote's writing branch already accepts paths; this keeps capture
+     consistent with the documented "Capture ref (slug, full slug, or path)"
+     contract from `pkm promote --help` and spec §6.3.
   1. Exact stem (slug) match → that file.
   2. Otherwise, substring match against stem.
   3. Zero matches → PKMNotFoundError.
   4. Multiple substring matches → PKMValidationError ("ambiguous").
 
-Spec reference: §3.2 (capture/chunks set-status, show, rm).
+Spec reference: §3.2 (capture/chunks set-status, show, rm), §6.3 (promote).
 """
 
 from __future__ import annotations
@@ -24,10 +29,23 @@ def _chunks_dir(root: Path) -> Path:
     return root / "data" / "raw" / "chunks"
 
 
+def _normalize_ref(ref: str) -> str:
+    """Reduce path-style refs to bare stems before matching.
+
+    Accepts inputs like ``data/raw/captures/2026-05-04-foo.md``,
+    ``raw/captures/foo.md``, ``./foo.md``, or just ``foo.md`` and returns
+    ``foo`` (or ``2026-05-04-foo``). Bare slug refs are left untouched.
+    """
+    if "/" in ref or ref.endswith(".md"):
+        return Path(ref).stem
+    return ref
+
+
 def resolve_capture(root: Path, ref: str) -> Path:
     base = _captures_dir(root)
     if not base.exists():
         raise PKMNotFoundError(f"captures directory not found at {base.relative_to(root)}")
+    ref = _normalize_ref(ref)
     files = list(base.glob("*.md"))
     # Exact stem match first
     exact = [p for p in files if p.stem == ref]

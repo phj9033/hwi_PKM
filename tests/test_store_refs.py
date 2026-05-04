@@ -40,6 +40,30 @@ def test_resolve_capture_not_found(tmp_path: Path):
         resolve_capture(tmp_path, "nope")
 
 
+def test_resolve_capture_path_ref_full(tmp_path: Path):
+    """Path-style ref like `data/raw/captures/foo.md` resolves to the same file."""
+    p = _mkcapture(tmp_path, "2026-05-04-sonja-byeongbeop-ko-wikipedia")
+    assert resolve_capture(tmp_path, "data/raw/captures/2026-05-04-sonja-byeongbeop-ko-wikipedia.md") == p
+
+
+def test_resolve_capture_path_ref_partial(tmp_path: Path):
+    """Path-style ref starting at `raw/captures/` (relative variant) also works."""
+    p = _mkcapture(tmp_path, "2026-05-04-foo")
+    assert resolve_capture(tmp_path, "raw/captures/2026-05-04-foo.md") == p
+
+
+def test_resolve_capture_bare_md_filename(tmp_path: Path):
+    """Just a filename with `.md` extension reduces to stem."""
+    p = _mkcapture(tmp_path, "2026-05-04-foo")
+    assert resolve_capture(tmp_path, "2026-05-04-foo.md") == p
+
+
+def test_resolve_capture_path_ref_dot_prefix(tmp_path: Path):
+    """`./foo.md` reduces to stem (Path.stem strips the ./ prefix)."""
+    p = _mkcapture(tmp_path, "2026-05-04-foo")
+    assert resolve_capture(tmp_path, "./data/raw/captures/2026-05-04-foo.md") == p
+
+
 def test_resolve_chunk_topic(tmp_path: Path):
     topic_dir = tmp_path / "data/raw/chunks/oauth"
     topic_dir.mkdir(parents=True)

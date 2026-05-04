@@ -112,4 +112,70 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [x] M6 — Dashboard
 - [x] M7 — Hardening (V1 GA, 태그 `m7-hardening`)
 
-V1 인수 체크리스트: `docs/M7-SHIP-CHECKLIST.md`.
+기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
+
+## 아키텍처
+
+세 레이어로 분리됨: AI 에이전트(operator) → `pkm` CLI(deterministic core) → data repo(source of truth). 외부 의존성은 두 개뿐 — 옵트인 AI CLI 와 로컬 모델 캐시.
+
+```
+  Layer 1 — AI agent (operator)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Claude Code session                                         │
+  │   SCHEMA.md               (진입 매뉴얼, 워크플로우 SoT)     │
+  │   .claude/commands/*.md   (슬래시 커맨드 9종)               │
+  │   .claude/settings.json   (data/wiki/** deny-write 권한)    │
+  └────────────────────────────┬────────────────────────────────┘
+                               │ shell exec
+                               ▼
+  Layer 2 — pkm CLI (deterministic core, no LLM SDK, no API key)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ commands/                                                   │
+  │   init  bootstrap  doctor   ← setup                         │
+  │   capture  chunks  extract  ← collect / curate              │
+  │   reindex  search  related  ← index / retrieve              │
+  │   promote  demote  wiki     ← lifecycle gates               │
+  │   write    lint             ← author / verify               │
+  │   dashboard  log  index  bench                              │
+  │                                                             │
+  │ store/      files frontmatter chunker embedder              │
+  │             index_db git(auto-commit) log toc               │
+  │ search/     bm25(FTS5) vector(vec0) rrf rerank pipeline     │
+  │ extract/    pdf html                                        │
+  │ lint/       rules fixers                                    │
+  │ dashboard/  scanner builder renderer pages                  │
+  │ llm_bridge  3-tier: autodetect → TOML config → shell hook   │
+  └────┬─────────────────┬──────────────────────────┬───────────┘
+       │ read / write    │ read (embed/rerank)      │ opt-in shell-out
+       ▼                 ▼                          ▼
+  Layer 3 — data + caches              External (옵트인)
+  ┌─────────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+  │ data repo           │  │ model cache      │  │ user's AI CLI    │
+  │ (markdown = truth)  │  │ (모든 repo 공유) │  │ (셸아웃 대상)    │
+  │                     │  │                  │  │                  │
+  │ data/               │  │ ~/.cache/pkm/    │  │ claude / codex / │
+  │  log.md  index.md   │  │  models/         │  │ gemini / ollama  │
+  │  raw/captures/      │  │   bge-m3 (6.4G)  │  │                  │
+  │  raw/chunks/<topic>/│  │   bge-reranker   │  │ tasks:           │
+  │  wiki/{concepts,    │  │    -v2-m3 (2.1G) │  │  expand_query    │
+  │   entities,notes,   │  │                  │  │  lint_summary    │
+  │   reports}/         │  └──────────────────┘  └──────────────────┘
+  │  writing/           │
+  │                     │
+  │ .pkm/               │   ☑ git tracked
+  │  index.db (SQLite)  │     data/**, SCHEMA.md, .claude/, .pkm/config.toml
+  │  config.toml      ☑ │
+  │  config.local.toml✗ │   ✗ gitignore (재생성 가능)
+  │                     │     .pkm/index.db, dashboard/, .pkm/config.local.toml
+  │ dashboard/        ✗ │
+  │ SCHEMA.md  .claude/ │
+  └─────────────────────┘
+```
+
+핵심 경계:
+
+- **markdown = 진실**. `.pkm/index.db`·`dashboard/` 는 모두 `data/` 에서 결정론적으로 재생성.
+- **CLI 코어 = 결정론**. LLM SDK import 없음, API 키 보관 없음. 임베더·재랭커 같은 로컬 모델은 실행하지만 외부 호출은 안 함.
+- **AI CLI 셸아웃 = 옵트인** (`pkm search --expand` 등). `llm_bridge` 가 사용자 환경의 `claude`/`codex`/`gemini`/`ollama` 를 자동탐지하거나 `.pkm/config.local.toml` 로 명시.
+- **자동 git 커밋**. 모든 mutate 명령은 데이터 repo 에 자동 커밋 — `git log` 가 활동 감사로그.
+- **Strict 권한**. AI 에이전트가 `data/wiki/**` 를 직접 쓸 수 없게 `.claude/settings.json` 으로 deny. 유일한 wiki 변경 경로는 `pkm promote` / `pkm wiki edit`.

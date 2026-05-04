@@ -58,7 +58,11 @@ def resolve_wiki(root: Path, ref: str) -> Path:
     """
     # Form 1: path-like
     if "/" in ref and ref.endswith(".md"):
-        p = (root / ref).resolve()
+        # Don't .resolve() here — callers do `target.relative_to(root)` and
+        # if root is relative (e.g. default `--root .`) while target is
+        # absolute, that call raises ValueError. Forms 2 & 3 already preserve
+        # root's relativity; keep Form 1 consistent.
+        p = root / ref
         if p.exists() and p.is_file():
             return p
         raise PKMNotFoundError(

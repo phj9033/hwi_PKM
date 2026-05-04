@@ -52,6 +52,18 @@ def test_resolve_wiki_unknown_raises(tmp_path: Path):
         wp.resolve_wiki(tmp_path, "does-not-exist")
 
 
+def test_resolve_wiki_form1_preserves_relative_root(tmp_path: Path, monkeypatch):
+    # Regression: when callers pass `--root .` and a path-form ref like
+    # 'data/wiki/concepts/x.md', the returned target must remain relative
+    # so that downstream `target.relative_to(root)` doesn't blow up with
+    # "one path is relative and the other is absolute".
+    _make_wiki(tmp_path, "concepts", "oauth")
+    monkeypatch.chdir(tmp_path)
+    target = wp.resolve_wiki(Path("."), "data/wiki/concepts/oauth.md")
+    # The crucial post-condition: this must not raise.
+    assert target.relative_to(Path(".")).as_posix() == "data/wiki/concepts/oauth.md"
+
+
 def test_iter_all_wiki(tmp_path: Path):
     _make_wiki(tmp_path, "concepts", "a")
     _make_wiki(tmp_path, "concepts", "b")

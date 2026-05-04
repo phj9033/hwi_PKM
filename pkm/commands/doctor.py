@@ -140,10 +140,9 @@ def _check_ai_cli() -> _Item:
 
 
 def _check_model_cache() -> _Item:
-    from pkm.store.embedder import model_cache_root
+    from pkm.store.model_cache import is_cached
 
-    cache = model_cache_root() / "bge-m3"
-    if cache.exists() or any(model_cache_root().glob("models--BAAI--bge-m3*")):
+    if is_cached("BAAI/bge-m3"):
         return _Item("bge-m3", "ok", None)
     return _Item("bge-m3", "missing", "run: pkm doctor --download")
 

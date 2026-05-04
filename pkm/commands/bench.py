@@ -28,15 +28,10 @@ _BGE_M3_REPO = "BAAI/bge-m3"
 
 
 def _bge_m3_cache_present() -> bool:
-    """Return True if bge-m3 looks present under the configured cache root.
+    """Return True if bge-m3 is in the cache root in HF snapshot layout."""
+    from pkm.store.model_cache import is_cached
 
-    Mirrors the reranker's lightweight existence check (`pkm/search/rerank.py`).
-    Honors ``PKM_MODEL_CACHE`` for tests, falling back to ``~/.cache/pkm/models``.
-    """
-    override = os.environ.get("PKM_MODEL_CACHE")
-    root = Path(override) if override else Path("~/.cache/pkm/models").expanduser()
-    target = root / _BGE_M3_REPO.replace("/", "__")
-    return target.exists() and any(target.iterdir())
+    return is_cached(_BGE_M3_REPO)
 
 
 KO_SAMPLE_TITLE = "Karpathy 위키 노트 {n}"

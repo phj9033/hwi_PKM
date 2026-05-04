@@ -21,8 +21,12 @@ def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     runner.invoke(app, ["reindex", "db", "--full", "--root", str(tmp_path)])
+    # Seed the HF standard cache layout so `pkm.store.model_cache.is_cached`
+    # treats bge-m3 as present (mirrors what `snapshot_download` writes).
     model_cache = tmp_path / "cache"
-    (model_cache / "bge-m3").mkdir(parents=True)
+    snapshot = model_cache / "models--BAAI--bge-m3" / "snapshots" / "stub"
+    snapshot.mkdir(parents=True)
+    (snapshot / "config.json").write_text("{}")
     monkeypatch.setenv("PKM_MODEL_CACHE", str(model_cache))
 
 

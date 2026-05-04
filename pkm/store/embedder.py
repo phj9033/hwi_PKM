@@ -8,7 +8,8 @@ The stub embedder yields a deterministic 1024-d L2-normalized vector from a
 SHA-256 hash of the input text. Cosine values are not semantically meaningful;
 the stub exists to exercise the search pipeline shape under the M1 RAM cap.
 
-`model_cache_root()` is the single source of truth for where bge-m3 lives:
+`model_cache_root()` delegates to `pkm.store.model_cache.cache_dir()` — the
+single source of truth for where bge-m3 / bge-reranker-v2-m3 live:
 - $PKM_MODEL_CACHE if set (used by tests via monkeypatch)
 - otherwise ~/.cache/pkm/models/
 
@@ -24,16 +25,14 @@ from typing import Protocol
 
 import numpy as np
 
+from pkm.store.model_cache import cache_dir as _cache_dir
+
 EMB_DIM = 1024
 MODEL_NAME = "BAAI/bge-m3"
 
 
 def model_cache_root() -> Path:
-    """Resolve the model cache directory. Env override > default."""
-    override = os.environ.get("PKM_MODEL_CACHE")
-    if override:
-        return Path(override)
-    return Path("~/.cache/pkm/models").expanduser()
+    return _cache_dir()
 
 
 class Embedder(Protocol):

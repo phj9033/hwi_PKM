@@ -69,11 +69,17 @@ In strict mode, attempting `Write` against `data/wiki/**` from Claude Code must 
 
 ## 9. All mutate auto-commits + `--no-git` deny
 
+`--no-git` is not a CLI flag — it's blocked at the Claude Code Bash layer
+via `.claude/settings.json` deny rule `Bash(pkm * --no-git*)` (spec §6.6,
+M3.5 plan §22). Verify in a Claude Code session:
+
 ```bash
 pkm capture set-status X reviewed --no-git
 ```
 
-Expected: `Error [...]: --no-git is not permitted in strict mode`.
+Expected: Claude Code Bash permission deny (the command never reaches `pkm`).
+For mutate auto-commit verification: run any mutate command without the flag
+and confirm `git log` shows a fresh commit.
 
 ## 10. Claude Code `/ask` flow without external AI CLI
 

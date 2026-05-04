@@ -9,7 +9,6 @@ derived from chunk_id (descending) — deterministic and dependency-free.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
 from pkm.errors import PKMRerankModelMissing
@@ -46,13 +45,17 @@ def _load():
     global _CACHED
     if _CACHED is not None:
         return _CACHED
-    cache = Path.home() / ".cache" / "pkm" / "models" / _REPO.replace("/", "__")
-    if not cache.exists() or not any(cache.iterdir()):
+    from pkm.store.model_cache import cache_dir, is_cached, model_dir
+
+    if not is_cached(_REPO):
         raise PKMRerankModelMissing(
-            f"Reranker not found at {cache}.",
+            f"Reranker not found at {model_dir(_REPO)}.",
             hint="Run `pkm doctor --download` (or pass --no-rerank).",
         )
     from sentence_transformers import CrossEncoder
 
-    _CACHED = CrossEncoder(str(cache))
+    # Load via the HF cache_folder so CrossEncoder resolves the snapshot dir
+    # (under `cache_dir()/models--<repo>/snapshots/<rev>/`) the same way
+    # RealEmbedder loads bge-m3.
+    _CACHED = CrossEncoder(_REPO, cache_folder=str(cache_dir()))
     return _CACHED

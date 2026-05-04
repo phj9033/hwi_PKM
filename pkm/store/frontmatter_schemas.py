@@ -228,6 +228,45 @@ def validate_writing(fm: dict) -> None:
         )
 
 
+# --- style (M8) ---
+
+_STYLE_REQUIRED = ("title", "slug", "lang", "created_at", "updated_at")
+_STYLE_LANGS = ("ko", "en", "mixed")
+
+
+def style_defaults(
+    *,
+    slug: str,
+    title: str,
+    lang: str = "ko",
+    tags: list[str] | None = None,
+    source_url: str | None = None,
+    source_path: str | None = None,
+) -> dict:
+    """Build a frontmatter dict for a new style sample."""
+    now = _now_iso()
+    fm: dict = {
+        "title": title,
+        "slug": slug,
+        "lang": lang,
+        "created_at": now,
+        "updated_at": now,
+        "tags": list(tags) if tags else [],
+    }
+    if source_url:
+        fm["source_url"] = source_url
+    if source_path:
+        fm["source_path"] = source_path
+    return fm
+
+
+def validate_style(fm: dict) -> None:
+    _check_required(fm, _STYLE_REQUIRED, "style")
+    _check_enum(fm, "lang", _STYLE_LANGS, "style")
+    if not isinstance(fm.get("tags"), list):
+        raise PKMValidationError("style frontmatter `tags` must be a list")
+
+
 # Public aliases — `pkm.lint.rules` consumes these to avoid importing
 # underscore-prefixed names. The underscore versions remain the internal
 # module-level reference for the validators above.
@@ -246,3 +285,5 @@ WRITING_REQUIRED = _WRITING_REQUIRED
 WRITING_PURPOSES = _WRITING_PURPOSES
 WRITING_STATUSES = _WRITING_STATUSES
 WRITING_LANGS = _WRITING_LANGS
+STYLE_REQUIRED = _STYLE_REQUIRED
+STYLE_LANGS = _STYLE_LANGS

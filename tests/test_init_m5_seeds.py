@@ -23,6 +23,7 @@ def test_init_seeds_ask_and_write(tmp_path, monkeypatch):
             "promote.md",
             "research.md",
             "review-captures.md",
+            "style-import.md",
             "write.md",
         ]
     )

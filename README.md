@@ -67,7 +67,7 @@ open dashboard/index.html
 | Bench | `pkm bench [--docs N=100] [--real] [--json]` (M7) |
 | Log | `pkm log` |
 
-`pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write` — Claude Code 세션에서 바로 사용 가능.
+`pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` — Claude Code 세션에서 바로 사용 가능.
 
 ## 디렉토리 구조 (데이터 repo 기준)
 

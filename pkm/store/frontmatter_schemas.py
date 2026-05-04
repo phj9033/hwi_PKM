@@ -1,6 +1,7 @@
-"""Frontmatter schemas for the four data buckets (spec §6.1).
+"""Frontmatter schemas for the five data buckets (spec §6.1).
 
 M2 implements `capture` and `chunk`. `wiki` and `writing` land in M4/M5.
+M8 adds `style` (blog sample corpus).
 
 For each kind we expose:
 - `<kind>_defaults(**overrides) -> dict`: build a fully-populated frontmatter

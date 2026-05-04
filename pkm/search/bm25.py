@@ -1,8 +1,8 @@
 """FTS5 (trigram) BM25 search over chunks_fts.
 
 `query_bm25(conn, query, scope, top)` returns ranked Hit rows. The `scope`
-filter joins back to documents.bucket: 'wiki' / 'raw' / 'writing' / 'all'.
-'raw' covers both 'captures' and 'chunks' buckets per master spec §5.1.
+filter joins back to documents.bucket: 'wiki' / 'raw' / 'writing' / 'style' /
+'all'. 'raw' covers both 'captures' and 'chunks' buckets per master spec §5.1.
 """
 
 from __future__ import annotations

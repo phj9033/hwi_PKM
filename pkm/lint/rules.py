@@ -62,7 +62,7 @@ class _Doc:
 
     path: Path
     rel: str
-    kind: str  # "capture" | "chunk" | "wiki" | "writing"
+    kind: str  # "capture" | "chunk" | "wiki" | "writing" | "style"
     fm: dict
     body: str
     mtime: float

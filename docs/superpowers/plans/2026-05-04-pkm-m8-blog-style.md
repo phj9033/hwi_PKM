@@ -1231,3 +1231,13 @@ This is the audit output — every file changed during M8. Save the list to ment
 - `length_words` / `voice` / `kind` frontmatter fields.
 - Sub-bucket structure (`data/style/blog/`, `data/style/talk/`).
 - Plugin/extension abstraction.
+- **Dashboard surface for `data/style/`** — `pkm dashboard build` deliberately
+  does NOT generate list/detail pages for style samples. They remain
+  searchable via `pkm search --scope style` (CLI) and via Read inside
+  `/blog`, but the dashboard view is unaware. If a future user wants
+  style samples to appear in dashboard list pages, extend
+  `pkm/dashboard/scanner.py:_CATEGORIES` and the corresponding list page
+  templates. M8 ships without this to honor scope decision #11 (YAGNI).
+- Pre-creating empty `data/style/` in `pkm init` — directory is created
+  lazily on first `/style-import`. Asymmetric with `data/writing/` (which
+  IS pre-created) but acceptable: empty optional bucket.

@@ -3,7 +3,9 @@
 `scan(root)` is a pure function that:
 
 1. Walks `<root>/data/`, partitioning markdown files into 4 categories:
-   captures, chunks, wiki, writing.
+   captures, chunks, wiki, writing. (M8: `data/style/` is intentionally
+   excluded from the dashboard surface — style samples are searchable via
+   `pkm search --scope style` but get no list/detail pages.)
 2. Parses frontmatter to populate per-doc metadata (slug, title, tags, ...).
 3. If `<root>/.pkm/index.db` exists, joins the M3 `links` table to produce the
    wiki+writing link graph (outgoing / backlinks) and queries `docs_vec` for

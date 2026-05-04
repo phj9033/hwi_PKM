@@ -5,6 +5,9 @@
       "Read(./**)",
       "Write(./data/raw/**)", "Edit(./data/raw/**)",
       "Write(./data/writing/**)", "Edit(./data/writing/**)",
+      "Write(./data/style/**)", "Edit(./data/style/**)",
+      "Write(./raw-imports/**)", "Edit(./raw-imports/**)",
+      "Write(./blog/**)", "Edit(./blog/**)",
       "WebFetch", "WebSearch"
     ],
     "ask": [

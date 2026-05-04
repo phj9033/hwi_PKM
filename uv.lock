@@ -479,6 +479,7 @@ source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
     { name = "markdown" },
+    { name = "numpy" },
     { name = "psutil" },
     { name = "python-frontmatter" },
     { name = "pyyaml" },
@@ -509,6 +510,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "markdownify", marker = "extra == 'extract'", specifier = ">=0.13" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pdfplumber", marker = "extra == 'extract'", specifier = ">=0.11" },
     { name = "psutil", specifier = ">=5.9" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1" },

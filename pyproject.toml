@@ -14,6 +14,10 @@ dependencies = [
     "psutil>=5.9",
     "jinja2>=3.1",
     "markdown>=3.6",
+    # numpy is used by StubEmbedder (always loaded via pkm.commands.* registration
+    # chain through pkm._mutations → pkm.store.embedder), so it must be a core
+    # runtime dep. ml-only optional install used to fail at command registration.
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

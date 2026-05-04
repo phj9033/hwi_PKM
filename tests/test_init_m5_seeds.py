@@ -18,6 +18,7 @@ def test_init_seeds_ask_and_write(tmp_path, monkeypatch):
     assert names == sorted(
         [
             "ask.md",
+            "blog.md",
             "collect.md",
             "lint.md",
             "promote.md",

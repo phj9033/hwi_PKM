@@ -83,26 +83,52 @@ Expected: `m8.x-pre-random` appears in tag list. Anchor for `git diff m8.x-pre-r
 
 ---
 
-### Task 1: Add `E_SAMPLE_INSUFFICIENT_WIKI` error code
+### Task 1: Add `PKMSampleInsufficientWiki` error subclass
 
 **Files:**
-- Modify: `pkm/errors.py` (append new code constant + register in error registry)
+- Modify: `pkm/errors.py` (append new subclass)
+- Modify: `tests/test_error_registry.py` (register SCENARIO — registry test enforces "no missing/extra" so this is mandatory)
 
-- [ ] **Step 1: Read `pkm/errors.py`** to find the existing error registry pattern (E_* constants).
+- [ ] **Step 1: Read `pkm/errors.py`** to confirm the subclass pattern (e.g. `PKMRerankModelMissing(PKMError)` with `code = "RERANK_MODEL_MISSING"`). Convention: bare uppercase code, no `E_` prefix.
 
-- [ ] **Step 2: Add the new code** following the same pattern as existing `E_*` codes. Code value: `E_SAMPLE_INSUFFICIENT_WIKI` (or whatever string convention the file uses). Default message: `"wiki 카드가 3장 미만입니다 — 샘플링할 풀이 부족합니다."`. Default hint: `"`/promote` 로 영구 메모를 늘리세요. 현재 wiki 카드 수: <count>."`
+- [ ] **Step 2: Add subclass to `pkm/errors.py`** (append near other `PKM*Missing`/`*Failed` classes):
 
-- [ ] **Step 3: If `tests/test_error_registry.py` exists**, ensure it still passes (no test changes needed unless registry has a "all codes present" test).
+```python
+class PKMSampleInsufficientWiki(PKMError):
+    """Raised when `pkm sample` cannot find ≥ 3 wiki notes to sample from."""
+
+    code = "SAMPLE_INSUFFICIENT_WIKI"
+```
+
+- [ ] **Step 3: Register in `tests/test_error_registry.py`** — add import + SCENARIOS entry:
+
+```python
+# imports
+from pkm.errors import (
+    ...,
+    PKMSampleInsufficientWiki,
+    ...,
+)
+
+# SCENARIOS dict
+SCENARIOS = {
+    ...,
+    "SAMPLE_INSUFFICIENT_WIKI": lambda: PKMSampleInsufficientWiki("wiki 카드 부족", hint="/promote 로 늘리세요"),
+    ...,
+}
+```
+
+- [ ] **Step 4: Run registry test, expect green**
 
 ```bash
 .venv/bin/python -m pytest tests/test_error_registry.py -v
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add pkm/errors.py
-git commit -m "M9.1: add E_SAMPLE_INSUFFICIENT_WIKI error code"
+git add pkm/errors.py tests/test_error_registry.py
+git commit -m "M9.1: add PKMSampleInsufficientWiki error subclass + registry scenario"
 ```
 
 ---
@@ -123,7 +149,7 @@ from __future__ import annotations
 
 import pytest
 
-from pkm.errors import PKMError
+from pkm.errors import PKMSampleInsufficientWiki
 from pkm.search.sample import SampleResult, sample_wiki
 from pkm.store.index_db import connect
 
@@ -178,9 +204,9 @@ def test_sample_fallback_when_constraint_impossible(wiki_db_factory):
 
 def test_sample_insufficient_wiki_raises(wiki_db_factory):
     db = wiki_db_factory(n_docs=2, links=[])
-    with pytest.raises(PKMError) as exc:
+    with pytest.raises(PKMSampleInsufficientWiki) as exc:
         sample_wiki(db, seed=0)
-    assert "E_SAMPLE_INSUFFICIENT_WIKI" in str(exc.value.code)
+    assert exc.value.code == "SAMPLE_INSUFFICIENT_WIKI"
 
 
 def test_sample_deterministic_with_seed(wiki_db_factory):
@@ -191,10 +217,22 @@ def test_sample_deterministic_with_seed(wiki_db_factory):
     assert a.n == b.n
 
 
-def test_sample_excludes_non_wiki_buckets(wiki_db_factory):
-    # Even if `documents` has raw/writing rows, sample_wiki should only consider wiki ones.
-    # Factory should be enhanced to support mixed-bucket inserts; for now, document the expectation.
-    pass  # implement once factory supports it
+def test_sample_excludes_non_wiki_buckets(wiki_db_factory_mixed):
+    # 4 wiki docs + 4 raw docs. Sample must only return wiki paths.
+    db = wiki_db_factory_mixed(wiki_count=4, raw_count=4)
+    for seed in range(10):
+        result = sample_wiki(db, seed=seed)
+        assert all(p.startswith("data/wiki/") for p in result.paths)
+
+
+def test_sample_ignores_unresolved_links(wiki_db_factory):
+    # Unresolved wikilinks (dst_doc_id IS NULL, only dst_path set) must be filtered out
+    # by the adjacency query — they shouldn't accidentally exclude any cards.
+    db = wiki_db_factory(n_docs=4, links=[], unresolved_links=[(1, "data/wiki/concepts/missing.md")])
+    # With 4 unlinked docs, sample should always succeed without relaxation.
+    for seed in range(10):
+        result = sample_wiki(db, seed=seed)
+        assert result.constraint_relaxed is False
 ```
 
 - [ ] **Step 2: Run tests to verify they fail (no implementation yet)**
@@ -225,7 +263,7 @@ import random
 import sqlite3
 from dataclasses import dataclass
 
-from pkm.errors import PKMError
+from pkm.errors import PKMSampleInsufficientWiki
 
 _N_MIN = 3
 _N_MAX = 5
@@ -246,9 +284,8 @@ def sample_wiki(db: sqlite3.Connection, *, seed: int | None = None) -> SampleRes
         "SELECT id, path FROM documents WHERE bucket = 'wiki' ORDER BY id"
     ).fetchall()
     if len(rows) < _N_MIN:
-        raise PKMError(
-            code="E_SAMPLE_INSUFFICIENT_WIKI",
-            message=f"wiki 카드가 {_N_MIN}장 미만입니다 — 샘플링할 풀이 부족합니다 (현재 {len(rows)}장).",
+        raise PKMSampleInsufficientWiki(
+            f"wiki 카드가 {_N_MIN}장 미만입니다 — 샘플링할 풀이 부족합니다 (현재 {len(rows)}장).",
             hint="`/promote` 로 영구 메모를 늘리세요.",
         )
 
@@ -304,19 +341,33 @@ def _pick_with_constraint(
     return picked, True
 ```
 
-- [ ] **Step 4: Implement the test fixture `wiki_db_factory`** in `tests/test_sample.py` (the fixture body left as `...` in Step 1).
+- [ ] **Step 4: Implement the test fixtures** in `tests/test_sample.py`:
 
 ```python
 # Inside tests/test_sample.py
 import sqlite3
 from pkm.store.index_schema import CREATE_STATEMENTS
 
+
+def _new_db() -> sqlite3.Connection:
+    db = sqlite3.connect(":memory:")
+    # CREATE_STATEMENTS includes vec0 virtual tables — skip those for in-memory tests
+    # since sqlite-vec is loaded by `connect()` only. Filter them out.
+    for stmt in CREATE_STATEMENTS:
+        if "vec0" in stmt:
+            continue
+        db.executescript(stmt)
+    return db
+
+
 @pytest.fixture
 def wiki_db_factory():
-    def _build(n_docs: int, links: list[tuple[int, int]]) -> sqlite3.Connection:
-        db = sqlite3.connect(":memory:")
-        for stmt in CREATE_STATEMENTS:
-            db.executescript(stmt)
+    def _build(
+        n_docs: int,
+        links: list[tuple[int, int]],
+        unresolved_links: list[tuple[int, str]] | None = None,
+    ) -> sqlite3.Connection:
+        db = _new_db()
         for i in range(1, n_docs + 1):
             db.execute(
                 "INSERT INTO documents (id, path, bucket) VALUES (?, ?, 'wiki')",
@@ -327,11 +378,42 @@ def wiki_db_factory():
                 "INSERT INTO links (src_doc_id, dst_doc_id, kind) VALUES (?, ?, 'wikilink')",
                 (src, dst),
             )
+        for src, dst_path in unresolved_links or []:
+            db.execute(
+                "INSERT INTO links (src_doc_id, dst_doc_id, dst_path, kind) "
+                "VALUES (?, NULL, ?, 'wikilink')",
+                (src, dst_path),
+            )
+        db.commit()
+        return db
+
+    return _build
+
+
+@pytest.fixture
+def wiki_db_factory_mixed():
+    def _build(wiki_count: int, raw_count: int) -> sqlite3.Connection:
+        db = _new_db()
+        idx = 1
+        for _ in range(wiki_count):
+            db.execute(
+                "INSERT INTO documents (id, path, bucket) VALUES (?, ?, 'wiki')",
+                (idx, f"data/wiki/concepts/wiki{idx}.md"),
+            )
+            idx += 1
+        for _ in range(raw_count):
+            db.execute(
+                "INSERT INTO documents (id, path, bucket) VALUES (?, ?, 'raw')",
+                (idx, f"data/raw/captures/raw{idx}.md"),
+            )
+            idx += 1
         db.commit()
         return db
 
     return _build
 ```
+
+If `CREATE_STATEMENTS` filtering is awkward, alternative: use `connect(tmp_path)` with a real on-disk index — but in-memory is faster and avoids the vec0 dependency for these unit tests.
 
 - [ ] **Step 5: Re-run tests, expect green**
 
@@ -410,7 +492,14 @@ def test_sample_insufficient_wiki(tmp_path):
     # ... pkm init at tmp_path, no promote
     result = runner.invoke(app, ["sample", "--root", str(tmp_path)])
     assert result.exit_code != 0
-    assert "E_SAMPLE_INSUFFICIENT_WIKI" in result.stderr or "wiki 카드" in result.stderr
+    assert "SAMPLE_INSUFFICIENT_WIKI" in result.stderr or "wiki 카드" in result.stderr
+
+
+def test_sample_seed_reproducible(populated_pkm):
+    a = runner.invoke(app, ["sample", "--json", "--seed", "7", "--root", str(populated_pkm)])
+    b = runner.invoke(app, ["sample", "--json", "--seed", "7", "--root", str(populated_pkm)])
+    assert a.exit_code == 0 and b.exit_code == 0
+    assert json.loads(a.stdout)["paths"] == json.loads(b.stdout)["paths"]
 ```
 
 - [ ] **Step 2: Run tests, expect fail** (`pkm sample` not registered yet).
@@ -482,7 +571,7 @@ def register(app: typer.Typer) -> None:
 
 - [ ] **Step 4: Register in `pkm/cli.py`**
 
-Add to `_register_all()` following the existing pattern (alphabetical-ish, after `related`):
+Add to `_register_all()` following the existing pattern. Place after `bench_cmd` (the last current registration) to match the file's chronological-by-milestone ordering:
 
 ```python
 from pkm.commands import sample as sample_cmd
@@ -609,18 +698,24 @@ git commit -m "M9.4: /blog --random branch — serendipity drafts to blog/seeds/
 
 **Files:**
 - Modify: `README.md`
-- Modify: `docs/FEATURES.md`
+- Modify: `docs/FEATURES.md` (only if it has a slash-commands section that mentions `/blog`)
 
-- [ ] **Step 1: Read current README slash command index.** Find the section listing `/blog`, `/style-import`, etc.
+- [ ] **Step 1: Read current `README.md` slash command index.** Find the section listing `/blog`, `/style-import`, etc.
 
 - [ ] **Step 2: Add `/blog --random` row** with one-line description: `serendipity drafts — 랜덤 wiki 카드 3-5장 조합으로 영감용 초안. 출력: blog/seeds/<slug>.md`.
 
-- [ ] **Step 3: Update `docs/FEATURES.md`** if it tabulates slash commands (read first, then update).
+- [ ] **Step 3: Inspect `docs/FEATURES.md`** for slash-command coverage:
+
+```bash
+grep -n "blog\|slash\|/" docs/FEATURES.md | head -20
+```
+
+If FEATURES.md already lists slash commands but is missing `/blog`, add **both** `/blog` and `/blog --random` together. If FEATURES.md does not list slash commands at all, skip it (don't introduce a new section just for M9 — out of scope).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add README.md docs/FEATURES.md
+git add README.md docs/FEATURES.md  # FEATURES.md may be unmodified — git add will no-op for it
 git commit -m "M9.5: README + FEATURES — /blog --random in slash index"
 ```
 

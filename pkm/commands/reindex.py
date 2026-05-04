@@ -40,12 +40,14 @@ _BUCKETS = {
     "captures": "data/raw/captures",
     "chunks": "data/raw/chunks",
     "writing": "data/writing",
+    "style": "data/style",                                    # M8
 }
 _SCOPE_BUCKETS = {
     "wiki": ("wiki",),
     "raw": ("captures", "chunks"),
     "writing": ("writing",),
-    "all": ("wiki", "captures", "chunks", "writing"),
+    "style": ("style",),                                      # M8
+    "all": ("wiki", "captures", "chunks", "writing", "style"),  # M8: +style
 }
 
 
@@ -141,7 +143,7 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opte
     conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM links WHERE src_doc_id = ?", (doc_id,))
 
-    do_vector = (bucket == "wiki") or (bucket in ("captures", "chunks") and vec_opted_in)
+    do_vector = (bucket in ("wiki", "style")) or (bucket in ("captures", "chunks") and vec_opted_in)
     embeddings = None
     if do_vector and chunks:
         embeddings = embedder.embed([c.text for c in chunks])
@@ -258,7 +260,7 @@ def register(app: typer.Typer) -> None:
         ),
         full: bool = typer.Option(False, "--full", help="Drop everything and rebuild."),
         scope: str = typer.Option(
-            "all", "--scope", help="Bucket filter: wiki | raw | writing | all."
+            "all", "--scope", help="Bucket filter: wiki | raw | writing | style | all."
         ),
         low_memory: bool = typer.Option(
             False, "--low-memory", help="Use batch_size=4 for embedder."

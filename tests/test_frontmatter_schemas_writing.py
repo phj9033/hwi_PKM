@@ -52,3 +52,13 @@ def test_validate_writing_rejects_unknown_purpose():
     fm["purpose"] = "novel"
     with pytest.raises(PKMValidationError):
         validate_writing(fm)
+
+
+def test_validate_writing_accepts_grounding_exempt():
+    """M11: grounding_exempt is an optional opt-out flag, must pass validation."""
+    fm = writing_defaults(
+        slug="x", title="X", purpose="report",
+        derived_from=["data/raw/captures/a.md"], lang="ko",
+    )
+    fm["grounding_exempt"] = True
+    validate_writing(fm)  # must not raise

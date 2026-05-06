@@ -34,9 +34,11 @@ def _seed_wiki_dep(tmp_path: Path) -> None:
 
 
 def _set_derived_from(writing_path: Path, dep_path: str) -> None:
-    """Edit the writing file's derived_from to point at dep_path."""
+    """Edit the writing file's derived_from to point at dep_path AND cite it
+    inline so the M11 grounding gate (R2 DERIVED_NOT_CITED) is satisfied."""
     txt = writing_path.read_text(encoding="utf-8")
     txt = txt.replace("derived_from: []", f"derived_from:\n- {dep_path}")
+    txt = txt.rstrip() + f"\n\n[{dep_path}]\n"
     writing_path.write_text(txt, encoding="utf-8")
 
 

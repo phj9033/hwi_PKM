@@ -15,12 +15,16 @@ import typer
 
 from pkm._mutations import post_mutation
 from pkm.errors import (
+    PKMCitationNotDerived,
+    PKMDerivedNotCited,
     PKMError,
     PKMNotFoundError,
     PKMStateError,
     PKMStatusError,
+    PKMUngroundedWriting,
     PKMValidationError,
 )
+from pkm.lint.grounding import GroundingViolation, check_grounding
 from pkm.store.files import atomic_write
 from pkm.store.frontmatter import parse, serialize
 from pkm.store.frontmatter_schemas import (
@@ -31,6 +35,18 @@ from pkm.store.frontmatter_schemas import (
 from pkm.store.log import LogEvent
 from pkm.store.refs import resolve_capture
 from pkm.store.wiki_paths import WIKI_BUCKETS, wiki_path
+
+
+def _raise_grounding(v: GroundingViolation) -> None:
+    """Map a GroundingViolation to the right PKMError subclass."""
+    cls: dict[str, type[PKMValidationError]] = {
+        "CITATION_NOT_DERIVED": PKMCitationNotDerived,
+        "DERIVED_NOT_CITED": PKMDerivedNotCited,
+        "UNGROUNDED_WRITING": PKMUngroundedWriting,
+        "BROKEN_CITATION": PKMValidationError,
+    }
+    err_cls = cls.get(v.code, PKMValidationError)
+    raise err_cls(v.message, hint=v.fix_hint)
 
 _DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 
@@ -166,6 +182,11 @@ def _promote_from_writing(
             f"writing status is {fm_src.get('status')!r}, must be 'final'",
             hint=f"Run: pkm write set-status {fm_src.get('slug')} final",
         )
+
+    # === V2 M11: grounding hard-gate ===
+    violations = check_grounding(fm_src, body_src, root)
+    if violations:
+        _raise_grounding(violations[0])
 
     derived = fm_src.get("derived_from") or []
     missing = [p for p in derived if not (root / p).exists()]

@@ -190,7 +190,12 @@ def test_promote_collision_existing_wiki_path(repo_with_capture: Path):
 
 
 def test_promote_writing_missing_derived_from_fails(tmp_path: Path):
-    """Writing with missing derived_from path should fail with VALIDATION_ERROR (M5.11)."""
+    """Writing with missing derived_from path should fail with VALIDATION_ERROR (M5.11).
+
+    M11: body must also cite the derived_from path to clear the grounding gate's
+    R2 (DERIVED_NOT_CITED), so the failure surfaces from R4 (BROKEN_CITATION
+    via path-existence) which maps to plain VALIDATION_ERROR.
+    """
     runner.invoke(app, ["init", "--root", str(tmp_path), "-f"])
     # Writing file references a derived_from path that does not exist on disk
     w = tmp_path / "data" / "writing" / "x.md"
@@ -199,7 +204,7 @@ def test_promote_writing_missing_derived_from_fails(tmp_path: Path):
         "updated_at: 2026-05-01T10:00:00+09:00\n"
         "status: final\npurpose: report\n"
         "derived_from:\n- data/wiki/concepts/y.md\n"
-        "lang: ko\ntags: []\n---\nbody\n",
+        "lang: ko\ntags: []\n---\nbody [data/wiki/concepts/y.md]\n",
         encoding="utf-8",
     )
     subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)

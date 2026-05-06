@@ -85,3 +85,11 @@ def test_init_config_toml_has_indexing_section(tmp_path: Path):
     cfg = (tmp_path / ".pkm" / "config.toml").read_text(encoding="utf-8")
     assert "[indexing]" in cfg
     assert "[memory]" in cfg
+
+
+def test_init_writes_dashboard_graph_section(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    cfg = (tmp_path / ".pkm" / "config.toml").read_text(encoding="utf-8")
+    assert "[dashboard.graph]" in cfg
+    assert "max_nodes" in cfg
+    assert "overlay_suggestions" in cfg

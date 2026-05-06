@@ -60,10 +60,10 @@ open dashboard/index.html
 | Setup | `pkm init`, `pkm doctor [--strict] [--download] [--json]`, `pkm bootstrap` |
 | Capture / chunks | `pkm capture {create,list,show,set-status,rm}`, `pkm chunks {new,add,list,show,set-status}` |
 | Index / search | `pkm reindex db [--full] [--low-memory]`, `pkm search <q> [--no-rerank] [--expand] [--with-related] [--json]`, `pkm related <path> [--mode backlinks\|semantic\|both]`, `pkm sample [--seed N] [--json]` |
-| Promote / lint | `pkm promote <ref> --to <bucket>`, `pkm demote <ref>`, `pkm wiki edit <ref> {--replace\|--patch}`, `pkm lint [--fix] [--json] [--errors-only]` |
+| Promote / lint | `pkm promote <ref> --to <bucket>`, `pkm demote <ref>`, `pkm wiki edit <ref> {--replace\|--patch}`, `pkm wiki suggest <slug> [--threshold N] [-n K] [--json]`, `pkm lint [--fix] [--json] [--errors-only]` |
 | Extract | `pkm extract <file>` (PDF/HTML → md, `[extract]` extra 필요) |
 | Writing | `pkm write {new,list,set-status}` (writing → wiki promotion 은 동일하게 `pkm promote` 사용) |
-| Dashboard | `pkm dashboard build [--out PATH]` |
+| Dashboard | `pkm dashboard build [--out PATH]` (생성물: `index/captures/chunks/wiki/writing/search/help/status/graph` HTML) |
 | Bench | `pkm bench [--docs N=100] [--real] [--json]` (M7) |
 | Log | `pkm log` |
 
@@ -111,6 +111,7 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [x] M5 — AI bridge & Writing
 - [x] M6 — Dashboard
 - [x] M7 — Hardening (V1 GA, 태그 `m7-hardening`)
+- [ ] M10 — Graph Surfacing (in progress)
 
 기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
 

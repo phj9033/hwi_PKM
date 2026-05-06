@@ -144,6 +144,12 @@ pkm wiki edit <ref> --replace|--patch [--json]
                                        # --replace: stdin = 전체 본문 (frontmatter 포함) 교체
                                        # --patch:   stdin = unified diff (git apply)
                                        # 둘 다 frontmatter + wikilink 무결성 검증 후 쓰기
+
+pkm wiki suggest <slug> [-n K] [--threshold T] [--json]
+                                       # 단일 wiki 페이지에 대한 MISSING_LINK_CANDIDATE 후보 출력.
+                                       # `[lint.missing_link]` 설정을 따르되 -n / --threshold 로 인-라인 override.
+                                       # `.pkm/index.db` 부재 시 `INDEX_MISSING` 으로 비-0 종료.
+                                       # JSON 모드: {"ok":true,"slug":"...","suggestions":[{path,slug,similarity}]}
 ```
 
 게이트 조건:
@@ -199,7 +205,7 @@ pkm lint [--fix] [--errors-only] [--json]
 ### 2.8 Dashboard
 
 ```bash
-pkm dashboard build [--out PATH]    # 기본 ./dashboard/. 단일 명령으로 8 페이지 생성.
+pkm dashboard build [--out PATH]    # 기본 ./dashboard/. 단일 명령으로 9 페이지 생성.
 ```
 
 생성물 (모두 정적 HTML, 외부 CDN 없음, 오프라인 동작):
@@ -209,6 +215,10 @@ pkm dashboard build [--out PATH]    # 기본 ./dashboard/. 단일 명령으로 8
 - `search.html` — 클라이언트 사이드 substring + 태그 매칭 (진지한 검색은 `pkm search`)
 - `help.html` — `SCHEMA.md` 렌더 + CLI 치트시트
 - `status.html` — `pkm doctor --json` 렌더 + 마스킹된 config + 권한 모드
+- `graph.html` — wiki 링크 그래프 (vis-network) + MISSING_LINK_CANDIDATE 제안 오버레이. 노드 색=bucket, 점선=`derived_from`, 빨간 점선=suggested. 체크박스로 엣지 종류 토글, 슬러그 부분 일치 검색, 노드 클릭 시 incoming/outgoing/suggested 사이드바.
+  - 결정론: 노드 초기 좌표는 `sha256(path)` 시드 — 같은 corpus 면 같은 좌표.
+  - 컨피그: `[dashboard.graph]` (`max_nodes=1000`, `include_writing=false`, `include_captures=false`, `overlay_suggestions=true`). 노드 수 cap 초과 시 connectivity 낮은 노드부터 drop, `stats.trimmed` 에 카운트.
+  - 인덱스(`.pkm/index.db`) 가 없으면 unavailable 카드 렌더.
 
 빌드 트리거는 수동 (`pkm dashboard build`) — 자동화하려면 git post-commit 훅. `dashboard/` 는 gitignore.
 

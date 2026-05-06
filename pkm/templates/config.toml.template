@@ -25,3 +25,10 @@ enabled            = true
 sim_threshold      = 0.78  # cosine similarity floor (0..1, higher = stricter)
 min_graph_distance = 2     # 2 = exclude directly-linked pairs only
 top_k_per_doc      = 3     # cap suggestions per source doc
+
+[dashboard.graph]
+# Graph page on dashboard/graph.html. Reads links + docs_vec from .pkm/index.db.
+max_nodes              = 1000   # Cap on rendered nodes (lowest-connectivity dropped first).
+include_writing        = false  # Add writing nodes (off by default).
+include_captures       = false  # Add capture nodes (off by default).
+overlay_suggestions    = true   # Render MISSING_LINK_CANDIDATE pairs as suggested edges.

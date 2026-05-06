@@ -48,6 +48,7 @@ class DashboardContext:
     config_masked: dict[str, Any] | None = None
     recent_log: list[dict[str, Any]] = field(default_factory=list)
     suggestions: list[dict[str, Any]] | None = None  # MISSING_LINK_CANDIDATE pairs
+    graph_payload: dict[str, Any] | None = None  # M10 graph.html data
     mode: str = "strict"
 
 
@@ -201,6 +202,151 @@ def _read_suggestions(root: Path) -> list[dict[str, Any]] | None:
     ]
 
 
+def _read_graph_config(root: Path) -> dict[str, Any]:
+    """Read [dashboard.graph] section, applying defaults."""
+    defaults: dict[str, Any] = {
+        "max_nodes": 1000,
+        "include_writing": False,
+        "include_captures": False,
+        "overlay_suggestions": True,
+    }
+    cfg_path = root / ".pkm" / "config.toml"
+    if not cfg_path.exists():
+        return defaults
+    try:
+        with cfg_path.open("rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return defaults
+    section = (data.get("dashboard") or {}).get("graph") or {}
+    out = dict(defaults)
+    for k, v in section.items():
+        if k in defaults:
+            out[k] = v
+    return out
+
+
+def _seed_position(rel_path: str) -> tuple[int, int]:
+    """Deterministic initial position from a slug hash. Spread across a 2000x2000 grid."""
+    import hashlib
+
+    h = hashlib.sha256(rel_path.encode("utf-8")).digest()
+    x = int.from_bytes(h[:4], "big") % 2000 - 1000
+    y = int.from_bytes(h[4:8], "big") % 2000 - 1000
+    return x, y
+
+
+def _read_graph_payload(root: Path) -> dict[str, Any] | None:
+    """Build the graph payload (nodes/edges/stats/config) for the M10 graph page.
+
+    Returns None when .pkm/index.db is missing — the page renders an
+    'unavailable' card in that case. Never raises.
+    """
+    db_path = root / ".pkm" / "index.db"
+    if not db_path.exists():
+        return None
+    cfg = _read_graph_config(root)
+    try:
+        from pkm.store.index_db import connect
+
+        conn = connect(root)
+    except Exception as e:  # noqa: BLE001
+        _logger.debug("graph payload: failed to connect: %s", e)
+        return None
+
+    try:
+        wanted_buckets = ["wiki"]
+        if cfg.get("include_writing"):
+            wanted_buckets.append("writing")
+        if cfg.get("include_captures"):
+            wanted_buckets.append("captures")
+        placeholders = ",".join("?" for _ in wanted_buckets)
+        rows = conn.execute(
+            f"SELECT id, path, bucket, title, status FROM documents "
+            f"WHERE bucket IN ({placeholders}) AND status != 'deprecated'",
+            wanted_buckets,
+        ).fetchall()
+        docs = [dict(r) for r in rows]
+
+        cap = int(cfg["max_nodes"])
+        trimmed = 0
+        if len(docs) > cap:
+            edge_count: dict[int, int] = {d["id"]: 0 for d in docs}
+            for r in conn.execute(
+                "SELECT src_doc_id, dst_doc_id FROM links WHERE dst_doc_id IS NOT NULL"
+            ):
+                if r["src_doc_id"] in edge_count:
+                    edge_count[r["src_doc_id"]] += 1
+                if r["dst_doc_id"] in edge_count:
+                    edge_count[r["dst_doc_id"]] += 1
+            docs.sort(key=lambda d: edge_count.get(d["id"], 0), reverse=True)
+            trimmed = len(docs) - cap
+            docs = docs[:cap]
+
+        kept_ids = {d["id"] for d in docs}
+        nodes = []
+        for d in docs:
+            x, y = _seed_position(d["path"])
+            nodes.append(
+                {
+                    "id": d["path"],
+                    "label": d["title"] or d["path"].rsplit("/", 1)[-1],
+                    "group": d["bucket"],
+                    "x": x,
+                    "y": y,
+                }
+            )
+        path_by_id = {d["id"]: d["path"] for d in docs}
+
+        edges: list[dict[str, Any]] = []
+        seen_edges: set[tuple[str, str, str]] = set()
+        for r in conn.execute(
+            "SELECT src_doc_id, dst_doc_id, kind FROM links "
+            "WHERE dst_doc_id IS NOT NULL AND kind IN ('wikilink', 'derived_from')"
+        ):
+            src, dst, kind = r["src_doc_id"], r["dst_doc_id"], r["kind"]
+            if src not in kept_ids or dst not in kept_ids:
+                continue
+            key = (path_by_id[src], path_by_id[dst], kind)
+            if key in seen_edges:
+                continue
+            seen_edges.add(key)
+            edges.append(
+                {"from": path_by_id[src], "to": path_by_id[dst], "type": kind, "weight": 1.0}
+            )
+
+        if cfg.get("overlay_suggestions"):
+            try:
+                from pkm.lint.missing_links import find_suggestions
+
+                node_ids = {n["id"] for n in nodes}
+                for s in find_suggestions(root):
+                    if s.src_path in node_ids and s.dst_path in node_ids:
+                        edges.append(
+                            {
+                                "from": s.src_path,
+                                "to": s.dst_path,
+                                "type": "suggested",
+                                "weight": s.similarity,
+                            }
+                        )
+            except Exception as e:  # noqa: BLE001
+                _logger.debug("graph payload: suggestions overlay failed: %s", e)
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "stats": {
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+                "trimmed": trimmed,
+            },
+            "config": cfg,
+        }
+    finally:
+        conn.close()
+
+
 def build_context(root: Path) -> DashboardContext:
     """Construct a ``DashboardContext`` for `root`. See module docstring."""
     registry = scan(root)
@@ -211,6 +357,7 @@ def build_context(root: Path) -> DashboardContext:
     config_masked = _read_masked_config(root)
     recent_log = _read_recent_log(root)
     suggestions = _read_suggestions(root)
+    graph_payload = _read_graph_payload(root)
     mode = _detect_mode(root)
     return DashboardContext(
         root=root,
@@ -220,5 +367,6 @@ def build_context(root: Path) -> DashboardContext:
         config_masked=config_masked,
         recent_log=recent_log,
         suggestions=suggestions,
+        graph_payload=graph_payload,
         mode=mode,
     )

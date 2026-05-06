@@ -147,6 +147,69 @@ def _check_model_cache() -> _Item:
     return _Item("bge-m3", "missing", "run: pkm doctor --download")
 
 
+def _check_schema_version(root: Path) -> _Item:
+    """M12: report schema_version (current/latest). Missing if below latest."""
+    from pkm.store.index_db import connect
+    from pkm.store.migrations._runner import (
+        _is_extra_available,
+        _current_version,
+        discover,
+    )
+
+    db = root / ".pkm" / "index.db"
+    if not db.exists():
+        return _Item("schema_version", "missing", "no .pkm/index.db")
+    try:
+        conn = connect(root)
+    except Exception as e:  # noqa: BLE001
+        return _Item("schema_version", "error", f"{type(e).__name__}")
+    try:
+        current = _current_version(conn)
+    finally:
+        conn.close()
+    # The "latest" baseline is the highest migration ID we can actually apply
+    # in this environment — so missing optional extras (e.g. [korean]) don't
+    # falsely report pending migrations.
+    available_ids = [
+        m.id for m in discover() if _is_extra_available(m.depends_on_extra)
+    ]
+    latest = max(available_ids) if available_ids else 1
+    if current >= latest:
+        return _Item("schema_version", "ok", f"{current}/{latest}")
+    return _Item(
+        "schema_version",
+        "missing",
+        f"{current}/{latest} — run `pkm migrate --apply`",
+    )
+
+
+def _check_tokenizer(root: Path) -> _Item:
+    """M12: report active tokenizer + version (kiwi only)."""
+    from pkm.search.tokenizer import detect_active, get_tokenizer
+    from pkm.store.index_db import connect
+
+    db = root / ".pkm" / "index.db"
+    if not db.exists():
+        return _Item("tokenizer", "missing", "no .pkm/index.db")
+    try:
+        conn = connect(root)
+    except Exception as e:  # noqa: BLE001
+        return _Item("tokenizer", "error", f"{type(e).__name__}")
+    try:
+        active = detect_active(conn)
+    finally:
+        conn.close()
+    spec = get_tokenizer(active)
+    detail = active
+    if spec.version:
+        detail += f" ({spec.version})"
+    elif active == "trigram":
+        kiwi = get_tokenizer("kiwi")
+        if not kiwi.available:
+            detail += " (kiwi unavailable — install `[korean]` extra to enable)"
+    return _Item("tokenizer", "ok", detail)
+
+
 def _render_human(items: list[_Item], system: dict[str, object]) -> str:
     lines: list[str] = []
     lines.append("[ Doctor ]")
@@ -212,6 +275,8 @@ def register(app: typer.Typer) -> None:
         items.append(_check_python())
         items.extend(_check_paths(root))
         items.append(_check_index_db(root))
+        items.append(_check_schema_version(root))
+        items.append(_check_tokenizer(root))
         items.append(_check_model_cache())
         items.append(_check_git(root))
         items.append(_check_ai_cli())
@@ -219,14 +284,29 @@ def register(app: typer.Typer) -> None:
 
         any_bad = any(it.status in ("missing", "error") for it in items)
 
+        # M12: under --strict, a pending migration surfaces as MIGRATION_PENDING
+        # in the JSON error envelope. Other failures stay as plain exit-1.
+        schema_item = next((it for it in items if it.name == "schema_version"), None)
+        pending_migration = strict and schema_item is not None and schema_item.status == "missing"
+
         if json_out:
-            payload = {
+            payload: dict[str, object] = {
                 "ok": not any_bad,
                 "items": [
-                    {"name": it.name, "status": it.status, "detail": it.detail} for it in items
+                    {"name": it.name, "status": it.status, "detail": it.detail}
+                    for it in items
                 ],
                 "system": system,
             }
+            if pending_migration:
+                from pkm.errors import PKMMigrationPending
+
+                err = PKMMigrationPending(
+                    f"schema_version pending: {schema_item.detail}",
+                    hint="run `pkm migrate --apply`.",
+                )
+                payload["ok"] = False
+                payload["error"] = err.to_dict()
             typer.echo(json.dumps(payload, ensure_ascii=False))
         else:
             typer.echo(_render_human(items, system))

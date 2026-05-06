@@ -90,3 +90,37 @@ def test_doctor_python_version_check(tmp_path: Path):
     py_items = [i for i in payload["items"] if i["name"] == "python"]
     assert len(py_items) == 1
     assert py_items[0]["status"] == "ok"
+
+
+def test_doctor_shows_schema_version(tmp_path: Path):
+    """M12: doctor reports schema_version row."""
+    _init_pkm(tmp_path)
+    res = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    payload = json.loads(res.output)
+    names = [it["name"] for it in payload["items"]]
+    assert "schema_version" in names
+
+
+def test_doctor_shows_tokenizer(tmp_path: Path):
+    """M12: doctor reports tokenizer row."""
+    _init_pkm(tmp_path)
+    res = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    payload = json.loads(res.output)
+    names = [it["name"] for it in payload["items"]]
+    assert "tokenizer" in names
+
+
+def test_doctor_strict_fails_on_pending_migration(tmp_path: Path):
+    """M12: --strict surfaces MIGRATION_PENDING when schema_version below latest."""
+    _init_pkm(tmp_path)
+    from pkm.store.index_db import connect
+
+    conn = connect(tmp_path)
+    conn.execute("UPDATE schema_version SET version = 0")
+    conn.commit()
+    conn.close()
+    res = runner.invoke(app, ["doctor", "--strict", "--root", str(tmp_path), "--json"])
+    assert res.exit_code == 1
+    payload = json.loads(res.output)
+    assert payload["ok"] is False
+    assert payload.get("error", {}).get("code") == "MIGRATION_PENDING"

@@ -29,6 +29,7 @@ from pkm.errors import (
     PKMEmbedModelMissing,
     PKMError,
     PKMExpandFailed,
+    PKMIndexMissing,
     PKMNotFoundError,
     PKMNotImplementedError,
     PKMPromoteFromWritingNotYet,
@@ -60,6 +61,10 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "BOOTSTRAP_STEP_FAILED": lambda: PKMBootstrapStepFailed("step failed"),
     "SAMPLE_INSUFFICIENT_WIKI": lambda: PKMSampleInsufficientWiki(
         "wiki 카드 부족", hint="/promote 로 늘리세요"
+    ),
+    "INDEX_MISSING": lambda: PKMIndexMissing(
+        "no search index found at .pkm/index.db",
+        hint="Run `pkm reindex db --full` first.",
     ),
 }
 

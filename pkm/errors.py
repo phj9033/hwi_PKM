@@ -110,6 +110,12 @@ class PKMSampleInsufficientWiki(PKMError):
     code = "SAMPLE_INSUFFICIENT_WIKI"
 
 
+class PKMIndexMissing(PKMStateError):
+    """Raised when a command requires .pkm/index.db but it doesn't exist."""
+
+    code = "INDEX_MISSING"
+
+
 def all_error_codes() -> dict[str, type[PKMError]]:
     """Return ``{code: cls}`` for every PKMError subclass reachable from this module.
 

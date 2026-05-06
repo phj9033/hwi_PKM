@@ -221,6 +221,22 @@ def _scenario_sample_insufficient_wiki(repo: Path) -> list[str]:
     return ["sample", "--json"]
 
 
+def _scenario_index_missing(repo: Path) -> list[str]:
+    """A wiki page exists but no .pkm/index.db → `pkm wiki suggest` must hard-fail."""
+    (repo / "data" / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
+    (repo / "data" / "wiki" / "concepts" / "demo.md").write_text(
+        "---\nslug: demo\ntitle: Demo\nbucket: concepts\nstatus: active\n"
+        "lang: ko\ncreated_at: 2026-05-01T00:00:00+00:00\n"
+        "updated_at: 2026-05-01T00:00:00+00:00\ntags: []\n---\n\nbody\n",
+        encoding="utf-8",
+    )
+    # Remove the index db that `pkm init` may have created.
+    db = repo / ".pkm" / "index.db"
+    if db.exists():
+        db.unlink()
+    return ["wiki", "suggest", "demo", "--json"]
+
+
 SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "PKM_ERROR": _scenario_pkm_error,
     "CONFIG_ERROR": _scenario_config_error,
@@ -236,6 +252,7 @@ SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "EXPAND_FAILED": _scenario_expand_failed,
     "BOOTSTRAP_STEP_FAILED": _scenario_bootstrap_step_failed,
     "SAMPLE_INSUFFICIENT_WIKI": _scenario_sample_insufficient_wiki,
+    "INDEX_MISSING": _scenario_index_missing,
 }
 
 

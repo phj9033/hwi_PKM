@@ -10,8 +10,10 @@ Output contract (per spec §5.7):
   - system{}: only numeric/derived fields (ram_total_gb, ram_available_gb,
     recommended_batch_size, python_version)
 
-M1 scope: python version + repo structure. Models, AI CLI, and index checks
-land in M3 / M5 / M6.
+Item rows accumulate across milestones: python + paths (M1), index.db (M3),
+bge-m3 model cache (M3/M5), git repo (M3.5), AI CLI detection (M5),
+schema_version + tokenizer (M12). Under `--strict`, a pending migration
+surfaces as MIGRATION_PENDING in the JSON error envelope.
 """
 
 from __future__ import annotations

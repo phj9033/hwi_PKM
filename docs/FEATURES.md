@@ -1,6 +1,6 @@
 # 기능 상세 & 유즈케이스
 
-`pkm` CLI 의 기능을 6 레이어 → 명령 → 슬래시 커맨드 → 유즈케이스 순서로 설명한다. 디자인 사양 (`docs/superpowers/specs/2026-05-01-pkm-design.md`) 의 운영자용 발췌본.
+`pkm` CLI 의 기능을 6 레이어 → 명령 → 슬래시 커맨드 → 유즈케이스 순서로 설명한다. 디자인 사양 (`docs/superpowers/specs/2026-05-01-pkm-design.md` V1, `2026-05-06-pkm-v2-design.md` V2) 의 운영자용 발췌본.
 
 ---
 
@@ -15,7 +15,7 @@
 | 3 | **Wiki** | `data/wiki/{concepts,entities,notes,reports}/` | 정제된 누적 지식 (compounding) | `pkm promote`, `pkm demote`, `pkm wiki edit` |
 | 4 | **Search / RAG** | (인덱스: `.pkm/index.db`) | 한국어 강한 하이브리드 검색 | `pkm search`, `pkm related`, `pkm reindex` |
 | 5 | **Writing** | `data/writing/` | AI 가 CLI 로 합성하는 워크스페이스 | `pkm write *`, `/write`, `/ask` |
-| 6 | **Dashboard** | `dashboard/` (gitignore) | 정적 HTML 8 페이지 | `pkm dashboard build`, `pkm bootstrap` |
+| 6 | **Dashboard** | `dashboard/` (gitignore) | 정적 HTML 9 페이지 (graph 포함) | `pkm dashboard build`, `pkm bootstrap` |
 
 ### 라이프사이클 게이트
 
@@ -509,8 +509,9 @@ PKM_AI_CLI=ollama-local pkm search "..." --expand
 
 ## 5. 더 깊이 들어가려면
 
-- **디자인 사양** (1266 줄, 한국어): `docs/superpowers/specs/2026-05-01-pkm-design.md`
-- **마일스톤 플랜**: `docs/superpowers/plans/2026-05-{01..03}-pkm-m{1..7}-*.md`
+- **디자인 사양 (V1)** (한국어): `docs/superpowers/specs/2026-05-01-pkm-design.md`
+- **디자인 사양 (V2)**: `docs/superpowers/specs/2026-05-06-pkm-v2-design.md` — graph surfacing, writing grounding, migration infra
+- **마일스톤 플랜**: `docs/superpowers/plans/2026-05-{01..06}-pkm-m{1..12}-*.md` (M1–M7 V1, M8–M9 blog/serendipity, M10–M12 V2)
 - **운영자 매뉴얼** (AI 진입점): 데이터 repo 의 `SCHEMA.md`
 - **에러 코드 단일 진실**: `pkm/errors.py` (커버리지: `tests/test_failure_mode_matrix.py`)
 - **CLI surface 단일 진실**: `pkm --help` + 각 서브명령 `--help`

@@ -2,7 +2,7 @@
 
 마크다운을 단일 진실(source of truth)로 두는 1인용 PKM. 결정론적 `pkm` CLI 가 capture · curation · indexing · wiki promotion · AI 보조 작성 · 정적 HTML 대시보드까지 담당하며, 일상 운용은 Claude Code 세션에서 한다.
 
-전체 V1 디자인 사양: `docs/superpowers/specs/2026-05-01-pkm-design.md` (한국어).
+디자인 사양: `docs/superpowers/specs/2026-05-01-pkm-design.md` (V1, 한국어) + `docs/superpowers/specs/2026-05-06-pkm-v2-design.md` (V2 — graph surfacing, writing grounding, migration infra).
 
 ## 두 개의 repo — 소스 vs 데이터
 
@@ -112,9 +112,11 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [x] M5 — AI bridge & Writing
 - [x] M6 — Dashboard
 - [x] M7 — Hardening (V1 GA, 태그 `m7-hardening`)
-- [ ] M10 — Graph Surfacing (in progress)
-- [ ] M11 — Writing Grounding (in progress)
-- [ ] M12 — Migration Infra + Kiwi (in progress)
+- [x] M8 — Blog & Style samples (`/blog`, `/style-import`, `data/style/` 버킷)
+- [x] M9 — Serendipity (`pkm sample`, `/blog --random`)
+- [x] M10 — Graph Surfacing (`pkm wiki suggest`, `dashboard/graph.html`, 태그 `m10-graph-surfacing`)
+- [x] M11 — Writing Grounding (4 룰 promote hard-gate + lint warning, 태그 `m11-writing-grounding`)
+- [x] M12 — Migration Infra + Kiwi (`pkm migrate`, `[korean]` extra, 태그 `m12-migrate-and-kiwi`)
 
 기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
 

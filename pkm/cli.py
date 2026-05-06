@@ -109,6 +109,10 @@ def _register_all() -> None:
 
     sample_cmd.register(app)
 
+    from pkm.commands import migrate as migrate_cmd
+
+    migrate_cmd.register(app)
+
 
 _register_all()
 

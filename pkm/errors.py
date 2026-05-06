@@ -134,6 +134,18 @@ class PKMIndexMissing(PKMStateError):
     code = "INDEX_MISSING"
 
 
+class PKMMigrationFailed(PKMStateError):
+    """A migration's apply() raised, the runner rolled back, schema_version unchanged."""
+
+    code = "MIGRATION_FAILED"
+
+
+class PKMMigrationPending(PKMStateError):
+    """schema_version < latest registered migration ID. Surfaced by `pkm doctor --strict`."""
+
+    code = "MIGRATION_PENDING"
+
+
 def all_error_codes() -> dict[str, type[PKMError]]:
     """Return ``{code: cls}`` for every PKMError subclass reachable from this module.
 

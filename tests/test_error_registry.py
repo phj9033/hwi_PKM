@@ -32,6 +32,8 @@ from pkm.errors import (
     PKMError,
     PKMExpandFailed,
     PKMIndexMissing,
+    PKMMigrationFailed,
+    PKMMigrationPending,
     PKMNotFoundError,
     PKMNotImplementedError,
     PKMPromoteFromWritingNotYet,
@@ -80,6 +82,14 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "UNGROUNDED_WRITING": lambda: PKMUngroundedWriting(
         "body length exceeds threshold but has no citations",
         hint="cite at least one source or set grounding_exempt: true.",
+    ),
+    "MIGRATION_FAILED": lambda: PKMMigrationFailed(
+        "migration 2 failed: forced",
+        hint="re-run with `pkm migrate --check` to see remaining work.",
+    ),
+    "MIGRATION_PENDING": lambda: PKMMigrationPending(
+        "schema_version 1 < latest 2",
+        hint="run `pkm migrate --apply`.",
     ),
 }
 

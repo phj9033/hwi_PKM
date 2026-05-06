@@ -300,6 +300,32 @@ def _scenario_ungrounded_writing(repo: Path) -> list[str]:
     return ["promote", "ungrounded", "--to", "concepts", "--json"]
 
 
+def _scenario_migration_failed(repo: Path) -> list[str]:
+    """Force a migration to fail at apply time via PKM_TEST_FORCE_MIGRATION_FAIL.
+
+    The runner honors this env var and breaks before the first migration runs,
+    surfacing MIGRATION_FAILED through the CLI.
+    """
+    from pkm.store.index_db import connect
+
+    conn = connect(repo)
+    conn.execute("UPDATE schema_version SET version = 0")
+    conn.commit()
+    conn.close()
+    return ["migrate", "--apply", "--json"]
+
+
+def _scenario_migration_pending(repo: Path) -> list[str]:
+    """schema_version < latest → `pkm doctor --strict` raises MIGRATION_PENDING."""
+    from pkm.store.index_db import connect
+
+    conn = connect(repo)
+    conn.execute("UPDATE schema_version SET version = 0")
+    conn.commit()
+    conn.close()
+    return ["doctor", "--strict", "--json"]
+
+
 def _scenario_index_missing(repo: Path) -> list[str]:
     """A wiki page exists but no .pkm/index.db → `pkm wiki suggest` must hard-fail."""
     (repo / "data" / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
@@ -335,6 +361,8 @@ SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "CITATION_NOT_DERIVED": _scenario_citation_not_derived,
     "DERIVED_NOT_CITED": _scenario_derived_not_cited,
     "UNGROUNDED_WRITING": _scenario_ungrounded_writing,
+    "MIGRATION_FAILED": _scenario_migration_failed,
+    "MIGRATION_PENDING": _scenario_migration_pending,
 }
 
 
@@ -356,6 +384,9 @@ SCENARIO_ENV: dict[str, dict[str, str]] = {
     },
     "BOOTSTRAP_STEP_FAILED": {
         "PKM_BOOTSTRAP_FORCE_FAIL_STEP": "doctor",
+    },
+    "MIGRATION_FAILED": {
+        "PKM_TEST_FORCE_MIGRATION_FAIL": "1",
     },
 }
 

@@ -75,21 +75,75 @@ def write_new(
         paths=[str(target.relative_to(root))],
     )
 
+    related = _related_suggestions(root, from_search)
+
     out = {
         "ok": True,
         "slug": slug,
         "path": str(target.relative_to(root)),
         "frontmatter": fm,
         "git_commit": sha,
+        "related_suggestions": related,
     }
     if json_out:
         typer.echo(json.dumps(out, ensure_ascii=False))
     else:
         typer.echo(f"Created {target.relative_to(root)}")
+        if related:
+            typer.echo("Related wiki you may also cite (from search seed):")
+            for r in related[:5]:
+                typer.echo(f"  {r['similarity']:.2f}  {r['path']}")
 
 
 def _humanize(slug: str) -> str:
     return slug.replace("-", " ").title()
+
+
+def _related_suggestions(root: Path, search_seed: str | None) -> list[dict]:
+    """M11: surface MISSING_LINK_CANDIDATE pairs reachable from the search seed.
+
+    Resolution heuristic: treat the seed as a candidate slug, also try
+    case-insensitive substring match against existing wiki slugs. Empty list
+    if M10 helper is missing or the seed can't be resolved to any wiki slug.
+    """
+    if not search_seed:
+        return []
+    try:
+        from pkm.lint.missing_links import find_suggestions_for
+    except ImportError:
+        return []
+    from pkm.store.wiki_paths import iter_all_wiki
+
+    known_slugs = [p.stem for p in iter_all_wiki(root)]
+    seed = (search_seed or "").strip()
+    candidates: list[str] = []
+    if seed in known_slugs:
+        candidates.append(seed)
+    else:
+        candidates.extend(s for s in known_slugs if seed.lower() in s.lower())
+
+    seen_paths: set[str] = set()
+    out: list[dict] = []
+    for slug in candidates:
+        try:
+            sugs = find_suggestions_for(root, slug)
+        except Exception:  # noqa: BLE001
+            continue
+        for s in sugs:
+            other = s.dst_path if s.src_path.endswith(f"/{slug}.md") else s.src_path
+            if other in seen_paths:
+                continue
+            seen_paths.add(other)
+            out.append(
+                {
+                    "path": other,
+                    "slug": Path(other).stem,
+                    "similarity": s.similarity,
+                    "via": f"data/wiki/.../{slug}.md",
+                }
+            )
+    out.sort(key=lambda r: -r["similarity"])
+    return out
 
 
 def _chunks_paths(root: Path, topic: str) -> list[str]:

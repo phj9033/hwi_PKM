@@ -33,6 +33,11 @@ extract = [
     "pdfplumber>=0.11",
     "markdownify>=0.13",
 ]
+korean = [
+    # Lang-aware Korean morphological tokenizer used by M12 m002 migration.
+    # Without this extra, `pkm migrate` cleanly skips m002 — schema stays at v1.
+    "kiwipiepy>=0.17",
+]
 dev = [
     "pytest>=8",
     "pytest-timeout>=2.3",

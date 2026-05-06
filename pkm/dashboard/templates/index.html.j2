@@ -35,6 +35,31 @@
   {% endif %}
 </section>
 
+<section class="card suggestions-card">
+  <h2>suggested links</h2>
+  {% if suggestions is none %}
+    <p class="empty">(unavailable — index not built)</p>
+  {% elif not suggestions %}
+    <p class="empty">No suggestions — every semantically-close pair is already linked.</p>
+  {% else %}
+    <p class="suggestions-hint">Wiki pairs that look related but aren't linked yet.</p>
+    <table class="suggestions-table">
+      <thead>
+        <tr><th>similarity</th><th>page A</th><th>page B</th></tr>
+      </thead>
+      <tbody>
+        {% for s in suggestions %}
+          <tr>
+            <td>{{ '%.2f'|format(s.similarity) }}</td>
+            <td><code>{{ s.src_path }}</code></td>
+            <td><code>{{ s.dst_path }}</code></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+
 <section class="card log-card">
   <h2>recent log</h2>
   {% if not recent_log %}

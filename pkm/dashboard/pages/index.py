@@ -61,6 +61,16 @@ def _lint_view(summary: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+_SUGGESTIONS_LIMIT = 20
+
+
+def _suggestions_view(items: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    """Cap to top-N for the landing page; `None` means feature unavailable."""
+    if items is None:
+        return None
+    return list(items[:_SUGGESTIONS_LIMIT])
+
+
 def build_index(out: Path, ctx: DashboardContext) -> Path:
     """Render `index.html` into `out` and return the written path."""
     html = render(
@@ -69,6 +79,7 @@ def build_index(out: Path, ctx: DashboardContext) -> Path:
         depth=0,
         counts=_counts(ctx),
         lint=_lint_view(ctx.lint_summary),
+        suggestions=_suggestions_view(ctx.suggestions),
         recent_log=list(ctx.recent_log[-_LOG_TAIL:]),
     )
     target = out / "index.html"

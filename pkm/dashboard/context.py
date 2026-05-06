@@ -47,6 +47,7 @@ class DashboardContext:
     doctor: dict[str, Any] | None = None  # parsed `pkm doctor --json`
     config_masked: dict[str, Any] | None = None
     recent_log: list[dict[str, Any]] = field(default_factory=list)
+    suggestions: list[dict[str, Any]] | None = None  # MISSING_LINK_CANDIDATE pairs
     mode: str = "strict"
 
 
@@ -181,6 +182,25 @@ def _detect_mode(root: Path) -> str:
     return "strict"
 
 
+def _read_suggestions(root: Path) -> list[dict[str, Any]] | None:
+    """Compute MISSING_LINK_CANDIDATE pairs for the dashboard. None means
+    "feature unavailable / index missing"; [] means "no suggestions".
+
+    Catches all errors so a malformed index never breaks the dashboard build.
+    """
+    try:
+        from pkm.lint.missing_links import find_suggestions
+
+        sugs = find_suggestions(root)
+    except Exception as e:  # noqa: BLE001 — best-effort dashboard input
+        _logger.debug("suggestions unavailable: %s", e)
+        return None
+    return [
+        {"src_path": s.src_path, "dst_path": s.dst_path, "similarity": s.similarity}
+        for s in sugs
+    ]
+
+
 def build_context(root: Path) -> DashboardContext:
     """Construct a ``DashboardContext`` for `root`. See module docstring."""
     registry = scan(root)
@@ -190,6 +210,7 @@ def build_context(root: Path) -> DashboardContext:
     doctor = doctor_raw if isinstance(doctor_raw, dict) else None
     config_masked = _read_masked_config(root)
     recent_log = _read_recent_log(root)
+    suggestions = _read_suggestions(root)
     mode = _detect_mode(root)
     return DashboardContext(
         root=root,
@@ -198,5 +219,6 @@ def build_context(root: Path) -> DashboardContext:
         doctor=doctor,
         config_masked=config_masked,
         recent_log=recent_log,
+        suggestions=suggestions,
         mode=mode,
     )

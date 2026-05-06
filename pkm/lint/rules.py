@@ -394,6 +394,27 @@ def _broken_citation(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
                 )
 
 
+def _missing_link_candidate(root: Path) -> Iterator[LintFinding]:
+    """Surface wiki pairs that look semantically close but aren't directly
+    linked. One finding per pair, attached to the alphabetically-first path so
+    `pkm lint` doesn't double-report.
+
+    Silently skips when `.pkm/index.db` is absent or feature is disabled —
+    `find_suggestions` handles every fallback.
+    """
+    from pkm.lint.missing_links import find_suggestions
+
+    for sug in find_suggestions(root):
+        other_slug = Path(sug.dst_path).stem
+        yield LintFinding(
+            "MISSING_LINK_CANDIDATE",
+            "warning",
+            sug.src_path,
+            f"semantically close to {sug.dst_path} (similarity={sug.similarity:.2f}) "
+            f"but no direct link; consider [[{other_slug}]] or shared tags.",
+        )
+
+
 # --------- Orchestrator ---------
 
 
@@ -414,5 +435,6 @@ def collect_findings(root: Path) -> list[LintFinding]:
     out.extend(_lang_inconsistent(snap))
     out.extend(_raw_body_mutated(snap))
     out.extend(_broken_citation(root, snap))
+    out.extend(_missing_link_candidate(root))
     out.sort(key=lambda f: (f.path, f.code))
     return out

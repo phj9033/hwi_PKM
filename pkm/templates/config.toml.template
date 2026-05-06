@@ -16,3 +16,12 @@ batch_size     = 16
 [memory]
 auto_throttle   = true
 low_memory_mode = false
+
+[lint.missing_link]
+# Surface wiki pairs that look semantically close but aren't directly linked.
+# Reads docs_vec + links from .pkm/index.db. Silently skipped if the index
+# is absent. Both `pkm lint` and the dashboard use these settings.
+enabled            = true
+sim_threshold      = 0.78  # cosine similarity floor (0..1, higher = stricter)
+min_graph_distance = 2     # 2 = exclude directly-linked pairs only
+top_k_per_doc      = 3     # cap suggestions per source doc

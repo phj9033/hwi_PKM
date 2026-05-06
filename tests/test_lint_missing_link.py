@@ -279,3 +279,71 @@ def test_top_k_caps_per_source(tmp_path: Path):
     assert len(sugs) <= 5
     # similarity is non-increasing in the output
     assert sugs == sorted(sugs, key=lambda s: (-s.similarity, s.src_path, s.dst_path))
+
+
+def test_find_suggestions_for_single_slug(tmp_path: Path):
+    """Single-slug mode returns only pairs originating from that slug."""
+    from pkm.lint.missing_links import find_suggestions_for
+
+    conn = _scaffold(tmp_path)
+    a = _unit(0.0)
+    b = _unit(math.acos(0.92))
+    c = _unit(math.acos(0.30), second_axis=2)  # unrelated to a
+    _insert_doc(conn, 1, "data/wiki/concepts/a.md")
+    _insert_doc(conn, 2, "data/wiki/concepts/b.md")
+    _insert_doc(conn, 3, "data/wiki/concepts/c.md")
+    _insert_vec(conn, 1, a)
+    _insert_vec(conn, 2, b)
+    _insert_vec(conn, 3, c)
+    conn.commit()
+    conn.close()
+
+    sugs = find_suggestions_for(tmp_path, "a")
+    paths = {(s.src_path, s.dst_path) for s in sugs}
+    # canonical form is alphabetical, so a-b shows up regardless of source
+    assert ("data/wiki/concepts/a.md", "data/wiki/concepts/b.md") in paths
+    # c is unrelated (similarity below threshold) so should not appear
+    assert all("c.md" not in s.dst_path and "c.md" not in s.src_path for s in sugs)
+
+
+def test_find_suggestions_for_unknown_slug_returns_empty(tmp_path: Path):
+    from pkm.lint.missing_links import find_suggestions_for
+
+    _scaffold(tmp_path).close()
+    assert find_suggestions_for(tmp_path, "nonexistent") == []
+
+
+def test_find_suggestions_for_threshold_override(tmp_path: Path):
+    """An ad-hoc threshold higher than config drops borderline matches."""
+    from pkm.lint.missing_links import find_suggestions_for
+
+    conn = _scaffold(tmp_path)
+    a = _unit(0.0)
+    b = _unit(math.acos(0.80))  # above default 0.78, below override 0.85
+    _insert_doc(conn, 1, "data/wiki/concepts/a.md")
+    _insert_doc(conn, 2, "data/wiki/concepts/b.md")
+    _insert_vec(conn, 1, a)
+    _insert_vec(conn, 2, b)
+    conn.commit()
+    conn.close()
+
+    assert find_suggestions_for(tmp_path, "a", threshold=0.85) == []
+    assert len(find_suggestions_for(tmp_path, "a", threshold=0.75)) == 1
+
+
+def test_find_suggestions_for_n_override(tmp_path: Path):
+    """`n` caps the returned list, even if more candidates clear the threshold."""
+    from pkm.lint.missing_links import find_suggestions_for
+
+    conn = _scaffold(tmp_path)
+    _insert_doc(conn, 1, "data/wiki/concepts/center.md")
+    _insert_vec(conn, 1, _unit(0.0))
+    angles = [math.acos(s) for s in (0.95, 0.92, 0.89, 0.85, 0.80)]
+    for i, theta in enumerate(angles, start=2):
+        _insert_doc(conn, i, f"data/wiki/concepts/peer{i}.md")
+        _insert_vec(conn, i, _unit(theta))
+    conn.commit()
+    conn.close()
+
+    sugs = find_suggestions_for(tmp_path, "center", n=2)
+    assert len(sugs) == 2

@@ -120,6 +120,58 @@ def find_suggestions(root: Path) -> list[LinkSuggestion]:
         conn.close()
 
 
+def find_suggestions_for(
+    root: Path,
+    slug: str,
+    *,
+    n: int | None = None,
+    threshold: float | None = None,
+) -> list[LinkSuggestion]:
+    """Suggestions for a single wiki slug. Filters the global pair list to
+    those involving `slug` (canonical orientation: pair is reported either way).
+
+    `n` overrides `top_k_per_doc` (cap on returned items).
+    `threshold` overrides `sim_threshold` (cosine similarity floor).
+
+    Returns [] when the slug is unknown, the index is missing, or the feature
+    is disabled — never raises (consistent with `find_suggestions`).
+    """
+    cfg = load_config(root)
+    if threshold is not None:
+        cfg = {**cfg, "sim_threshold": float(threshold)}
+    if n is not None:
+        cfg = {**cfg, "top_k_per_doc": max(1, int(n))}
+    if not cfg.get("enabled"):
+        return []
+    db_path = root / ".pkm" / "index.db"
+    if not db_path.exists():
+        return []
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.enable_load_extension(True)
+        import sqlite_vec
+
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+    except (sqlite3.OperationalError, ImportError):
+        conn.close()
+        return []
+
+    try:
+        all_pairs = _find_suggestions(conn, cfg)
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        conn.close()
+
+    target = f"/{slug}.md"
+    matches = [s for s in all_pairs if s.src_path.endswith(target) or s.dst_path.endswith(target)]
+    cap = int(cfg["top_k_per_doc"])
+    return matches[:cap]
+
+
 def _find_suggestions(conn: sqlite3.Connection, cfg: dict[str, Any]) -> list[LinkSuggestion]:
     sim_th = float(cfg["sim_threshold"])
     min_d = int(cfg["min_graph_distance"])

@@ -15,7 +15,7 @@ from pathlib import Path
 import typer
 
 from pkm._mutations import post_mutation
-from pkm.errors import PKMError, PKMValidationError
+from pkm.errors import PKMError, PKMIndexMissing, PKMNotFoundError, PKMValidationError
 from pkm.store.files import atomic_write
 from pkm.store.frontmatter import parse, serialize
 from pkm.store.frontmatter_schemas import validate_wiki
@@ -111,3 +111,76 @@ def register(app: typer.Typer) -> None:
             typer.echo(json.dumps(result, ensure_ascii=False))
         else:
             typer.echo(f"edited {result['path']}  (commit {result['git_commit'] or 'none'})")
+
+    @wiki_app.command("suggest")
+    def suggest_cmd(
+        slug: str = typer.Argument(..., help="Wiki slug (without .md)"),
+        n: int = typer.Option(
+            0,
+            "-n",
+            "--top-n",
+            help="Cap on results (0 = use config top_k_per_doc).",
+        ),
+        threshold: float = typer.Option(
+            -1.0,
+            "--threshold",
+            help="Override cosine sim floor (-1 = use config).",
+        ),
+        json_out: bool = typer.Option(False, "--json"),
+        root: Path = typer.Option(Path("."), "--root", "-r"),
+    ) -> None:
+        """List missing-link suggestions for a single wiki page."""
+        from pkm.lint.missing_links import find_suggestions_for
+
+        known = {p.stem for p in iter_all_wiki(root)}
+        try:
+            if slug not in known:
+                raise PKMNotFoundError(
+                    f"no wiki page with slug {slug!r}",
+                    hint="`pkm dashboard build` then check dashboard/wiki.html for valid slugs.",
+                )
+            if not (root / ".pkm" / "index.db").exists():
+                raise PKMIndexMissing(
+                    "no search index found at .pkm/index.db",
+                    hint="Run `pkm reindex db --full` first.",
+                )
+            sugs = find_suggestions_for(
+                root,
+                slug,
+                n=(n if n > 0 else None),
+                threshold=(threshold if threshold >= 0 else None),
+            )
+        except PKMError as e:
+            if json_out:
+                typer.echo(json.dumps({"ok": False, "error": e.to_dict()}, ensure_ascii=False))
+            else:
+                typer.echo(f"Error [{e.code}]: {e.message}", err=True)
+                if e.hint:
+                    typer.echo(f"  hint: {e.hint}", err=True)
+            raise typer.Exit(1) from None
+
+        items = [
+            {
+                "path": s.dst_path if s.src_path.endswith(f"/{slug}.md") else s.src_path,
+                "slug": Path(
+                    s.dst_path if s.src_path.endswith(f"/{slug}.md") else s.src_path
+                ).stem,
+                "similarity": s.similarity,
+            }
+            for s in sugs
+        ]
+        if json_out:
+            typer.echo(
+                json.dumps(
+                    {"ok": True, "slug": slug, "suggestions": items}, ensure_ascii=False
+                )
+            )
+        else:
+            typer.echo(f"{slug} ({len(items)} suggestions):")
+            for it in items:
+                typer.echo(f"  {it['similarity']:.2f}  {it['path']}")
+            if items:
+                typer.echo(
+                    f"hint: copy [[{items[0]['slug']}]] into your draft, "
+                    f"or run `pkm wiki edit {slug} --patch`."
+                )

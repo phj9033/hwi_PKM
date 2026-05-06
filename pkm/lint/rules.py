@@ -394,6 +394,28 @@ def _broken_citation(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
                 )
 
 
+def _writing_grounding(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
+    """Surface R1/R2/R3/R4 grounding violations on writing docs as warnings.
+
+    Mirrors the promote-time hard gate so users see issues during `pkm lint`
+    instead of only at promote time.
+    """
+    from pkm.lint.grounding import check_grounding, load_config
+
+    cfg = load_config(root)
+    if not cfg.get("enabled", True):
+        return
+    for d in snap.by_kind("writing"):
+        for v in check_grounding(d.fm, d.body, root, config=cfg):
+            yield LintFinding(
+                code=v.code,
+                severity="warning",
+                path=d.rel,
+                message=v.message,
+                fixable=False,
+            )
+
+
 def _missing_link_candidate(root: Path) -> Iterator[LintFinding]:
     """Surface wiki pairs that look semantically close but aren't directly
     linked. One finding per pair, attached to the alphabetically-first path so
@@ -435,6 +457,7 @@ def collect_findings(root: Path) -> list[LintFinding]:
     out.extend(_lang_inconsistent(snap))
     out.extend(_raw_body_mutated(snap))
     out.extend(_broken_citation(root, snap))
+    out.extend(_writing_grounding(root, snap))
     out.extend(_missing_link_candidate(root))
     out.sort(key=lambda f: (f.path, f.code))
     return out

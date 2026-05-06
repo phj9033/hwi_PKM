@@ -31,7 +31,7 @@ uv sync --all-extras
 # 3) 글로벌 `pkm` 커맨드 설치 (editable — 소스 수정이 즉시 반영)
 #    `[ml,extract]` 는 sentence-transformers · sqlite-vec · huggingface_hub · pdfplumber · markdownify
 #    까지 함께 받음. zsh 에서 `[` 가 glob 문자라 따옴표 필수.
-uv tool install --reinstall -e ".[ml,extract]"
+uv tool install --reinstall -e ".[ml,extract,korean]"  # `korean` 은 옵션 — Kiwi 한국어 토크나이저 (영어 위주 repo 면 생략 가능)
 which pkm                         # 예: ~/.local/bin/pkm
 
 # 4) 데이터 repo 생성 + 한 번에 셋업
@@ -65,6 +65,7 @@ open dashboard/index.html
 | Writing | `pkm write {new,list,set-status}` (writing → wiki promotion 은 동일하게 `pkm promote` 사용) |
 | Dashboard | `pkm dashboard build [--out PATH]` (생성물: `index/captures/chunks/wiki/writing/search/help/status/graph` HTML) |
 | Bench | `pkm bench [--docs N=100] [--real] [--json]` (M7) |
+| Migrate | `pkm migrate [--check] [--apply] [--json]` (M12 — 스키마 버전 마이그레이션) |
 | Log | `pkm log` |
 
 `pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` (`/blog --random` 으로 랜덤 wiki 카드 시드 초안 생성) — Claude Code 세션에서 바로 사용 가능.
@@ -113,6 +114,7 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [x] M7 — Hardening (V1 GA, 태그 `m7-hardening`)
 - [ ] M10 — Graph Surfacing (in progress)
 - [ ] M11 — Writing Grounding (in progress)
+- [ ] M12 — Migration Infra + Kiwi (in progress)
 
 기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
 

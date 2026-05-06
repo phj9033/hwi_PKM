@@ -101,3 +101,10 @@ def test_init_writes_writing_grounding_section(tmp_path: Path):
     assert "[lint.writing_grounding]" in cfg
     assert "min_grounded_chars" in cfg
     assert "exempt_purposes" in cfg
+
+
+def test_init_writes_indexing_tokenizer_section(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    cfg = (tmp_path / ".pkm" / "config.toml").read_text(encoding="utf-8")
+    assert "[indexing.tokenizer]" in cfg
+    assert "preferred" in cfg

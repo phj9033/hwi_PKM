@@ -13,6 +13,13 @@ embed_captures = false
 embed_chunks   = false
 batch_size     = 16
 
+[indexing.tokenizer]
+# preferred: auto | trigram | kiwi
+# auto = use kiwi if `[korean]` extra is installed, else trigram. Setting to
+# kiwi explicitly without the extra silently falls back to trigram.
+# Effective tokenizer is determined by schema_version (≥2 → kiwi, else trigram).
+preferred = "auto"
+
 [memory]
 auto_throttle   = true
 low_memory_mode = false

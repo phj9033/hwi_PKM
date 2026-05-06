@@ -113,10 +113,12 @@ pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]
 
 검색 파이프라인 (5 단계):
 1. **쿼리확장** (`--expand` 시) — AI CLI 가 원 쿼리 + 영문 + 패러프레이즈 2~3 개 생성. 실패 시 `EXPAND_FAILED` hard-fail.
-2. **병렬 retrieval** — 변형마다 BM25(FTS5 trigram) top-50 + 벡터(bge-m3 → vec0 코사인) top-50.
+2. **병렬 retrieval** — 변형마다 BM25(FTS5) top-50 + 벡터(bge-m3 → vec0 코사인) top-50.
 3. **RRF 융합** — `score = Σ 1/(k + rank)` (k=60). top-30 후보.
 4. **재랭킹** (`--no-rerank` 미지정 시) — bge-reranker-v2-m3 cross-encoder.
 5. **top-K** + 모든 점수 노출 (`--explain`).
+
+**토크나이저 (M12):** BM25 인덱싱은 토크나이저 어댑터(`pkm.search.tokenizer`)를 통해 분기한다. V1 (schema_version=1) = FTS5 trigram. M12 마이그레이션 (`m002_kiwi_tokenizer`) 적용 후 (schema_version≥2) = Kiwi 형태소 분석기로 사전 토큰화 + FTS5 `unicode61`. 한국어 BM25 recall 향상 목적. `[korean]` extra 미설치 시 m002 는 silently skip 되고 trigram 으로 유지된다. 토크나이저 상태는 `pkm doctor` 의 `tokenizer` 행에서 확인.
 
 `--with-related` 는 결과 각 hit 에 다음 추가:
 ```json
@@ -239,6 +241,36 @@ pkm bench [--docs N=100] [--real] [--json]
 
 pkm log                              # data/log.md tail
 pkm index rebuild                    # data/index.md (TOC) 재생성 — 검색 인덱스와 별개
+```
+
+### 2.10 Migration (M12)
+
+```bash
+pkm migrate                # 기본 = dry-run (--check 와 동일).
+pkm migrate --apply        # 실제 적용. 각 마이그레이션은 SAVEPOINT 안에서 동작.
+pkm migrate --json         # 머신용 출력. 실패 시 `error.code = MIGRATION_FAILED`.
+```
+
+각 마이그레이션은 `pkm/store/migrations/m<NNN>_*.py` 모듈로 등록 — `ID`, `DESCRIPTION`, 옵션으로 `DEPENDS_ON_EXTRA`, `check(conn)`, `apply(conn)` 를 export. 런타임 시 ID 순으로 발견 + 정렬 + `schema_version` 보다 높은 ID 만 적용.
+
+- **의존성 체크.** `DEPENDS_ON_EXTRA` 가 import 안 되면 silently skip — 에러 아님, schema_version 그대로. 해당 extra 설치 후 다시 실행하면 그때 적용.
+- **실패 격리.** 마이그레이션이 raise 하면 SAVEPOINT 롤백 + `MIGRATION_FAILED` exit. 단 FTS5 DDL 은 SAVEPOINT 보장이 약해서 `m002` 는 내부적으로 swap 가드를 둔다 (`chunks_fts_old` 로 rename → 검증 → drop, 실패 시 복원).
+- **doctor 통합.** `pkm doctor` 가 `schema_version: <current>/<latest>` + `tokenizer` 행을 표시. `--strict` + 미적용 마이그레이션 있으면 `MIGRATION_PENDING` 으로 exit 1.
+
+현재 등록된 마이그레이션:
+
+| ID | DEPENDS_ON_EXTRA | 설명 |
+|----|---|---|
+| 1 | — | V1 baseline (스키마는 `index_db.connect` 가 이미 만들어줌; no-op marker) |
+| 2 | `korean` | `chunks_fts` 토크나이저를 Kiwi 사전토큰화 + FTS5 unicode61 로 전환 (한국어 BM25 recall 향상) |
+
+```bash
+# 한국어 토크나이저 활성화 워크플로우
+uv tool install --reinstall -e ".[ml,extract,korean]"   # `[korean]` 추가
+pkm migrate --check                                      # m002 가 pending 으로 보임
+pkm migrate --apply                                      # text_tokenized 컬럼 추가 + FTS swap
+pkm reindex db --full                                    # 새 토크나이저로 재인덱싱
+pkm doctor                                               # tokenizer: kiwi (...)
 ```
 
 ---

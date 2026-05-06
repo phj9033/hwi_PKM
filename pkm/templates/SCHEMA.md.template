@@ -100,6 +100,13 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 ### Browse the dashboard
 - `pkm dashboard build && open dashboard/index.html` — static HTML overview of all docs, link graph, lint, and status.
 
+## Migrations (V2 M12)
+
+- A new PKM version may introduce schema changes. `pkm doctor` flags them with `schema_version: <current>/<latest>` (status `missing`).
+- Recovery: `pkm migrate --check` to preview, then `pkm migrate --apply` to apply. The runner advances `schema_version` per step inside a SAVEPOINT; a failure rolls back and surfaces `MIGRATION_FAILED`. Both flows write to the auto-commit log.
+- Optional dependencies: a migration may declare `DEPENDS_ON_EXTRA` (e.g., `korean` for `m002_kiwi_tokenizer`). If the extra isn't installed, the migration is skipped silently, `schema_version` stays put, and `pkm doctor` does not flag it as pending. Install the extra (e.g. `uv tool install -e ".[ml,extract,korean]"`) and re-run `pkm migrate --apply`.
+- Markdown files in `data/` are never modified by migrations — only `.pkm/index.db` schema changes. So `pkm reindex db --full` is always a safe fallback if the index gets confused.
+
 ## 5. CLI Reference
 
 - **Search enhancements (M5):**

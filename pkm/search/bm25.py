@@ -1,8 +1,14 @@
-"""FTS5 (trigram) BM25 search over chunks_fts.
+"""FTS5 BM25 search over chunks_fts.
 
 `query_bm25(conn, query, scope, top)` returns ranked Hit rows. The `scope`
 filter joins back to documents.bucket: 'wiki' / 'raw' / 'writing' / 'style' /
 'all'. 'raw' covers both 'captures' and 'chunks' buckets per master spec §5.1.
+
+Tokenizer dispatch (M12): pre-m002 repos use the FTS5 trigram tokenizer; the
+``_build_fts_query`` path applies the boundary-space trick for 2-char CJK
+tokens. Post-m002 repos store kiwi-pretokenized text and use FTS5 ``unicode61``,
+so the query is also pre-tokenized via the same adapter and the trigram tricks
+are skipped.
 """
 
 from __future__ import annotations
@@ -30,13 +36,19 @@ class Hit:
     chunk_text: str
 
 
-def _build_fts_query(query: str) -> str:
-    """Convert a user query string into an FTS5 trigram-compatible OR query.
+def _build_fts_query(query: str, *, trigram: bool = True) -> str:
+    """Convert a user query string into an FTS5-compatible OR query.
 
-    FTS5 trigram requires at least 3 Unicode codepoints per token. Short tokens
-    (< 3 chars, common with 2-char CJK words like '토큰') cannot form a trigram
-    on their own.  We wrap them as a phrase with a leading space—'" 토큰"'—which
-    matches the trigram ' 토큰' that is indexed for word-boundary positions.
+    `trigram=True` (V1 / pre-m002): FTS5 trigram requires at least 3 Unicode
+    codepoints per token. Short tokens (< 3 chars, common with 2-char CJK words
+    like '토큰') cannot form a trigram on their own. We wrap them as a phrase
+    with a leading space—'" 토큰"'—which matches the trigram ' 토큰' that is
+    indexed for word-boundary positions.
+
+    `trigram=False` (post-m002, kiwi pre-tokenized text + unicode61): the
+    boundary-space trick is irrelevant — every kiwi morpheme is already
+    whitespace-separated. Only the phrase-quote-to-neutralize-operators rule
+    still applies.
 
     Every token is phrase-quoted so FTS5 operator characters embedded in the
     user's query (``?``, ``*``, ``(``, ``)``, ``:``, ``^``, ``+``, ``-``,
@@ -50,13 +62,10 @@ def _build_fts_query(query: str) -> str:
     tokens = query.split()
     fts_tokens: list[str] = []
     for tok in tokens:
-        # Escape any embedded double-quotes per FTS5 phrase literal syntax.
         safe = tok.replace('"', '""')
-        if len(safe) < 3:
-            # Leading space tags into the boundary trigram for 2-char CJK words.
+        if trigram and len(safe) < 3:
             fts_tokens.append(f'" {safe}"')
         else:
-            # Phrase-quote to neutralize FTS5 operators (?, *, (, ), :, ^, +, -).
             fts_tokens.append(f'"{safe}"')
     return " OR ".join(fts_tokens)
 
@@ -70,7 +79,15 @@ def query_bm25(
     if buckets is None:
         raise ValueError(f"unknown scope: {scope!r}")
     placeholders = ",".join("?" for _ in buckets)
-    fts_query = _build_fts_query(query)
+
+    from pkm.search.tokenizer import detect_active, get_tokenizer, tokenize_for_indexing
+
+    active = detect_active(conn)
+    if active == "kiwi":
+        spec = get_tokenizer(active)
+        # lang='mixed' — kiwi leaves English alone (no Hangul = no segmentation).
+        query = tokenize_for_indexing(query, lang="mixed", tokenizer=spec)
+    fts_query = _build_fts_query(query, trigram=(active != "kiwi"))
     sql = f"""
         SELECT c.id AS chunk_id, c.doc_id AS doc_id, d.path AS path,
                d.bucket AS bucket, c.text AS text,

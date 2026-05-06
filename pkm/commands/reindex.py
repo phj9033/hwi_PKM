@@ -87,7 +87,17 @@ def _walk_files(root: Path, buckets: Iterable[str]) -> list[tuple[str, Path]]:
     return out
 
 
-def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opted_in: bool) -> bool:
+def _index_one(
+    conn,
+    root: Path,
+    bucket: str,
+    abs_path: Path,
+    embedder,
+    vec_opted_in: bool,
+    *,
+    post_m002: bool = False,
+    tokenizer=None,
+) -> bool:
     """Index a single file. Returns True if (re)indexed, False if skipped."""
     rel = str(abs_path.relative_to(root))
     text = abs_path.read_text(encoding="utf-8")
@@ -132,10 +142,16 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opte
     # Wipe old chunks/fts/vec/links for this doc.
     # FTS5 + vec0 are virtual tables — they do NOT honor SQLite FK CASCADE.
     # Delete from them BEFORE chunks (otherwise we lose the chunk_id list).
-    conn.execute(
-        "DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE doc_id = ?)",
-        (doc_id,),
-    )
+    if not post_m002:
+        # V1 contentless FTS5: rowid-targeted DELETE works.
+        conn.execute(
+            "DELETE FROM chunks_fts WHERE rowid IN "
+            "(SELECT id FROM chunks WHERE doc_id = ?)",
+            (doc_id,),
+        )
+    # Post-m002 (content=chunks FTS5): a single end-of-loop 'rebuild' in
+    # reindex_db handles invalidation. Per-doc DELETE is unnecessary and the
+    # contentless idiom doesn't apply.
     conn.execute(
         "DELETE FROM chunks_vec WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?)",
         (doc_id,),
@@ -163,7 +179,24 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opte
             ),
         )
         chunk_id = cur.lastrowid
-        conn.execute("INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)", (chunk_id, ch.text))
+        if post_m002:
+            # Post-m002: write pre-tokenized text into chunks.text_tokenized.
+            # No per-row chunks_fts INSERT — single 'rebuild' after the main
+            # loop in reindex_db keeps it O(N).
+            from pkm.search.tokenizer import tokenize_for_indexing
+
+            tokenized = tokenize_for_indexing(
+                ch.text, lang=fm.get("lang"), tokenizer=tokenizer
+            )
+            conn.execute(
+                "UPDATE chunks SET text_tokenized = ? WHERE id = ?",
+                (tokenized, chunk_id),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)",
+                (chunk_id, ch.text),
+            )
         if embeddings is not None:
             conn.execute(
                 "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",
@@ -219,17 +252,22 @@ def _index_one(conn, root: Path, bucket: str, abs_path: Path, embedder, vec_opte
     return True
 
 
-def _drop_all(conn) -> None:
+def _drop_all(conn, *, post_m002: bool = False) -> None:
     """Wipe every indexable row.
 
     Virtual tables (chunks_fts, chunks_vec, docs_vec) do NOT honor SQLite FK
-    cascade, so each gets an explicit DELETE.
+    cascade, so each gets explicit handling.
 
-    chunks_fts is a *contentless* FTS5 table (`content=''` in index_schema.py),
-    which does NOT support row DELETE. The supported idiom is the special
-    'delete-all' command insert. See SQLite FTS5 docs §4.4.3.
+    Pre-m002 chunks_fts is a *contentless* FTS5 table (`content=''` in
+    index_schema.py), which does NOT support row DELETE. The supported idiom
+    is the special 'delete-all' command insert. See SQLite FTS5 docs §4.4.3.
+
+    Post-m002 chunks_fts is a content-table form (`content=chunks`); the
+    'delete-all' command is contentless-only. We rely on the end-of-loop
+    'rebuild' in reindex_db to resync after chunks rows are repopulated.
     """
-    conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('delete-all')")
+    if not post_m002:
+        conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('delete-all')")
     conn.execute("DELETE FROM chunks_vec")
     conn.execute("DELETE FROM docs_vec")
     conn.execute("DELETE FROM chunks")
@@ -273,8 +311,14 @@ def register(app: typer.Typer) -> None:
 
         conn = connect(root)
         try:
+            from pkm.search.tokenizer import detect_active, get_tokenizer
+
+            active = detect_active(conn)
+            post_m002 = active == "kiwi"
+            tokenizer = get_tokenizer(active) if post_m002 else None
+
             if full:
-                _drop_all(conn)
+                _drop_all(conn, post_m002=post_m002)
 
             embedder = get_embedder(low_memory=low_memory)
             vec_opt = _vec_opted_in(root)
@@ -294,10 +338,26 @@ def register(app: typer.Typer) -> None:
             indexed = 0
             skipped = 0
             for bucket, abs_p in files:
-                if _index_one(conn, root.resolve(), bucket, abs_p, embedder, vec_opt):
+                if _index_one(
+                    conn,
+                    root.resolve(),
+                    bucket,
+                    abs_p,
+                    embedder,
+                    vec_opt,
+                    post_m002=post_m002,
+                    tokenizer=tokenizer,
+                ):
                     indexed += 1
                 else:
                     skipped += 1
+
+            # Post-m002: rebuild chunks_fts ONCE after the loop. Content-table
+            # FTS5 doesn't auto-sync on chunks updates, and per-row 'rebuild'
+            # would be O(N²).
+            if post_m002:
+                conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild')")
+
             conn.commit()
 
             stats = {

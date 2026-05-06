@@ -23,6 +23,7 @@ def _expected_paths(root: Path) -> list[Path]:
         root / "data" / "wiki" / "notes",
         root / "data" / "wiki" / "reports",
         root / "data" / "writing",
+        root / "data" / "style",
         root / ".pkm" / "config.toml",
         root / ".claude" / "settings.json",
         root / ".claude" / "commands",

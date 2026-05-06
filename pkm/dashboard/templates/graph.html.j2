@@ -1,0 +1,31 @@
+{% extends "base.html.j2" %}
+
+{% block head_extra %}
+<script src="{{ '../' * depth }}assets/vis-network.min.js" defer></script>
+{% endblock %}
+
+{% block content %}
+<h1>graph</h1>
+
+{% if unavailable %}
+<section class="card">
+  <p class="empty">Graph is unavailable — no <code>.pkm/index.db</code>. Run <code>pkm reindex db --full</code> first.</p>
+</section>
+{% else %}
+<section class="filter-bar">
+  <label><input type="checkbox" id="t-wikilink" checked> wikilinks</label>
+  <label><input type="checkbox" id="t-derived" checked> derived_from</label>
+  <label><input type="checkbox" id="t-suggested" checked> suggested</label>
+  <input id="filter-q" type="search" placeholder="filter slug…">
+</section>
+
+<div id="graph-canvas" style="height:70vh; border:1px solid var(--rule);"></div>
+
+<aside class="card" id="graph-sidebar">
+  <p class="empty">Click a node to see its connections.</p>
+</aside>
+
+<script id="graph-data" type="application/json">{{ payload_json | safe }}</script>
+<script src="{{ '../' * depth }}assets/graph.js" defer></script>
+{% endif %}
+{% endblock %}

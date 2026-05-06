@@ -124,3 +124,46 @@ def test_build_context_includes_graph_payload(tmp_path: Path, monkeypatch):
     assert ctx.graph_payload is not None
     assert "nodes" in ctx.graph_payload
     assert ctx.graph_payload["config"]["max_nodes"] == 1000
+
+
+def test_build_graph_writes_html(tmp_path: Path):
+    """build_graph emits graph.html that embeds the payload as JSON."""
+    _seed(tmp_path)
+    out = tmp_path / "dashboard"
+    out.mkdir()
+    from pkm.dashboard.context import build_context
+    from pkm.dashboard.pages.graph import build_graph
+
+    ctx = build_context(tmp_path)
+    target = build_graph(out, ctx)
+    assert target.exists()
+    html = target.read_text(encoding="utf-8")
+    assert 'id="graph-data"' in html
+    assert "vis-network.min.js" in html
+    assert "graph.js" in html
+
+
+def test_build_graph_unavailable_card(tmp_path: Path):
+    """Without an index DB, the page renders an 'unavailable' message."""
+    (tmp_path / "data" / "wiki" / "concepts").mkdir(parents=True)
+    out = tmp_path / "dashboard"
+    out.mkdir()
+    from pkm.dashboard.context import build_context
+    from pkm.dashboard.pages.graph import build_graph
+
+    ctx = build_context(tmp_path)
+    target = build_graph(out, ctx)
+    html = target.read_text(encoding="utf-8")
+    assert "unavailable" in html.lower()
+
+
+def test_dashboard_build_includes_graph(tmp_path: Path):
+    """`pkm dashboard build` end-to-end produces graph.html."""
+    _seed(tmp_path)
+    out = tmp_path / "dashboard"
+    from pkm.dashboard.builder import build_dashboard
+
+    build_dashboard(tmp_path, out)
+    assert (out / "graph.html").exists()
+    assert (out / "assets" / "vis-network.min.js").exists()
+    assert (out / "assets" / "graph.js").exists()

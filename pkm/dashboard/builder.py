@@ -12,7 +12,8 @@ Page-build order is deterministic so the output is reproducible:
 4. ``search.html`` + ``search-index.json``
 5. ``help.html``
 6. ``status.html``
-7. Asset copy
+7. ``graph.html``
+8. Asset copy
 
 Spec reference: M6 plan, Task 11.
 """
@@ -24,6 +25,7 @@ from pathlib import Path
 
 from pkm.dashboard.context import build_context
 from pkm.dashboard.pages.doc import build_doc_page
+from pkm.dashboard.pages.graph import build_graph
 from pkm.dashboard.pages.help import build_help
 from pkm.dashboard.pages.index import build_index
 from pkm.dashboard.pages.lists import build_list_page
@@ -48,6 +50,7 @@ def build_dashboard(root: Path, out: Path) -> None:
     build_search(out, ctx)
     build_help(out, ctx)
     build_status(out, ctx)
+    build_graph(out, ctx)
 
     _copy_assets(out)
 

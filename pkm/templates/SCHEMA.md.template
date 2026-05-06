@@ -83,6 +83,12 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
 ### Write
 - `/write <topic>` orchestrates `pkm write new` → fill body via Edit → `pkm write set-status <s> final` → `pkm promote <path> --to <bucket>`.
 - `pkm write new` seeds frontmatter only (empty body); the AI fills the body using search hits or chunk sources, citing inline.
+- **Grounding contract (V2 M11)** — `pkm promote` enforces 4 rules on `writing → wiki`:
+  - Every `derived_from` path must be cited inline at least once (`[<path>]`); else `DERIVED_NOT_CITED`.
+  - Every inline `[data/...]` citation must appear in `derived_from`; else `CITATION_NOT_DERIVED`.
+  - Bodies ≥ 400 chars need at least one citation, unless `purpose: essay` or frontmatter `grounding_exempt: true` is set; else `UNGROUNDED_WRITING`.
+  - Cited paths must exist on disk; else `BROKEN_CITATION`.
+- `pkm lint` surfaces the same 4 codes as warnings on writing docs so issues are visible before promote time.
 
 ### Chunk → Wiki Synthesis
 1. `pkm chunks new <topic>` and gather sources via `/research` or `pkm chunks add <topic> <file>`.

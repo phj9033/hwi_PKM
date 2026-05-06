@@ -32,3 +32,13 @@ max_nodes              = 1000   # Cap on rendered nodes (lowest-connectivity dro
 include_writing        = false  # Add writing nodes (off by default).
 include_captures       = false  # Add capture nodes (off by default).
 overlay_suggestions    = true   # Render MISSING_LINK_CANDIDATE pairs as suggested edges.
+
+[lint.writing_grounding]
+# Karpathy citation contract on writing → wiki promote (M11).
+# Four rules — R1 CITATION_NOT_DERIVED / R2 DERIVED_NOT_CITED /
+# R3 UNGROUNDED_WRITING / R4 BROKEN_CITATION — fire as both lint warnings
+# and `pkm promote` hard gates. `purpose=essay` or frontmatter
+# `grounding_exempt: true` skips R3 only; R1/R2/R4 always enforced.
+enabled            = true
+min_grounded_chars = 400
+exempt_purposes    = ["essay"]

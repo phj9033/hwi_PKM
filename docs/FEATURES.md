@@ -154,7 +154,12 @@ pkm wiki suggest <slug> [-n K] [--threshold T] [--json]
 
 게이트 조건:
 - capture → wiki 승격: `status: reviewed` 필수. draft 면 `STATUS_NOT_REVIEWED` 에러.
-- writing → wiki 승격: `status: final` 필수.
+- writing → wiki 승격: `status: final` 필수 + **M11 grounding gate** (4 룰):
+  - **R1 `CITATION_NOT_DERIVED`** — body 의 `[<path>]` 인용은 모두 `derived_from` 안에 있어야 함.
+  - **R2 `DERIVED_NOT_CITED`** — `derived_from` 의 모든 항목은 body 에 한 번 이상 인용돼야 함.
+  - **R3 `UNGROUNDED_WRITING`** — body 가 400 자 이상이면 ≥1 인용 필수. `purpose: essay` 또는 frontmatter `grounding_exempt: true` 로만 면제 (R3 만 면제, R1/R2/R4 는 그대로 적용).
+  - **R4 `BROKEN_CITATION`** — 인용 경로는 디스크에 존재해야 함.
+  - 같은 4 룰이 `pkm lint` 의 warning 으로도 노출 — promote 전에 미리 본다.
 - wiki 페이지는 `status: stub` 으로 시작 + `promoted_from: <source path>` 자동 기재.
 - 자동 부수효과: source 가 `archived` 로 (기본), git 자동 커밋, `data/log.md` append.
 
@@ -199,6 +204,9 @@ pkm lint [--fix] [--errors-only] [--json]
 | `LANG_INCONSISTENT` | warning | 본문 언어와 frontmatter `lang` 불일치 | — |
 | `RAW_BODY_MUTATED` | warning | reviewed 이후 본문 해시 변경 (compounding 위반) | — |
 | `BROKEN_CITATION` | warning | `[<path>]` 인용이 실존 path 아님 | — |
+| `CITATION_NOT_DERIVED` | warning (M11) | writing body 의 인용이 frontmatter `derived_from` 에 없음 — promote 시 hard gate | — |
+| `DERIVED_NOT_CITED` | warning (M11) | `derived_from` 의 path 가 body 에서 한 번도 인용되지 않음 — promote 시 hard gate | — |
+| `UNGROUNDED_WRITING` | warning (M11) | body ≥ 400 자인데 인용 0 개. `purpose: essay` / `grounding_exempt: true` 로만 면제 | — |
 
 `--errors-only` 는 warning 을 숨기고 error 만으로 exit 게이트 — CI/pre-commit 용.
 

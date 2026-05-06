@@ -93,3 +93,11 @@ def test_init_writes_dashboard_graph_section(tmp_path: Path):
     assert "[dashboard.graph]" in cfg
     assert "max_nodes" in cfg
     assert "overlay_suggestions" in cfg
+
+
+def test_init_writes_writing_grounding_section(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    cfg = (tmp_path / ".pkm" / "config.toml").read_text(encoding="utf-8")
+    assert "[lint.writing_grounding]" in cfg
+    assert "min_grounded_chars" in cfg
+    assert "exempt_purposes" in cfg

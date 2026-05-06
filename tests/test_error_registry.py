@@ -24,8 +24,10 @@ from pkm.errors import (
     EXPAND_FAILED,  # noqa: F401
     RERANK_MODEL_MISSING,  # noqa: F401
     PKMBootstrapStepFailed,
+    PKMCitationNotDerived,
     PKMConfigError,
     PKMDemoteToWritingNotYet,
+    PKMDerivedNotCited,
     PKMEmbedModelMissing,
     PKMError,
     PKMExpandFailed,
@@ -37,6 +39,7 @@ from pkm.errors import (
     PKMSampleInsufficientWiki,
     PKMStateError,
     PKMStatusError,
+    PKMUngroundedWriting,
     PKMValidationError,
     all_error_codes,
 )
@@ -65,6 +68,18 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "INDEX_MISSING": lambda: PKMIndexMissing(
         "no search index found at .pkm/index.db",
         hint="Run `pkm reindex db --full` first.",
+    ),
+    "CITATION_NOT_DERIVED": lambda: PKMCitationNotDerived(
+        "body cites paths not in derived_from",
+        hint="add the cited path(s) to derived_from or remove the citation.",
+    ),
+    "DERIVED_NOT_CITED": lambda: PKMDerivedNotCited(
+        "derived_from paths never cited in body",
+        hint="cite each derived_from path inline or remove unused entries.",
+    ),
+    "UNGROUNDED_WRITING": lambda: PKMUngroundedWriting(
+        "body length exceeds threshold but has no citations",
+        hint="cite at least one source or set grounding_exempt: true.",
     ),
 }
 

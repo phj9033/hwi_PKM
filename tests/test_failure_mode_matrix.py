@@ -221,6 +221,85 @@ def _scenario_sample_insufficient_wiki(repo: Path) -> list[str]:
     return ["sample", "--json"]
 
 
+def _wiki_md(slug: str) -> str:
+    return (
+        f"---\nslug: {slug}\ntitle: {slug}\nbucket: concepts\nstatus: active\n"
+        "lang: ko\ncreated_at: 2026-05-01T00:00:00+00:00\n"
+        "updated_at: 2026-05-01T00:00:00+00:00\ntags: []\n---\n\nbody\n"
+    )
+
+
+def _capture_md(slug: str) -> str:
+    return (
+        f"---\nslug: {slug}\ntitle: {slug}\nstatus: reviewed\nsource_type: text\n"
+        "lang: ko\ntags: []\ncreated_at: 2026-05-01T00:00:00+00:00\n---\n\nbody\n"
+    )
+
+
+def _seed_writing_for_grounding(
+    repo: Path,
+    *,
+    slug: str,
+    derived_from: list[str],
+    body: str,
+    purpose: str = "report",
+) -> None:
+    (repo / "data" / "writing").mkdir(parents=True, exist_ok=True)
+    if not derived_from:
+        df_block = "derived_from: []"
+    else:
+        df_block = "derived_from:\n  - " + "\n  - ".join(derived_from)
+    (repo / "data" / "writing" / f"{slug}.md").write_text(
+        f"---\nslug: {slug}\ntitle: {slug}\nstatus: final\npurpose: {purpose}\n"
+        f"{df_block}\n"
+        "lang: ko\ntags: []\ncreated_at: 2026-05-01T00:00:00+00:00\n"
+        f"updated_at: 2026-05-01T00:00:00+00:00\n---\n\n{body}\n",
+        encoding="utf-8",
+    )
+
+
+def _scenario_citation_not_derived(repo: Path) -> list[str]:
+    """Writing body cites a path not in derived_from → CITATION_NOT_DERIVED on promote."""
+    _seed_writing_for_grounding(
+        repo,
+        slug="cite-not-derived",
+        derived_from=[],
+        body="See [data/wiki/concepts/missing-from-derived.md] for context.",
+    )
+    (repo / "data" / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
+    (repo / "data" / "wiki" / "concepts" / "missing-from-derived.md").write_text(
+        _wiki_md("missing-from-derived"), encoding="utf-8"
+    )
+    return ["promote", "cite-not-derived", "--to", "concepts", "--json"]
+
+
+def _scenario_derived_not_cited(repo: Path) -> list[str]:
+    """derived_from has a path that body never cites → DERIVED_NOT_CITED on promote."""
+    (repo / "data" / "raw" / "captures").mkdir(parents=True, exist_ok=True)
+    (repo / "data" / "raw" / "captures" / "src.md").write_text(
+        _capture_md("src"), encoding="utf-8"
+    )
+    _seed_writing_for_grounding(
+        repo,
+        slug="derived-not-cited",
+        derived_from=["data/raw/captures/src.md"],
+        body="A short body that doesn't cite anything.",
+    )
+    return ["promote", "derived-not-cited", "--to", "concepts", "--json"]
+
+
+def _scenario_ungrounded_writing(repo: Path) -> list[str]:
+    """Long body with no citations + non-essay purpose → UNGROUNDED_WRITING."""
+    _seed_writing_for_grounding(
+        repo,
+        slug="ungrounded",
+        derived_from=[],
+        body="가" * 600,
+        purpose="report",
+    )
+    return ["promote", "ungrounded", "--to", "concepts", "--json"]
+
+
 def _scenario_index_missing(repo: Path) -> list[str]:
     """A wiki page exists but no .pkm/index.db → `pkm wiki suggest` must hard-fail."""
     (repo / "data" / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
@@ -253,6 +332,9 @@ SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "BOOTSTRAP_STEP_FAILED": _scenario_bootstrap_step_failed,
     "SAMPLE_INSUFFICIENT_WIKI": _scenario_sample_insufficient_wiki,
     "INDEX_MISSING": _scenario_index_missing,
+    "CITATION_NOT_DERIVED": _scenario_citation_not_derived,
+    "DERIVED_NOT_CITED": _scenario_derived_not_cited,
+    "UNGROUNDED_WRITING": _scenario_ungrounded_writing,
 }
 
 

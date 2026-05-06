@@ -45,6 +45,24 @@ class PKMValidationError(PKMError):
     code = "VALIDATION_ERROR"
 
 
+class PKMCitationNotDerived(PKMValidationError):
+    """Body cites a path that isn't in `derived_from`."""
+
+    code = "CITATION_NOT_DERIVED"
+
+
+class PKMDerivedNotCited(PKMValidationError):
+    """`derived_from` has a path that body never cites."""
+
+    code = "DERIVED_NOT_CITED"
+
+
+class PKMUngroundedWriting(PKMValidationError):
+    """Body length exceeds the grounding threshold but has no citations."""
+
+    code = "UNGROUNDED_WRITING"
+
+
 class PKMStateError(PKMError):
     """System is in an unexpected state (file missing, invalid status, etc.)."""
 

@@ -1455,13 +1455,27 @@ In `docs/FEATURES.md` §2.5 (promote/demote/wiki edit), add a paragraph describi
 
 In §2.7 (lint), add the 4 new warning codes.
 
-- [ ] **Step 7.8: Commit**
+- [ ] **Step 7.8: Update SCHEMA.md.template (Workflows → Write)**
+
+`pkm/templates/SCHEMA.md.template` is the workflow rulebook scaffolded into every data repo by `pkm init`. The Workflows section's "Write" step needs to mirror the new grounding contract.
+
+Find the existing Write workflow block (search for `## Workflows` then the `Write` heading inside it). Append or strengthen language to capture:
+
+- All `derived_from` paths must be cited inline at least once (R2 enforcement).
+- Inline `[<path>]` citations must appear in `derived_from` (R1 enforcement).
+- Bodies ≥ 400 chars need at least one citation unless `purpose: essay` or `grounding_exempt: true` is set.
+- Promote rejects with `CITATION_NOT_DERIVED` / `DERIVED_NOT_CITED` / `UNGROUNDED_WRITING` / `BROKEN_CITATION` if any rule is violated.
+
+Keep the existing language about `pkm write new` / `pkm promote` workflow — only the grounding contract is new.
+
+- [ ] **Step 7.9: Commit**
 
 ```bash
 git add pkm/templates/config.toml.template pkm/templates/.claude/commands/write.md \
         pkm/templates/.claude/commands/promote.md pkm/templates/.claude/commands/lint.md \
+        pkm/templates/SCHEMA.md.template \
         tests/test_init.py README.md docs/FEATURES.md
-git commit -m "M11.7: config + slash commands + README + FEATURES — document grounding gate"
+git commit -m "M11.7: config + slash commands + SCHEMA + README + FEATURES — document grounding gate"
 ```
 
 ---

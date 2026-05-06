@@ -916,7 +916,7 @@ In `pyproject.toml`, under `[project.optional-dependencies]`:
 korean = ["kiwipiepy>=0.17"]
 ```
 
-Run `uv sync --all-extras` to confirm the lockfile updates without conflicts (don't commit the lockfile change yet — it ships in Step 5.x).
+Run `uv sync --all-extras` to confirm the lockfile updates without conflicts. The `uv.lock` change is committed together with this task's other changes in **Step 5.7** (do not split it off into a standalone commit).
 
 - [ ] **Step 5.2: Write failing migration tests**
 
@@ -1496,7 +1496,18 @@ Currently registered migrations:
 
 In §2.4 (Index/Search), add a paragraph about the tokenizer adapter — `auto` config, trigram default, Kiwi opt-in via `[korean]`.
 
-- [ ] **Step 8.5: Final regression**
+- [ ] **Step 8.5: Update SCHEMA.md.template (new Migrations section)**
+
+`pkm/templates/SCHEMA.md.template` is the workflow rulebook scaffolded into every data repo by `pkm init`. Add a new section explaining the migration lifecycle so AI agents working in the data repo understand when to run `pkm migrate`.
+
+Recommended placement: after the existing Workflows section, add a new heading `## Migrations`. Cover:
+
+- When a new PKM version introduces a schema change, `pkm doctor` flags `schema_version: 1/2 ⚠`.
+- Recovery: run `pkm migrate --check` first, then `pkm migrate --apply`. Both write to the auto-commit log.
+- Optional dependencies: if a migration's `DEPENDS_ON_EXTRA` is missing (e.g., `[korean]` for `m002_kiwi_tokenizer`), the migration is skipped silently and `schema_version` stays put — install the extra and re-run.
+- The data layer (markdown files) is never modified by migrations — only `.pkm/index.db` schema. So `pkm reindex db --full` is always a safe fallback if the index gets confused.
+
+- [ ] **Step 8.6: Final regression**
 
 Run: `uv run pytest -q`
 Expected: All previously-passing tests still pass; new M12 tests pass (with kiwi-specific ones skipped if `[korean]` isn't installed).
@@ -1509,7 +1520,7 @@ uv run pytest -q tests/test_migration_002_kiwi.py
 
 Expected: PASS.
 
-- [ ] **Step 8.6: Acceptance walkthrough (spec §8 V2 criteria for M12)**
+- [ ] **Step 8.7: Acceptance walkthrough (spec §8 V2 criteria for M12)**
 
 - [ ] `pkm migrate --apply` works in `[korean]`-installed env
 - [ ] `pkm migrate --apply` cleanly skips m002 in non-`[korean]` env (exit 0, schema_version unchanged)
@@ -1519,11 +1530,12 @@ Expected: PASS.
 - [ ] English search results unchanged before/after migration (lang=en passthrough)
 - [ ] Failure-mode matrix passes for `MIGRATION_FAILED` and `MIGRATION_PENDING`
 
-- [ ] **Step 8.7: Commit + tag**
+- [ ] **Step 8.8: Commit + tag**
 
 ```bash
-git add pkm/templates/config.toml.template tests/test_init.py README.md docs/FEATURES.md
-git commit -m "M12.8: config + README + FEATURES — document migrate + tokenizer"
+git add pkm/templates/config.toml.template pkm/templates/SCHEMA.md.template \
+        tests/test_init.py README.md docs/FEATURES.md
+git commit -m "M12.8: config + SCHEMA + README + FEATURES — document migrate + tokenizer"
 git tag m12-migrate-and-kiwi
 git log --oneline m12-migrate-and-kiwi~10..m12-migrate-and-kiwi
 ```

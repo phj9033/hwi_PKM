@@ -441,6 +441,10 @@ pkm/session/adapters/claude_code.py
 
 스킬이 Claude in-session 으로 transcript 를 직접 Read 하므로 `parse` 는 V3 의 critical path 에서 호출되지 않는다. 어댑터는 사실상 **discovery + resolve_project_id 두 메서드** 만 critical path. `parse` 는 doctor/디버그/V4 어댑터 (Codex 등) 에서 in-session 처리가 어려운 경우의 fallback.
 
+V3 테스트 범위:
+- `discover` + `resolve_project_id` — `tests/test_session_adapter_claude.py` 에서 충분히 커버 (요구 정확도: production-grade).
+- `parse` — smoke test 1 개 (jsonl 파싱 안 깨지는지) + 정규화 schema 검증만. 깊은 정확도 검증은 V4 의 실제 caller (Codex 어댑터의 fallback path 등) 에서 추가. V3 에서 over-test 금지 — fallback 메서드라 yagni.
+
 ---
 
 ## 7. cwd → project-id 해석 알고리즘
@@ -580,7 +584,11 @@ This applies to any cwd, any project — the skill resolves which project automa
 
 ### 9.4 `pkm:extracting-session-knowledge` 스킬 절차
 
-1. uuid 미명시 시 *현재 세션* (Claude Code 환경변수 또는 마지막 세션 추론).
+1. uuid 결정 — 다음 우선순위:
+   1. 사용자가 인자로 명시 → 그것 사용.
+   2. 환경변수 `CLAUDE_SESSION_ID` (Claude Code 가 세션 시작 시 노출) → 그것 사용.
+   3. (1)·(2) 모두 없으면 `pkm session list --project <current> --since-today --limit 1 --json` 의 가장 최신 세션 선택. 결과 0 → *"현재 세션 식별 불가. uuid 인자로 명시 권장"* 안내 후 종료.
+   4. *Portability 룰 R6 준수*: project-id hardcode 없이 매번 `pkm project current --json` 으로 동적 해석.
 2. `pkm session show <uuid> --json` → transcript_path + cwd + project-id.
 3. project-id `NOT_LINKED` → *"이 cwd 는 link 안 됨. `pkm project link` 먼저 실행 권장"* 후 종료.
 4. transcript jsonl 을 Read 툴로 읽기 (긴 transcript 는 50 메시지 + overlap 5 윈도우 슬라이딩).
@@ -889,7 +897,7 @@ V3 의 절반. 사용자가 *손으로* 프로젝트 지식을 운용할 수 있
 | M13.2 | `pkm/session/registry.py` + 7.1 5 단계 해석 + git remote 정규화 |
 | M13.3 | `pkm/commands/project.py` — link/list/current/show/rebuild-index/rm |
 | M13.4 | `pkm/commands/project.py` — `knowledge add` (frontmatter 검증 + slug 정규화 + auto-commit) |
-| M13.5 | `pkm reindex db --scope projects|project:<id>` + search 새 스코프 + cwd default |
+| M13.5 | `pkm reindex db --scope projects|project:<id>` + search 새 스코프 + cwd default + **upgrade-time notice** (search default 변경을 `pkm doctor` 가 첫 m003 적용 직후 한 번 명시 — `release_note: search-default-changed` 행 추가) |
 | M13.6 | `pkm related --scope same-project|wiki|all` |
 | M13.7 | lint 4 신규 룰 + `SIMILAR_KNOWLEDGE_CANDIDATE` |
 | M13.8 | dashboard graph `include_projects` + 노드 색 + project_filter |

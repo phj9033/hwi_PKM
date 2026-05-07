@@ -320,7 +320,9 @@ def register(app: typer.Typer) -> None:
         ),
         full: bool = typer.Option(False, "--full", help="Drop everything and rebuild."),
         scope: str = typer.Option(
-            "all", "--scope", help="Bucket filter: wiki | raw | writing | style | all."
+            "all",
+            "--scope",
+            help="Bucket filter: wiki | raw | writing | style | projects | all | project:<id>.",
         ),
         low_memory: bool = typer.Option(
             False, "--low-memory", help="Use batch_size=4 for embedder."
@@ -328,8 +330,12 @@ def register(app: typer.Typer) -> None:
         root: Path = typer.Option(Path("."), "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
     ) -> None:
-        if scope not in _SCOPE_BUCKETS:
-            raise PKMError(f"unknown scope: {scope!r}", hint=f"Choose from: {list(_SCOPE_BUCKETS)}")
+        # Resolve project:<id> scope into an explicit file list.
+        _project_id_scope: str | None = None
+        if scope.startswith("project:"):
+            _project_id_scope = scope[len("project:"):]
+        elif scope not in _SCOPE_BUCKETS:
+            raise PKMError(f"unknown scope: {scope!r}", hint=f"Choose from: {list(_SCOPE_BUCKETS)} or project:<id>")
 
         conn = connect(root)
         try:
@@ -358,6 +364,19 @@ def register(app: typer.Typer) -> None:
                         hint=f"Allowed roots: {list(_BUCKETS.values())}",
                     )
                 files = [(bucket, abs_path)]
+            elif _project_id_scope is not None:
+                # project:<id> — walk only data/projects/<id>/**/*.md
+                project_dir = root.resolve() / "data" / "projects" / _project_id_scope
+                if not project_dir.exists():
+                    raise PKMStateError(
+                        f"project directory not found: data/projects/{_project_id_scope}",
+                        hint="Create the project with `pkm project link` first.",
+                    )
+                files = [
+                    ("projects", p)
+                    for p in sorted(project_dir.rglob("*.md"))
+                    if p.is_file()
+                ]
             else:
                 files = _walk_files(root.resolve(), _SCOPE_BUCKETS[scope])
 

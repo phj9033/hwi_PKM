@@ -147,7 +147,8 @@ Content must cover the four phases from spec verbatim in intent:
     -not -path './dist/*' -not -path './build/*'
   ```
 
-**2. Presentation format** (one assistant message, not multiple):
+**2. Presentation format** (one assistant message, not multiple). The example below uses Korean strings since hwi_PKM is the first target; English (`Detected domain doc candidates:` / `Reply with: numbers / path: <p> / "none" / "skip"`) is equally valid — match the project's working language.
+
 ```
 감지된 도메인 문서 후보:
   [1] SCHEMA.md

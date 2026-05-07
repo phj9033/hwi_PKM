@@ -28,6 +28,7 @@ from pkm.errors import (
     PKMCategoryPathMismatch,
     PKMCitationNotDerived,
     PKMConfigError,
+    PKMCorruptTranscript,
     PKMDemoteToWritingNotYet,
     PKMDerivedNotCited,
     PKMEmbedModelMissing,
@@ -35,6 +36,7 @@ from pkm.errors import (
     PKMExpandFailed,
     PKMIndexMissing,
     PKMInfoError,
+    PKMInstallMissing,
     PKMInvalidCategory,
     PKMInvalidProjectId,
     PKMMigrationFailed,
@@ -143,6 +145,14 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "SIMILAR_KNOWLEDGE_CANDIDATE": lambda: PKMSimilarKnowledgeCandidate(
         "two knowledge items have similarity >= 0.92",
         hint="review and merge or differentiate the similar items.",
+    ),
+    "CORRUPT_TRANSCRIPT": lambda: PKMCorruptTranscript(
+        "invalid jsonl at line 1: Expecting value",
+        hint="re-save the transcript or pkm session forget <uuid>.",
+    ),
+    "PKM_INSTALL_MISSING": lambda: PKMInstallMissing(
+        "claude-code: not installed",
+        hint="run `pkm install --for claude-code --data-repo <path>`.",
     ),
 }
 

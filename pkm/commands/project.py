@@ -6,7 +6,9 @@ Spec reference: M13 §5.4 (project commands).
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -66,6 +68,9 @@ def register(app: typer.Typer) -> None:
         no_args_is_help=True,
     )
     app.add_typer(project_app, name="project")
+
+    knowledge_app = typer.Typer(no_args_is_help=True, help="Manage project knowledge files.")
+    project_app.add_typer(knowledge_app, name="knowledge")
 
     @project_app.command("link")
     def link(
@@ -325,4 +330,133 @@ def register(app: typer.Typer) -> None:
                     ))
                     raise typer.Exit(getattr(e, "exit_code", 1))
                 raise
+            raise
+
+    @knowledge_app.command("add")
+    def knowledge_add(
+        project_id: str = typer.Option(..., "--project"),
+        category: str = typer.Option(...),
+        slug: str = typer.Option(...),
+        title: str = typer.Option(...),
+        tags: str = typer.Option("", "--tags"),
+        source_type: str = typer.Option("ai_session", "--source-type"),
+        session_id: str | None = typer.Option(None, "--session-id"),
+        session_path: str | None = typer.Option(None, "--session-path"),
+        no_commit: bool = typer.Option(False, "--no-commit"),
+        data_repo: Path | None = typer.Option(None, "--data-repo", hidden=True),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        """Write a project knowledge markdown."""
+        from pkm.errors import PKMInvalidCategory, PKMNotFoundError
+        from pkm.store.project_paths import slug_for_knowledge
+
+        try:
+            if category not in CATEGORIES:
+                raise PKMInvalidCategory(
+                    f"invalid category: {category!r}",
+                    hint=f"choose from: {', '.join(CATEGORIES)}",
+                )
+            repo = _resolve_repo(data_repo)
+            pdir = project_dir(repo, project_id)
+            if not pdir.is_dir():
+                raise PKMNotFoundError(
+                    f"project not found: {project_id}",
+                    hint="run `pkm project list` or `pkm project link --id <id>` first",
+                )
+
+            if not re.match(r"^\d{4}-\d{2}-\d{2}-", slug):
+                slug = slug_for_knowledge(slug)
+
+            body = sys.stdin.read() if not sys.stdin.isatty() else ""
+
+            fm = {
+                "title": title,
+                "slug": slug,
+                "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+                "status": "draft",
+                "source_type": source_type,
+                "lang": "ko",
+                "project": project_id,
+                "category": category,
+                "tags": [t.strip() for t in tags.split(",") if t.strip()],
+                "summary": "",
+                "derived_from": [],
+                "promoted_to": None,
+            }
+            if session_id:
+                fm["session_id"] = session_id
+                fm["extracted_at"] = fm["created_at"]
+            if session_path:
+                fm["session_path"] = session_path
+
+            file_path = pdir / category / f"{slug}.md"
+            if file_path.exists():
+                raise PKMValidationError(
+                    f"already exists: {file_path}",
+                    hint="use a different --slug or remove the existing file",
+                )
+            file_path.write_text(
+                "---\n" + yaml.safe_dump(fm, sort_keys=False, allow_unicode=True) + "---\n\n" + body,
+                encoding="utf-8",
+            )
+
+            if not no_commit:
+                rel = f"data/projects/{project_id}/{category}/{slug}.md"
+                subprocess.run(["git", "add", rel], cwd=repo, check=False)
+                subprocess.run(
+                    ["git", "commit", "-m", f"feat(project/{project_id}): add {category}/{slug}"],
+                    cwd=repo,
+                    check=False,
+                    capture_output=True,
+                )
+
+            payload = {
+                "ok": True,
+                "project_id": project_id,
+                "category": category,
+                "slug": slug,
+                "path": str(file_path.relative_to(repo)),
+            }
+            if json_out:
+                typer.echo(json.dumps(payload, ensure_ascii=False))
+            else:
+                typer.echo(f"added: {category}/{slug}")
+        except (PKMInvalidCategory, PKMNotFoundError, PKMValidationError) as e:
+            if json_out:
+                typer.echo(json.dumps(
+                    {"ok": False, "error": {"code": e.code, "message": e.message, "hint": e.hint}},
+                    ensure_ascii=False,
+                ))
+                raise typer.Exit(getattr(e, "exit_code", 1))
+            raise
+
+    @project_app.command("rebuild-index")
+    def rebuild_index_cmd(
+        pid: str = typer.Argument(...),
+        data_repo: Path | None = typer.Option(None, "--data-repo", hidden=True),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        """Rebuild data/projects/<pid>/index.md from current category contents."""
+        from pkm.errors import PKMNotFoundError
+        from pkm.store.project_index import rebuild_index
+
+        try:
+            repo = _resolve_repo(data_repo)
+            if not project_dir(repo, pid).is_dir():
+                raise PKMNotFoundError(
+                    f"project not found: {pid}",
+                    hint="run `pkm project list` to see registered projects",
+                )
+            rebuild_index(repo, pid)
+            if json_out:
+                typer.echo(json.dumps({"ok": True, "project_id": pid}, ensure_ascii=False))
+            else:
+                typer.echo(f"rebuilt index for {pid}")
+        except (PKMNotFoundError, PKMValidationError) as e:
+            if json_out:
+                typer.echo(json.dumps(
+                    {"ok": False, "error": {"code": e.code, "message": e.message, "hint": e.hint}},
+                    ensure_ascii=False,
+                ))
+                raise typer.Exit(getattr(e, "exit_code", 1))
             raise

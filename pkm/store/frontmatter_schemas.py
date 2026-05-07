@@ -2,6 +2,7 @@
 
 M2 implements `capture` and `chunk`. `wiki` and `writing` land in M4/M5.
 M8 adds `style` (blog sample corpus).
+M13 adds `project_knowledge` and `project_index` (data/projects/**).
 
 For each kind we expose:
 - `<kind>_defaults(**overrides) -> dict`: build a fully-populated frontmatter
@@ -14,6 +15,7 @@ exists) live in `pkm lint` (M4).
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
@@ -268,6 +270,94 @@ def validate_style(fm: dict) -> None:
         raise PKMValidationError("style frontmatter `tags` must be a list")
 
 
+# --- project knowledge (M13) ---
+
+_PROJECT_KNOWLEDGE_REQUIRED = (
+    "title", "slug", "created_at", "status", "source_type", "lang",
+    "project", "category",
+)
+_PROJECT_KNOWLEDGE_STATUSES = ("draft", "reviewed", "archived")
+# Extended source types for project knowledge: includes manual + ai_session
+# in addition to the base capture set.
+_PROJECT_KNOWLEDGE_SOURCE_TYPES = ("manual", "ai_session", "url", "text", "research")
+_PROJECT_KNOWLEDGE_LANGS = ("ko", "en", "mixed")
+
+
+def validate_project_knowledge(fm: dict) -> None:
+    from pkm.store.project_paths import CATEGORIES as _CATEGORIES  # local import avoids circular
+    _check_required(fm, _PROJECT_KNOWLEDGE_REQUIRED, "project_knowledge")
+    _check_enum(fm, "status", _PROJECT_KNOWLEDGE_STATUSES, "project_knowledge")
+    _check_enum(fm, "source_type", _PROJECT_KNOWLEDGE_SOURCE_TYPES, "project_knowledge")
+    _check_enum(fm, "lang", _PROJECT_KNOWLEDGE_LANGS, "project_knowledge")
+    _check_enum(fm, "category", _CATEGORIES, "project_knowledge")
+
+
+# --- project index (M13) ---
+
+_PROJECT_INDEX_REQUIRED = ("project", "git_remotes", "created_at", "data_repo_local_paths")
+
+
+def validate_project_index(fm: dict) -> None:
+    _check_required(fm, _PROJECT_INDEX_REQUIRED, "project_index")
+    if not isinstance(fm.get("git_remotes"), list):
+        raise PKMValidationError("project_index frontmatter `git_remotes` must be a list")
+    if not isinstance(fm.get("data_repo_local_paths"), list):
+        raise PKMValidationError(
+            "project_index frontmatter `data_repo_local_paths` must be a list"
+        )
+
+
+# --- unified dispatch (M13) ---
+
+# Public error alias — callers may import FrontmatterError directly.
+FrontmatterError = PKMValidationError
+
+
+def validate_frontmatter(fm: dict, *, path: str) -> None:
+    """Dispatch to the correct bucket validator based on the file's relative path.
+
+    Raises FrontmatterError (== PKMValidationError) for any validation failure.
+    Unknown path buckets also raise — fail-closed is safer than silently
+    skipping validation.
+    """
+    parts = PurePosixPath(path).parts
+
+    # data/projects/<id>/index.md
+    if (
+        len(parts) == 4
+        and parts[0] == "data"
+        and parts[1] == "projects"
+        and parts[3] == "index.md"
+    ):
+        validate_project_index(fm)
+        return
+
+    # data/projects/<id>/<category>/<slug>.md
+    if len(parts) >= 4 and parts[0] == "data" and parts[1] == "projects":
+        validate_project_knowledge(fm)
+        return
+
+    if path.startswith("data/wiki/"):
+        validate_wiki(fm)
+        return
+
+    if path.startswith("data/writing/"):
+        validate_writing(fm)
+        return
+
+    if path.startswith("data/raw/captures/"):
+        validate_capture(fm)
+        return
+
+    if path.startswith("data/style/"):
+        validate_style(fm)
+        return
+
+    # Raise for unknown buckets — fail-closed ensures new paths get explicit
+    # schema coverage rather than silently passing with wrong structure.
+    raise FrontmatterError(f"unknown path bucket: {path}")
+
+
 # Public aliases — `pkm.lint.rules` consumes these to avoid importing
 # underscore-prefixed names. The underscore versions remain the internal
 # module-level reference for the validators above.
@@ -288,3 +378,8 @@ WRITING_STATUSES = _WRITING_STATUSES
 WRITING_LANGS = _WRITING_LANGS
 STYLE_REQUIRED = _STYLE_REQUIRED
 STYLE_LANGS = _STYLE_LANGS
+PROJECT_KNOWLEDGE_REQUIRED = _PROJECT_KNOWLEDGE_REQUIRED
+PROJECT_KNOWLEDGE_STATUSES = _PROJECT_KNOWLEDGE_STATUSES
+PROJECT_KNOWLEDGE_SOURCE_TYPES = _PROJECT_KNOWLEDGE_SOURCE_TYPES
+PROJECT_KNOWLEDGE_LANGS = _PROJECT_KNOWLEDGE_LANGS
+PROJECT_INDEX_REQUIRED = _PROJECT_INDEX_REQUIRED

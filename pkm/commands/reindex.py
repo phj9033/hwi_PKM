@@ -41,13 +41,15 @@ _BUCKETS = {
     "chunks": "data/raw/chunks",
     "writing": "data/writing",
     "style": "data/style",                                    # M8
+    "projects": "data/projects",                              # M13
 }
 _SCOPE_BUCKETS = {
     "wiki": ("wiki",),
     "raw": ("captures", "chunks"),
     "writing": ("writing",),
     "style": ("style",),                                      # M8
-    "all": ("wiki", "captures", "chunks", "writing", "style"),  # M8: +style
+    "projects": ("projects",),                                # M13
+    "all": ("wiki", "captures", "chunks", "writing", "style", "projects"),  # M13: +projects
 }
 
 
@@ -96,6 +98,7 @@ def _index_one(
     vec_opted_in: bool,
     *,
     post_m002: bool = False,
+    post_m003: bool = False,
     tokenizer=None,
 ) -> bool:
     """Index a single file. Returns True if (re)indexed, False if skipped."""
@@ -165,19 +168,38 @@ def _index_one(
         embeddings = embedder.embed([c.text for c in chunks])
 
     for i, ch in enumerate(chunks):
-        cur = conn.execute(
-            """
-            INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count)
-            VALUES (?,?,?,?,?)
-            """,
-            (
-                doc_id,
-                ch.chunk_idx,
-                json.dumps(ch.heading_path, ensure_ascii=False),
-                ch.text,
-                ch.token_count,
-            ),
-        )
+        if post_m003:
+            cur = conn.execute(
+                """
+                INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count,
+                                   project, category, session_id)
+                VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (
+                    doc_id,
+                    ch.chunk_idx,
+                    json.dumps(ch.heading_path, ensure_ascii=False),
+                    ch.text,
+                    ch.token_count,
+                    fm.get("project"),
+                    fm.get("category"),
+                    fm.get("session_id"),
+                ),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count)
+                VALUES (?,?,?,?,?)
+                """,
+                (
+                    doc_id,
+                    ch.chunk_idx,
+                    json.dumps(ch.heading_path, ensure_ascii=False),
+                    ch.text,
+                    ch.token_count,
+                ),
+            )
         chunk_id = cur.lastrowid
         if post_m002:
             # Post-m002: write pre-tokenized text into chunks.text_tokenized.
@@ -317,6 +339,10 @@ def register(app: typer.Typer) -> None:
             post_m002 = active == "kiwi"
             tokenizer = get_tokenizer(active) if post_m002 else None
 
+            # Detect m003 columns (project/category/session_id) — mirrors post_m002 idiom.
+            chunks_columns = {r[1] for r in conn.execute("PRAGMA table_info(chunks)")}
+            post_m003 = "project" in chunks_columns
+
             if full:
                 _drop_all(conn, post_m002=post_m002)
 
@@ -346,6 +372,7 @@ def register(app: typer.Typer) -> None:
                     embedder,
                     vec_opt,
                     post_m002=post_m002,
+                    post_m003=post_m003,
                     tokenizer=tokenizer,
                 ):
                     indexed += 1

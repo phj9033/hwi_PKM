@@ -76,7 +76,7 @@ The `Use BEFORE superpowers:brainstorming` clause is the priority signal. Both t
 ```md
 ## Handoff to brainstorming
 
-When the user signals to proceed (`넘어가자` / `ok 진행` / `proceed` / `skip`) OR when the upcoming brainstorming topic's terms are sufficiently clear, you MUST invoke the `superpowers:brainstorming` skill via the Skill tool. Do not write code, scaffold, or invoke other skills before this handoff. Brainstorming is the next step.
+You MUST invoke the `superpowers:brainstorming` skill via the Skill tool only when the user explicitly signals to proceed: `넘어가자` / `ok 진행` / `proceed` / `skip`. Do not auto-hand-off based on model judgement that "terms are clear enough" — the stop condition is strictly user-controlled. Do not write code, scaffold, or invoke other skills before this handoff. Brainstorming is the only allowed downstream skill.
 ```
 
 The skill never writes code, scaffolds, or invokes any other skill. Brainstorming is the only allowed downstream skill.
@@ -118,7 +118,8 @@ If the user types `/superpowers:brainstorming` directly, this skill is bypassed.
     │   - Sharpen fuzzy/overloaded terms
     │   - Cross-reference code where possible (read code instead of asking)
     │   - Update CONTEXT.md inline as terms resolve (lazy create)
-    │   - Continue until user signals stop
+    │   - Continue until user EXPLICITLY signals stop
+    │     (skip / 넘어가자 / ok 진행 / proceed); model never auto-stops
     │
 [4] Handoff → superpowers:brainstorming
 ```
@@ -157,7 +158,7 @@ Ports mattpocock's multi-context map verbatim:
 
 ### `BOOTSTRAP.md`
 
-1. **Candidate scan** — patterns at depth 1–2 from project root (skip `node_modules/`, `.git/`, `dist/`, `build/`).
+1. **Candidate scan** — case-insensitive filename match against the patterns at depth 1–2 from project root. Skip `node_modules/`, `.git/`, `dist/`, `build/`. Do not follow symlinks. Only include regular files ending in `.md`; if a pattern resolves to a directory or a non-`.md` file, skip silently.
 2. **Presentation format** — one message containing the candidate list and the response menu (`select numbers` / `add path` / `none`).
 3. **CLAUDE.md write template**:
 
@@ -180,7 +181,7 @@ Ports mattpocock's multi-context map verbatim:
 |---|---|
 | User invokes `/superpowers:brainstorming` directly | Bypass our skill (deliberate choice) |
 | `CLAUDE.md` absent + user refuses creation | Abort bootstrap, hand off with no registry; retry next time |
-| Aliased file no longer exists | Surface missing-file list, one prompt: remove / fix path / leave; update `CLAUDE.md` accordingly |
+| Aliased file no longer exists, resolves to a directory, or is not a `.md` file | Surface as "missing/invalid", one prompt: remove / fix path / leave; update `CLAUDE.md` accordingly |
 | Multi-context but work scope unclear | One inference question; "all contexts" answer enables cross-context conflict detection |
 | Existing `CONTEXT.md` is free-form (not mattpocock format) | Read as-is, never reformat. New entries lazy-add Language/Relationships sections only when first needed |
 | User says `skip` immediately | Hand off with zero grill questions |
@@ -194,7 +195,7 @@ Manual scenarios run after install:
 2. **hwi_PKM (first real target)** — `SCHEMA.md`, `FEATURES.md` auto-detected → user confirms → block written → grill 1–2 questions → handoff.
 3. **Repeat invocation** — block already present → bootstrap skipped → grill starts → `skip` ends loop → handoff.
 4. **Alias file missing** — temporarily rename `SCHEMA.md` → skill flags missing → user picks "remove" → `CLAUDE.md` updated → grill continues.
-5. **Trigger priority** — bug fix request ("fix X") → verify our skill matches before `superpowers:brainstorming`.
+5. **Trigger priority** — bug fix request ("fix X") → observable pass criterion: the very first assistant message after the user prompt must come from `loading-domain-context` (e.g., a bootstrap candidate list or a grill question), not from `superpowers:brainstorming` (which would start by asking about purpose/constraints).
 6. **Free-form CONTEXT.md preservation** — pre-existing free-form `CONTEXT.md` retained; new term added under appended Language section without rewriting earlier content.
 
 Trigger matching is model-driven; not unit-testable. File-mutation steps could ship a dry-run mode but YAGNI — manual verification suffices.

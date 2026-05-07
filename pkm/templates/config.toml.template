@@ -38,6 +38,8 @@ top_k_per_doc      = 3     # cap suggestions per source doc
 max_nodes              = 1000   # Cap on rendered nodes (lowest-connectivity dropped first).
 include_writing        = false  # Add writing nodes (off by default).
 include_captures       = false  # Add capture nodes (off by default).
+include_projects       = true   # M13: include project knowledge nodes (on by default).
+project_filter         = []     # M13: empty = all projects; or list of project ids to whitelist.
 overlay_suggestions    = true   # Render MISSING_LINK_CANDIDATE pairs as suggested edges.
 
 [lint.writing_grounding]

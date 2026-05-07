@@ -32,6 +32,7 @@ def related_for(
     *,
     mode: Mode = "both",
     n: int = 5,
+    scope_filter: str | None = None,
 ) -> RelatedBlock:
     out: RelatedBlock = {}
     doc_id = _doc_id(db, path)
@@ -44,7 +45,7 @@ def related_for(
             out["tags"] = _tags_for(db, doc_id)
     if mode in ("semantic", "both"):
         if doc_id is not None:
-            out["semantic_neighbors"] = _semantic(db, doc_id, n)
+            out["semantic_neighbors"] = _semantic(db, doc_id, n, scope_filter=scope_filter)
     return out
 
 
@@ -82,14 +83,19 @@ def _tags_for(db: sqlite3.Connection, doc_id: int) -> list[str]:
     return [r[0] for r in rows if r[0]]
 
 
-def _semantic(db: sqlite3.Connection, doc_id: int, n: int) -> list[dict]:
+def _semantic(
+    db: sqlite3.Connection,
+    doc_id: int,
+    n: int,
+    scope_filter: str | None = None,
+) -> list[dict]:
     me = db.execute("SELECT embedding FROM docs_vec WHERE doc_id = ?", (doc_id,)).fetchone()
     if not me:
         return []
     # vec0 KNN queries require a literal LIMIT (not a parameter) and do NOT
     # support arbitrary WHERE filters or JOINs in the same statement.
-    # Strategy: over-fetch (n+1 to exclude self), then join in Python.
-    over = n + 1
+    # Strategy: over-fetch generously so we can apply scope filter post-vec0.
+    over = max((n + 1) * 4, 50)
     sql = f"""
         SELECT doc_id, distance
         FROM docs_vec
@@ -98,20 +104,38 @@ def _semantic(db: sqlite3.Connection, doc_id: int, n: int) -> list[dict]:
         LIMIT {over}
     """
     vec_rows = db.execute(sql, (me[0],)).fetchall()
-    # Exclude the document itself and cap at n.
-    filtered = [(r[0], r[1]) for r in vec_rows if r[0] != doc_id][:n]
+    # Exclude the document itself.
+    filtered = [(r[0], r[1]) for r in vec_rows if r[0] != doc_id]
     if not filtered:
         return []
     candidate_ids = [r[0] for r in filtered]
     dist_by_id = {r[0]: r[1] for r in filtered}
     placeholders = ",".join("?" for _ in candidate_ids)
-    path_rows = db.execute(
-        f"SELECT id, path FROM documents WHERE id IN ({placeholders})",
-        candidate_ids,
-    ).fetchall()
-    path_by_id = {r[0]: r[1] for r in path_rows}
+    base_sql = (
+        f"SELECT id, path, bucket FROM documents "
+        f"WHERE id IN ({placeholders})"
+    )
+    params: list = list(candidate_ids)
+    if scope_filter:
+        # scope_filter is one of: "wiki" | "same-project:<id>" | "wiki+project:<id>"
+        if scope_filter == "wiki":
+            base_sql += " AND bucket = 'wiki'"
+        elif scope_filter.startswith("same-project:"):
+            pid = scope_filter[len("same-project:"):]
+            base_sql += " AND bucket = 'projects' AND path LIKE ?"
+            params.append(f"data/projects/{pid}/%")
+        elif scope_filter.startswith("wiki+project:"):
+            pid = scope_filter[len("wiki+project:"):]
+            base_sql += " AND (bucket = 'wiki' OR (bucket = 'projects' AND path LIKE ?))"
+            params.append(f"data/projects/{pid}/%")
+    path_rows = db.execute(base_sql, params).fetchall()
+    # Order by ascending distance, take top n.
+    by_id = {r[0]: (r[1], r[2]) for r in path_rows}
+    ordered = sorted(
+        ((cid, d) for cid, d in filtered if cid in by_id),
+        key=lambda x: x[1],
+    )[:n]
     return [
-        {"path": path_by_id[cid], "similarity": round(1.0 - dist_by_id[cid], 4)}
-        for cid in candidate_ids
-        if cid in path_by_id
+        {"path": by_id[cid][0], "bucket": by_id[cid][1], "similarity": round(1.0 - float(d), 4)}
+        for cid, d in ordered
     ]

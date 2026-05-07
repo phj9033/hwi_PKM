@@ -162,7 +162,7 @@ def _index_one(
     conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM links WHERE src_doc_id = ?", (doc_id,))
 
-    do_vector = (bucket in ("wiki", "style")) or (bucket in ("captures", "chunks") and vec_opted_in)
+    do_vector = (bucket in ("wiki", "style", "projects")) or (bucket in ("captures", "chunks") and vec_opted_in)
     embeddings = None
     if do_vector and chunks:
         embeddings = embedder.embed([c.text for c in chunks])

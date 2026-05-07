@@ -146,6 +146,83 @@ class PKMMigrationPending(PKMStateError):
     code = "MIGRATION_PENDING"
 
 
+# ---------------------------------------------------------------------------
+# M13 error classes
+# ---------------------------------------------------------------------------
+
+class PKMInfoError(PKMError):
+    """Base for informational (non-failure) outcomes.
+
+    exit_code = 0 means the CLI exits successfully even though a PKMError was
+    raised. Rendered with an ``[INFO]`` prefix on stdout instead of
+    ``Error [...]`` on stderr.
+    """
+
+    code = "PKM_INFO_ERROR"
+    exit_code: int = 0
+
+
+class PKMNotAGitRepo(PKMValidationError):
+    """`pkm project link` invoked outside a git repo (and --allow-no-remote not set)."""
+
+    code = "NOT_A_GIT_REPO"
+
+
+class PKMAlreadyLinked(PKMInfoError):
+    """Same git remote already registered to a project — idempotent NOOP."""
+
+    code = "ALREADY_LINKED"
+    exit_code = 0  # info, not failure
+
+
+class PKMNotLinked(PKMStateError):
+    """cwd does not resolve to any registered project."""
+
+    code = "NOT_LINKED"
+
+
+class PKMProjectIdConflict(PKMValidationError):
+    """--id <slug> already in use."""
+
+    code = "PROJECT_ID_CONFLICT"
+
+
+class PKMInvalidProjectId(PKMValidationError):
+    """Project id contains characters outside [a-z0-9-]."""
+
+    code = "INVALID_PROJECT_ID"
+
+
+class PKMMissingProjectField(PKMValidationError):
+    """File under data/projects/<id>/** without `project` frontmatter or with mismatched value."""
+
+    code = "MISSING_PROJECT_FIELD"
+
+
+class PKMInvalidCategory(PKMValidationError):
+    """`category` value not in {decisions, pitfalls, snippets, qna, notes}."""
+
+    code = "INVALID_CATEGORY"
+
+
+class PKMCategoryPathMismatch(PKMValidationError):
+    """File path's category dir differs from frontmatter `category`."""
+
+    code = "CATEGORY_PATH_MISMATCH"
+
+
+class PKMOrphanProjectDir(PKMStateError):
+    """data/projects/<id>/index.md missing or has empty git_remotes."""
+
+    code = "ORPHAN_PROJECT_DIR"
+
+
+class PKMSimilarKnowledgeCandidate(PKMStateError):
+    """Two project knowledge items have cosine similarity >= 0.92."""
+
+    code = "SIMILAR_KNOWLEDGE_CANDIDATE"
+
+
 def all_error_codes() -> dict[str, type[PKMError]]:
     """Return ``{code: cls}`` for every PKMError subclass reachable from this module.
 

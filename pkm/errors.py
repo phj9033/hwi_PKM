@@ -216,8 +216,12 @@ class PKMOrphanProjectDir(PKMStateError):
     code = "ORPHAN_PROJECT_DIR"
 
 
-class PKMSimilarKnowledgeCandidate(PKMStateError):
-    """Two project knowledge items have cosine similarity >= 0.92."""
+class PKMSimilarKnowledgeCandidate(PKMInfoError):
+    """Two project knowledge items have cosine similarity >= 0.92.
+
+    Informational — surfaces pairs to consolidate; does not indicate state
+    corruption. exit_code = 0 (inherited from PKMInfoError).
+    """
 
     code = "SIMILAR_KNOWLEDGE_CANDIDATE"
 

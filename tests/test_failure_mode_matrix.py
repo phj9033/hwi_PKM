@@ -439,9 +439,29 @@ def _scenario_similar_knowledge_candidate(repo: Path) -> list[str]:
         "status: reviewed\nsource_type: manual\nlang: en\nproject: x\ncategory: decisions\n---\n\n"
     )
     body = "Store OAuth refresh tokens in httpOnly cookies with secure flag and SameSite=Strict.\n"
-    (repo / "data" / "projects" / "x" / "decisions" / "a.md").write_text(base_fm.replace("oauth-refresh", "a") + body, encoding="utf-8")
-    (repo / "data" / "projects" / "x" / "decisions" / "b.md").write_text(base_fm.replace("oauth-refresh", "b") + body, encoding="utf-8")
-    return ["reindex", "db", "--full"]  # then lint catches similarity in subsequent run
+    (repo / "data" / "projects" / "x" / "decisions" / "a.md").write_text(
+        base_fm.replace("oauth-refresh", "a") + body, encoding="utf-8"
+    )
+    (repo / "data" / "projects" / "x" / "decisions" / "b.md").write_text(
+        base_fm.replace("oauth-refresh", "b") + body, encoding="utf-8"
+    )
+    # Run migrate + reindex synchronously so docs_vec is populated for the lint warning.
+    env = _base_env()
+    subprocess.run(
+        [sys.executable, "-m", "pkm", "migrate", "--apply"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "pkm", "reindex", "db", "--full"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+    return ["lint", "--json"]
 
 
 # Codes whose expected exit code is 0 (info outcomes, not failures).

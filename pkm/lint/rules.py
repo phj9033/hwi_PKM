@@ -17,6 +17,7 @@ from pathlib import Path
 
 from pkm.errors import PKMValidationError
 from pkm.store.frontmatter import parse
+from pkm.store.project_paths import CATEGORIES
 from pkm.store.frontmatter_schemas import (
     CAPTURE_LANGS,
     CAPTURE_REQUIRED,
@@ -88,6 +89,14 @@ def _kind_for(rel: str) -> str | None:
         return "writing"
     if rel.startswith("data/style/") and rel.endswith(".md"):
         return "style"
+    if rel.startswith("data/projects/") and rel.endswith(".md"):
+        parts = rel.split("/")
+        # data/projects/<id>/index.md → project_index
+        if len(parts) == 4 and parts[3] == "index.md":
+            return "project_index"
+        # data/projects/<id>/<category>/<slug>.md → project_knowledge
+        if len(parts) == 5:
+            return "project_knowledge"
     return None
 
 
@@ -453,6 +462,152 @@ def _missing_link_candidate(root: Path) -> Iterator[LintFinding]:
         )
 
 
+# --------- Project rules (errors) ---------
+
+
+def _missing_project_field(snap: _Snapshot) -> Iterator[LintFinding]:
+    """data/projects/<id>/<cat>/x.md frontmatter must have project: <id>."""
+    for d in snap.docs:
+        if d.kind != "project_knowledge":
+            continue
+        parts = d.rel.split("/")
+        expected_pid = parts[2]
+        actual_pid = d.fm.get("project")
+        if actual_pid != expected_pid:
+            yield LintFinding(
+                code="MISSING_PROJECT_FIELD",
+                severity="error",
+                path=d.rel,
+                message=f"frontmatter project={actual_pid!r} does not match path project={expected_pid!r}",
+                field="project",
+                fixable=True,
+            )
+
+
+def _invalid_category(snap: _Snapshot) -> Iterator[LintFinding]:
+    """category field must be one of CATEGORIES."""
+    for d in snap.docs:
+        if d.kind != "project_knowledge":
+            continue
+        cat = d.fm.get("category")
+        if cat is None:
+            yield LintFinding(
+                code="INVALID_CATEGORY",
+                severity="error",
+                path=d.rel,
+                message="category field missing",
+                field="category",
+                fixable=True,
+            )
+        elif cat not in CATEGORIES:
+            yield LintFinding(
+                code="INVALID_CATEGORY",
+                severity="error",
+                path=d.rel,
+                message=f"category={cat!r} not in {CATEGORIES}",
+                field="category",
+                fixable=False,
+            )
+
+
+def _category_path_mismatch(snap: _Snapshot) -> Iterator[LintFinding]:
+    """File path's category dir must match frontmatter category."""
+    for d in snap.docs:
+        if d.kind != "project_knowledge":
+            continue
+        parts = d.rel.split("/")
+        path_cat = parts[3]
+        fm_cat = d.fm.get("category")
+        if fm_cat is not None and fm_cat in CATEGORIES and fm_cat != path_cat:
+            yield LintFinding(
+                code="CATEGORY_PATH_MISMATCH",
+                severity="error",
+                path=d.rel,
+                message=f"path category={path_cat} but frontmatter category={fm_cat}",
+                field="category",
+                fixable=True,
+            )
+
+
+def _orphan_project_dir(root: Path, snap: _Snapshot) -> Iterator[LintFinding]:
+    """data/projects/<id>/ exists but has no index.md or empty git_remotes."""
+    projects_root = root / "data" / "projects"
+    if not projects_root.is_dir():
+        return
+    indexed_pids = {d.rel.split("/")[2] for d in snap.docs if d.kind == "project_index"}
+    for pdir in sorted(projects_root.iterdir()):
+        if not pdir.is_dir():
+            continue
+        pid = pdir.name
+        if pid not in indexed_pids:
+            yield LintFinding(
+                code="ORPHAN_PROJECT_DIR",
+                severity="error",
+                path=f"data/projects/{pid}/",
+                message="missing index.md",
+                fixable=False,
+            )
+            continue
+        # Has index.md; check git_remotes
+        idx = next(
+            (d for d in snap.docs if d.kind == "project_index" and d.rel.split("/")[2] == pid),
+            None,
+        )
+        if idx is not None and not idx.fm.get("git_remotes"):
+            yield LintFinding(
+                code="ORPHAN_PROJECT_DIR",
+                severity="error",
+                path=idx.rel,
+                message="index.md has empty git_remotes",
+                field="git_remotes",
+                fixable=False,
+            )
+
+
+# --------- Project rules (warnings) ---------
+
+
+def _similar_knowledge(root: Path, threshold: float = 0.92) -> Iterator[LintFinding]:
+    """Pairwise cosine similarity over project knowledge embeddings."""
+    db_path = root / ".pkm" / "index.db"
+    if not db_path.exists():
+        return
+    from pkm.store.index_db import connect
+
+    conn = connect(root)
+    try:
+        rows = conn.execute(
+            """
+            SELECT d.path AS path, dv.embedding AS embedding
+            FROM docs_vec dv
+            JOIN documents d ON d.id = dv.doc_id
+            WHERE d.bucket = 'projects' AND d.path NOT LIKE '%/index.md'
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+    if len(rows) < 2:
+        return
+    import numpy as np
+
+    pairs = [(r["path"], np.frombuffer(r["embedding"], dtype=np.float32)) for r in rows]
+    for i in range(len(pairs)):
+        for j in range(i + 1, len(pairs)):
+            a, b = pairs[i][1], pairs[j][1]
+            denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+            if denom == 0.0:
+                continue
+            sim = float(np.dot(a, b) / denom)
+            if sim >= threshold:
+                p1, p2 = sorted([pairs[i][0], pairs[j][0]])
+                yield LintFinding(
+                    code="SIMILAR_KNOWLEDGE_CANDIDATE",
+                    severity="warning",
+                    path=p1,
+                    message=f">= {threshold:.2f} similar to {p2} (cosine={sim:.3f})",
+                )
+
+
 # --------- Orchestrator ---------
 
 
@@ -476,5 +631,10 @@ def collect_findings(root: Path) -> list[LintFinding]:
     out.extend(_broken_citation(root, snap))
     out.extend(_writing_grounding(root, snap))
     out.extend(_missing_link_candidate(root))
+    out.extend(_missing_project_field(snap))
+    out.extend(_invalid_category(snap))
+    out.extend(_category_path_mismatch(snap))
+    out.extend(_orphan_project_dir(root, snap))
+    out.extend(_similar_knowledge(root))
     out.sort(key=lambda f: (f.path, f.code))
     return out

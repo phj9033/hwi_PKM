@@ -12,7 +12,12 @@ from pathlib import Path
 
 import typer
 
-from pkm.lint.fixers import fix_missing_field, fix_orphan_promoted_source
+from pkm.lint.fixers import (
+    fix_category_path_mismatch,
+    fix_missing_field,
+    fix_missing_project_field,
+    fix_orphan_promoted_source,
+)
 from pkm.lint.rules import LintFinding, collect_findings
 
 
@@ -30,6 +35,12 @@ def _apply_fixes(root: Path, findings: list[LintFinding]) -> tuple[int, list[Lin
                 fixed += 1
         elif f.code == "ORPHAN_PROMOTED_SOURCE":
             if fix_orphan_promoted_source(root, f):
+                fixed += 1
+        elif f.code == "MISSING_PROJECT_FIELD":
+            if fix_missing_project_field(root, f):
+                fixed += 1
+        elif f.code == "CATEGORY_PATH_MISMATCH":
+            if fix_category_path_mismatch(root, f):
                 fixed += 1
     if fixed:
         return fixed, collect_findings(root)
@@ -86,6 +97,14 @@ def register(app: typer.Typer) -> None:
                 "errors": [_to_dict(f) for f in errors],
                 "fixed": fixed_count,
             }
+            if errors:
+                # Top-level envelope so the failure-mode matrix can assert error.code.
+                first = errors[0]
+                payload["error"] = {
+                    "code": first.code,
+                    "message": first.message,
+                    "hint": None,
+                }
             if not errors_only:
                 payload["warnings"] = [_to_dict(f) for f in warnings_]
             typer.echo(json.dumps(payload, ensure_ascii=False))

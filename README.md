@@ -116,7 +116,7 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [ ] M10 — Graph Surfacing (in progress)
 - [ ] M11 — Writing Grounding (in progress)
 - [x] M12 — Migration Infra + Kiwi
-- [ ] M13 — Project Scope Foundation (in progress)
+- [x] M13 — Project Scope Foundation
 
 기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
 

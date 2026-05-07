@@ -321,3 +321,10 @@ def tmp_unlinked_cwd_m14(tmp_path):
     p = tmp_path / "unlinked"
     p.mkdir()
     return p
+
+
+@pytest.fixture
+def tmp_home(tmp_path):
+    h = tmp_path / "home"
+    h.mkdir()
+    return h

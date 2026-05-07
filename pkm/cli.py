@@ -125,6 +125,10 @@ def _register_all() -> None:
 
     context_cmd.register(app)
 
+    from pkm.commands import install as install_cmd
+
+    install_cmd.register(app)
+
 
 _register_all()
 

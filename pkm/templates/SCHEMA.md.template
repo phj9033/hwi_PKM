@@ -20,8 +20,55 @@ data/
 │   ├── entities/
 │   ├── notes/
 │   └── reports/
-└── writing/              # AI synthesis workspace
+├── writing/              # AI synthesis workspace
+└── projects/             # 프로젝트별 노하우 (Layer 7 — M13)
+    └── <id>/
+        ├── index.md      # 프로젝트 메타데이터 (git_remotes, created_at 등)
+        ├── decisions/    # 기술 결정 기록
+        ├── pitfalls/     # 주의사항 / 삽질 기록
+        ├── snippets/     # 재사용 코드 조각
+        ├── qna/          # Q&A 노트
+        └── notes/        # 기타 메모
 ```
+
+### Layer 7 — Projects (M13)
+
+7 레이어 개요:
+
+| # | 레이어 | 디렉토리 | 용도 |
+| --- | --- | --- | --- |
+| 1–6 | Capture / Chunks / Wiki / Writing / Search / Dashboard | (위 Layout 참조) | 기존 V1 레이어 |
+| 7 | **Projects** | `data/projects/<id>/` | 프로젝트별 노하우 (decisions/pitfalls/snippets/qna/notes) |
+
+코드 레포 cwd 에서 `pkm project link --id <slug>` 로 등록하면 git remote 정규화 (SSH ↔ HTTPS 모두 동일 형태) 로 PC 간 자동 매칭된다. 관련 명령: `pkm project {link,list,current,show,rebuild-index,rm}`, `pkm project knowledge add`.
+
+**`data/projects/<id>/index.md` frontmatter:**
+
+```yaml
+project: <id>           # 필수 — 프로젝트 slug (디렉토리명과 일치)
+git_remotes:            # 필수 — 정규화된 git remote URL 목록 (SSH→HTTPS 통일)
+  - https://github.com/org/repo
+created_at: YYYY-MM-DD  # 필수
+data_repo_local_paths:  # 옵션 — 머신별 cwd 경로 fallback (PC 고유)
+  - /Users/me/dev/repo
+```
+
+**카테고리 노하우 파일 frontmatter (`data/projects/<id>/<cat>/<slug>.md`):**
+
+```yaml
+title: "..."            # 필수
+slug: <slug>            # 필수
+created_at: YYYY-MM-DD  # 필수
+status: active          # 필수 — active|archived
+source_type: ai_session # 필수 — ai_session|manual|migrated (ai_session 은 M13 신규 값)
+lang: ko                # 필수 — ko|en|mixed
+project: <id>           # 필수 — 상위 프로젝트 id (path 와 일치해야 함)
+category: decisions     # 필수 — decisions|pitfalls|snippets|qna|notes
+```
+
+**m003 migration:** `chunks` 테이블에 `project TEXT`, `category TEXT`, `session_id TEXT` 컬럼 추가. 기존 wiki/raw/writing 행은 NULL — V2 검색 결과 호환 유지.
+
+Lint 룰: `MISSING_PROJECT_FIELD`, `INVALID_CATEGORY`, `CATEGORY_PATH_MISMATCH`, `ORPHAN_PROJECT_DIR` (error); `SIMILAR_KNOWLEDGE_CANDIDATE` (warning). 자세한 내용은 `docs/FEATURES.md §2.7`.
 
 ## 3. Frontmatter
 

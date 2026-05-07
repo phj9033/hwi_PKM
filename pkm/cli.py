@@ -113,6 +113,10 @@ def _register_all() -> None:
 
     migrate_cmd.register(app)
 
+    from pkm.commands import project as project_cmd
+
+    project_cmd.register(app)
+
 
 _register_all()
 

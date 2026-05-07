@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import resource
+import subprocess
 import time
 
 import psutil
@@ -107,3 +108,39 @@ def _rss_guard():
         f"peak RSS {peak / (1024**3):.2f} GB exceeded §9.4 budget "
         f"{_RSS_BUDGET_BYTES / (1024**3):.0f} GB"
     )
+
+
+# ---------------------------------------------------------------------------
+# M13 Task 5 fixtures — project command testing
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def tmp_data_repo(tmp_path):
+    repo = tmp_path / "datarepo"
+    repo.mkdir()
+    (repo / "data" / "raw" / "captures").mkdir(parents=True)
+    (repo / "data" / "wiki" / "concepts").mkdir(parents=True)
+    (repo / "data" / "writing").mkdir(parents=True)
+    (repo / "data" / "projects").mkdir(parents=True)
+    (repo / ".pkm").mkdir()
+    (repo / ".pkm" / "config.toml").write_text("# scaffolded\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    return repo
+
+
+@pytest.fixture
+def tmp_code_repo(tmp_path):
+    repo = tmp_path / "code"
+    repo.mkdir()
+    return repo
+
+
+@pytest.fixture
+def tmp_code_repo_pair(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    return a, b

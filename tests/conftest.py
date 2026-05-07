@@ -209,3 +209,48 @@ def tmp_unlinked_cwd(tmp_path):
     p = tmp_path / "unlinked-cwd"
     p.mkdir()
     return p
+
+
+# ---------------------------------------------------------------------------
+# M14 Task 2 fixtures — session adapter testing
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def tmp_transcript_root(tmp_path):
+    """A fake ~/.claude/projects tree with one cwd dir + typical_session.jsonl."""
+    import shutil
+    from pathlib import Path as _Path
+    root = tmp_path / "claude_projects"
+    root.mkdir()
+    cwd_dir = root / "-Users-me-code-demo"
+    cwd_dir.mkdir()
+    src = _Path(__file__).parent / "fixtures" / "sessions" / "typical_session.jsonl"
+    shutil.copy(str(src), str(cwd_dir / "11111111-2222-3333-4444-555555555555.jsonl"))
+    return root
+
+
+@pytest.fixture
+def typical_session_jsonl():
+    """Absolute path to tests/fixtures/sessions/typical_session.jsonl."""
+    import pathlib
+    return pathlib.Path(__file__).parent / "fixtures" / "sessions" / "typical_session.jsonl"
+
+
+@pytest.fixture
+def corrupt_session_jsonl():
+    """Absolute path to tests/fixtures/sessions/corrupt_session.jsonl."""
+    import pathlib
+    return pathlib.Path(__file__).parent / "fixtures" / "sessions" / "corrupt_session.jsonl"
+
+
+@pytest.fixture
+def fake_project_index():
+    """A ProjectIndex with one record matching github.com:test/demo."""
+    from pkm.session.registry import ProjectIndex, ProjectRecord
+    return ProjectIndex(records=[
+        ProjectRecord(
+            id="demo",
+            git_remotes=["github.com:test/demo"],
+            local_paths=[],
+        )
+    ])

@@ -9,7 +9,9 @@
 - **In-session extraction.** No LLM shell-out. Claude (in the user's session) reads transcripts via `Read` tool and produces structured output following `pkm/templates/skills/extracting-session-knowledge/output-schema.md`. The CLI provides primitives only: `pkm session show` (transcript path), `pkm project knowledge add` (write file), `pkm session mark-processed` (record).
 - **Skill + CLAUDE.md, no SessionStart hook.** `~/.claude/CLAUDE.md` gets a managed block instructing Claude to call `pkm:recalling-project-context` skill at start of work in any cwd. Skill checks `pkm project current --json` — silent if NOT_LINKED. This avoids settings.json mutation and keeps `pkm install --uninstall` clean.
 - **Portability rules R1–R7 (spec §8.2) enforced in skill templates.** All skill bodies use `pkm` CLI for path resolution and project-id, never hardcoded paths/ids.
-- **Idempotent install + uninstall.** Managed markers (`<!-- pkm:start -->`/`<!-- pkm:end -->` for CLAUDE.md, `<!-- managed by pkm install -->` for files) bracket every emission. `--uninstall` removes only marker-bracketed content/files.
+- **Idempotent install + uninstall via manifest.** Two tracking strategies, used selectively:
+  1. **Embedded blocks** in user-edited files (`~/.claude/CLAUDE.md`) use `<!-- pkm:start -->` / `<!-- pkm:end -->` markers. `apply_managed_block()` inserts/replaces between markers, preserving user content outside.
+  2. **Standalone files** (slash commands, skill files) — these begin with YAML frontmatter (`---\nname: ...\n---`) so an HTML comment marker above them would break Claude Code's frontmatter parser. Instead, `pkm install` writes a manifest at `~/.pkm/install_manifest.json` listing every emitted file path. `--uninstall` reads the manifest and deletes those exact paths, then deletes the manifest. **No in-file marker is added to frontmatter-bearing files.**
 - **Session metadata gitignored.** `.pkm/sessions/<project>/<uuid>.json` records "this session has been processed on this PC" — not git-tracked because Claude Code transcripts themselves are PC-local.
 
 **Tech Stack:** Python 3.11+, no new PyPI deps (reuses tomllib/tomli-w/yaml). Templates are static markdown shipped in `pkm/templates/`.
@@ -33,7 +35,13 @@
 | `pkm/commands/session.py` | `pkm session {list, show, forget, mark-processed}` |
 | `pkm/commands/context.py` | `pkm context inject [--max-tokens N] [--quiet-on-not-linked]` |
 | `pkm/commands/install.py` | `pkm install --for claude-code [--data-repo PATH] [--uninstall]` |
-| `pkm/install/__init__.py` | Helpers: `apply_managed_block()`, `remove_managed_block()`, `copy_managed_dir()` |
+| `pkm/install/__init__.py` | Helpers: `apply_managed_block()`, `remove_managed_block()`, `install_file()`, `install_dir()`, `uninstall_via_manifest()`, `read_manifest()`, `write_manifest()` |
+| `pkm/templates/__init__.py` | Empty marker (existing — verify it's a Python package; if not, create) |
+| `pkm/templates/commands/__init__.py` | Empty marker — makes templates discoverable via filesystem |
+| `pkm/templates/skills/__init__.py` | Empty marker |
+| `pkm/templates/skills/recalling-project-context/__init__.py` | Empty marker |
+| `pkm/templates/skills/extracting-session-knowledge/__init__.py` | Empty marker |
+| `pkm/templates/skills/backfilling-sessions/__init__.py` | Empty marker |
 | `pkm/templates/claude_md_block.md` | Managed block content for `~/.claude/CLAUDE.md` |
 | `pkm/templates/commands/pkm-recall.md` | Slash command template — invoke pkm:recalling-project-context skill |
 | `pkm/templates/commands/pkm-extract-session.md` | Slash command — invoke pkm:extracting-session-knowledge skill |
@@ -514,12 +522,13 @@ runner = CliRunner()
 
 def test_session_list_filters_unprocessed(tmp_data_repo, tmp_transcript_root_with_2_sessions, monkeypatch, fake_project_setup):
     monkeypatch.setenv("PKM_TRANSCRIPT_ROOT", str(tmp_transcript_root_with_2_sessions))
-    # Mark one as processed
-    runner.invoke(app, ["session", "mark-processed", "abc123", "--extracted-count", "3", "--data-repo", str(tmp_data_repo)])
+    # Mark one as processed (fixture has 'first' and 'second' uuids)
+    runner.invoke(app, ["session", "mark-processed", "first", "--extracted-count", "3", "--data-repo", str(tmp_data_repo)])
     result = runner.invoke(app, ["session", "list", "--unprocessed", "--json", "--data-repo", str(tmp_data_repo)])
     payload = json.loads(result.output)
     uuids = [s["uuid"] for s in payload["sessions"]]
-    assert "abc123" not in uuids
+    assert "first" not in uuids
+    assert "second" in uuids
 
 
 def test_session_list_min_messages_default(tmp_data_repo, tmp_transcript_root, monkeypatch):
@@ -564,7 +573,72 @@ def test_mark_processed_idempotent(tmp_data_repo, typical_session_jsonl, monkeyp
     assert r1.exit_code == 0 and r2.exit_code == 0
 ```
 
-Add `fake_project_setup` fixture (creates `data/projects/demo/index.md` with `git_remotes: ["github.com:test/test"]`).
+Add fixtures to `tests/conftest.py` (these are referenced by Task 3, Task 8, and Task 11 tests):
+
+```python
+import json
+import subprocess
+
+@pytest.fixture
+def fake_project_setup(tmp_data_repo, monkeypatch):
+    """Seed data/projects/demo/ with a valid index.md frontmatter linked to a fake git remote.
+    Used by tests that need a linked project + matching transcript cwd."""
+    pdir = tmp_data_repo / "data" / "projects" / "demo"
+    for cat in ["decisions", "pitfalls", "snippets", "qna", "notes"]:
+        (pdir / cat).mkdir(parents=True, exist_ok=True)
+    (pdir / "index.md").write_text(
+        "---\nproject: demo\ngit_remotes:\n  - github.com:test/test\n"
+        "created_at: 2026-05-07T00:00:00+09:00\ndata_repo_local_paths: []\n---\n\n# demo\n",
+        encoding="utf-8",
+    )
+    # Stub discover_remote so adapter resolves to demo regardless of actual cwd git state
+    monkeypatch.setattr("pkm.session.adapters.claude_code.discover_remote", lambda cwd: "github.com:test/test")
+    return tmp_data_repo
+
+
+def _write_synthetic_session(target: Path, n_messages: int) -> None:
+    lines = []
+    for i in range(n_messages):
+        role = "user" if i % 2 == 0 else "assistant"
+        lines.append(json.dumps({
+            "type": role,
+            "content": f"message {i} content",
+            "timestamp": f"2026-05-07T1{i % 10}:{(i*7) % 60:02d}:00Z",
+        }))
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+@pytest.fixture
+def tmp_transcript_root_with_2_sessions(tmp_path):
+    """Two sessions named 'first' and 'second' under a single encoded-cwd dir."""
+    root = tmp_path / "transcripts"
+    cwd_dir = root / "-tmp-test-coderepo"
+    cwd_dir.mkdir(parents=True)
+    _write_synthetic_session(cwd_dir / "first.jsonl", n_messages=6)
+    _write_synthetic_session(cwd_dir / "second.jsonl", n_messages=7)
+    return root
+
+
+@pytest.fixture
+def tmp_transcript_root_with_3_sessions(tmp_path):
+    """Three sessions with deterministic uuids 'a', 'b', 'c' for batch tests."""
+    root = tmp_path / "transcripts"
+    cwd_dir = root / "-tmp-test-coderepo"
+    cwd_dir.mkdir(parents=True)
+    for uuid_ in ["a", "b", "c"]:
+        _write_synthetic_session(cwd_dir / f"{uuid_}.jsonl", n_messages=6)
+    return root
+
+
+@pytest.fixture
+def tmp_unlinked_cwd(tmp_path):
+    """A cwd that isn't linked to any project (no git remote, no override)."""
+    p = tmp_path / "unlinked"
+    p.mkdir()
+    return p
+```
+
+These fixtures are deterministic — uuids match what tests assert on, message counts pass `--min-messages 5` default.
 
 - [ ] **Step 3.2: Implement meta + commands**
 
@@ -1024,14 +1098,32 @@ def test_uninstall_removes_managed_block_only(tmp_data_repo, tmp_home, monkeypat
     (tmp_home / ".claude").mkdir(parents=True, exist_ok=True)
     (tmp_home / ".claude" / "CLAUDE.md").write_text("# User\n", encoding="utf-8")
     runner.invoke(app, ["install", "--for", "claude-code", "--data-repo", str(tmp_data_repo)])
+    # After install: manifest exists and lists installed paths
+    assert (tmp_home / ".pkm" / "install_manifest.json").is_file()
     runner.invoke(app, ["install", "--for", "claude-code", "--uninstall"])
     text = (tmp_home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
     assert "# User" in text
     assert "<!-- pkm:start" not in text
     assert "pkm project current" not in text
-    # commands and skills also removed
+    # commands and skills also removed (via manifest)
     assert not (tmp_home / ".claude" / "commands" / "pkm-recall.md").exists()
     assert not (tmp_home / ".claude" / "skills" / "pkm").exists()
+    # Manifest itself is deleted after uninstall
+    assert not (tmp_home / ".pkm" / "install_manifest.json").exists()
+
+
+def test_install_files_have_no_html_marker_above_frontmatter(tmp_data_repo, tmp_home, monkeypatch):
+    """Critical: Claude Code skill/slash files must start with `---\\n` (frontmatter).
+    An HTML comment above would break Claude Code's frontmatter parser.
+    """
+    monkeypatch.setenv("HOME", str(tmp_home))
+    runner.invoke(app, ["install", "--for", "claude-code", "--data-repo", str(tmp_data_repo)])
+    for cmd in ["pkm-recall.md", "pkm-extract-session.md", "pkm-backfill.md", "pkm-project.md"]:
+        text = (tmp_home / ".claude" / "commands" / cmd).read_text(encoding="utf-8")
+        assert text.startswith("---\n"), f"{cmd} must start with frontmatter, got: {text[:50]!r}"
+    for skill in ["recalling-project-context", "extracting-session-knowledge", "backfilling-sessions"]:
+        text = (tmp_home / ".claude" / "skills" / "pkm" / skill / "SKILL.md").read_text(encoding="utf-8")
+        assert text.startswith("---\n"), f"{skill}/SKILL.md must start with frontmatter, got: {text[:50]!r}"
 ```
 
 Add `tmp_home` fixture:
@@ -1043,28 +1135,57 @@ def tmp_home(tmp_path):
     return h
 ```
 
-- [ ] **Step 5.3: Implement install helpers**
+- [ ] **Step 5.3a: Add `__init__.py` files to templates dirs**
+
+```bash
+touch pkm/templates/__init__.py  # if missing
+mkdir -p pkm/templates/commands pkm/templates/skills/recalling-project-context \
+         pkm/templates/skills/extracting-session-knowledge \
+         pkm/templates/skills/backfilling-sessions
+touch pkm/templates/commands/__init__.py
+touch pkm/templates/skills/__init__.py
+touch pkm/templates/skills/recalling-project-context/__init__.py
+touch pkm/templates/skills/extracting-session-knowledge/__init__.py
+touch pkm/templates/skills/backfilling-sessions/__init__.py
+```
+
+Verify `pyproject.toml` includes markdown templates in the wheel. If `[tool.hatch.build.targets.wheel]` is used, ensure `include` covers `pkm/templates/**/*.md`. If using setuptools, add to `package_data` or `[tool.setuptools.package-data]`. Check existing config — it likely already includes templates because M12 ships `config.toml.template`.
+
+- [ ] **Step 5.3b: Implement install helpers (manifest-based, no in-file markers for frontmatter files)**
 
 `pkm/install/__init__.py`:
 ```python
-"""Install helpers — managed-marker-aware file/block emission.
+"""Install helpers — two strategies for tracking installed artifacts.
 
-Markers:
-- File-level: <!-- managed by pkm install --> at the top of generated files
-- Block-level: <!-- pkm:start ... --> ... <!-- pkm:end ... --> for embedding in user files
+1. Embedded blocks in user-edited files (CLAUDE.md):
+   Use <!-- pkm:start --> / <!-- pkm:end --> markers around the block.
+   apply_managed_block() inserts/replaces between markers; user content outside
+   is preserved.
+
+2. Standalone files (slash commands, skill bodies):
+   These start with YAML frontmatter (---\\n...---). An HTML comment above the
+   frontmatter would break Claude Code's frontmatter parser. Instead, we record
+   the absolute path of every emitted file in ~/.pkm/install_manifest.json.
+   Uninstall reads the manifest and deletes exactly those paths.
+
+The two strategies are independent — uninstall calls both remove_managed_block
+on CLAUDE.md *and* uninstall_via_manifest for files.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
-from importlib import resources
 from pathlib import Path
 
 BLOCK_START = "<!-- pkm:start managed by pkm install -->"
 BLOCK_END = "<!-- pkm:end managed by pkm install -->"
-FILE_MARKER = "<!-- managed by pkm install -->"
 
+MANIFEST_PATH = Path.home() / ".pkm" / "install_manifest.json"
+
+
+# --- Strategy 1: embedded block in user file ---------------------------------
 
 def apply_managed_block(target: Path, block_content: str) -> None:
     """Insert or replace the managed block in target file. Preserves user content."""
@@ -1092,48 +1213,88 @@ def remove_managed_block(target: Path) -> None:
         target.unlink()
 
 
-def copy_managed_file(template_pkg: str, template_name: str, target: Path) -> None:
-    """Copy a template file from pkm.templates package to target. Always overwrites."""
-    target.parent.mkdir(parents=True, exist_ok=True)
-    src = resources.files(template_pkg).joinpath(template_name)
-    content = src.read_text(encoding="utf-8")
-    if not content.lstrip().startswith(FILE_MARKER):
-        content = FILE_MARKER + "\n\n" + content
-    target.write_text(content, encoding="utf-8")
+# --- Strategy 2: manifest-tracked standalone files ---------------------------
+
+def _templates_root() -> Path:
+    """Filesystem path to pkm/templates/ — robust whether installed via uv tool or wheel."""
+    import pkm
+    return Path(pkm.__file__).parent / "templates"
 
 
-def remove_managed_file(target: Path) -> None:
-    if not target.is_file():
-        return
-    head = target.read_text(encoding="utf-8")[:200]
-    if FILE_MARKER in head:
-        target.unlink()
-
-
-def copy_managed_dir(template_pkg: str, target_dir: Path) -> None:
-    """Copy entire directory recursively, prepending FILE_MARKER to each file."""
-    target_dir.mkdir(parents=True, exist_ok=True)
-    src_root = resources.files(template_pkg)
-    for item in src_root.iterdir():
-        if item.is_file():
-            copy_managed_file(template_pkg, item.name, target_dir / item.name)
-        elif item.is_dir():
-            copy_managed_dir(f"{template_pkg}.{item.name}", target_dir / item.name)
-
-
-def remove_managed_dir(target_dir: Path) -> None:
-    """Remove all managed files in dir; remove dir if empty after."""
-    if not target_dir.is_dir():
-        return
-    for item in target_dir.iterdir():
-        if item.is_file():
-            remove_managed_file(item)
-        elif item.is_dir():
-            remove_managed_dir(item)
+def read_manifest() -> list[str]:
+    if not MANIFEST_PATH.is_file():
+        return []
     try:
-        target_dir.rmdir()
-    except OSError:
-        pass  # not empty — user content remains
+        return json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("paths", [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def write_manifest(paths: list[str]) -> None:
+    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    MANIFEST_PATH.write_text(json.dumps({"paths": sorted(set(paths))}, indent=2), encoding="utf-8")
+
+
+def install_file(template_relpath: str, target: Path) -> None:
+    """Copy a template (path relative to pkm/templates/) verbatim to target.
+    Records target in manifest. Always overwrites the target.
+    """
+    src = _templates_root() / template_relpath
+    if not src.is_file():
+        raise FileNotFoundError(f"template not found: {src}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, target)
+    paths = read_manifest()
+    abs_target = str(target.resolve())
+    if abs_target not in paths:
+        paths.append(abs_target)
+        write_manifest(paths)
+
+
+def install_dir(template_reldir: str, target_dir: Path) -> None:
+    """Copy all .md files in pkm/templates/<reldir>/ recursively to target_dir.
+    Each emitted file is recorded in manifest.
+    Skips __init__.py and any non-.md files.
+    """
+    src_dir = _templates_root() / template_reldir
+    if not src_dir.is_dir():
+        raise FileNotFoundError(f"template dir not found: {src_dir}")
+    for src in src_dir.rglob("*.md"):
+        rel = src.relative_to(src_dir)
+        target = target_dir / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, target)
+        paths = read_manifest()
+        abs_target = str(target.resolve())
+        if abs_target not in paths:
+            paths.append(abs_target)
+            write_manifest(paths)
+
+
+def uninstall_via_manifest() -> int:
+    """Delete every file recorded in the manifest. Returns count removed."""
+    paths = read_manifest()
+    removed = 0
+    for p in paths:
+        try:
+            Path(p).unlink()
+            removed += 1
+        except FileNotFoundError:
+            pass  # already gone
+        except OSError:
+            pass
+    if MANIFEST_PATH.is_file():
+        MANIFEST_PATH.unlink()
+    # Best-effort: prune empty parent dirs (commands/, skills/pkm/, skills/pkm/<skill>/)
+    for p in paths:
+        parent = Path(p).parent
+        for _ in range(4):  # up to 4 levels deep
+            try:
+                parent.rmdir()
+                parent = parent.parent
+            except OSError:
+                break
+    return removed
 ```
 
 - [ ] **Step 5.4: Implement install command**
@@ -1145,7 +1306,6 @@ def remove_managed_dir(target_dir: Path) -> None:
 from __future__ import annotations
 
 import json
-from importlib import resources
 from pathlib import Path
 
 import typer
@@ -1154,8 +1314,8 @@ from pkm.config.global_config import GlobalConfig, write_global_config, GLOBAL_C
 from pkm.errors import PKMValidationError
 from pkm.install import (
     apply_managed_block, remove_managed_block,
-    copy_managed_file, remove_managed_file,
-    copy_managed_dir, remove_managed_dir,
+    install_file, install_dir, uninstall_via_manifest,
+    _templates_root,
 )
 
 app = typer.Typer(invoke_without_command=True)
@@ -1166,23 +1326,23 @@ def _claude_root() -> Path:
 
 
 def _install_claude_code(data_repo: Path) -> dict:
-    # 1. global config
+    # 1. global config (data repo location SoT)
     write_global_config(GlobalConfig(data_repo=data_repo.resolve()))
 
-    # 2. CLAUDE.md managed block
-    block_path = resources.files("pkm.templates").joinpath("claude_md_block.md")
+    # 2. CLAUDE.md managed block (Strategy 1 — embedded block, preserves user content)
+    block_path = _templates_root() / "claude_md_block.md"
     block = block_path.read_text(encoding="utf-8")
     apply_managed_block(_claude_root() / "CLAUDE.md", block)
 
-    # 3. commands
+    # 3. slash commands (Strategy 2 — verbatim files tracked via manifest)
     cmds_dir = _claude_root() / "commands"
     for name in ["pkm-recall.md", "pkm-extract-session.md", "pkm-backfill.md", "pkm-project.md"]:
-        copy_managed_file("pkm.templates.commands", name, cmds_dir / name)
+        install_file(f"commands/{name}", cmds_dir / name)
 
-    # 4. skills
+    # 4. skills (Strategy 2 — recursive, manifest-tracked)
     skills_root = _claude_root() / "skills" / "pkm"
     for skill in ["recalling-project-context", "extracting-session-knowledge", "backfilling-sessions"]:
-        copy_managed_dir(f"pkm.templates.skills.{skill}", skills_root / skill)
+        install_dir(f"skills/{skill}", skills_root / skill)
 
     return {
         "ok": True,
@@ -1195,12 +1355,11 @@ def _install_claude_code(data_repo: Path) -> dict:
 
 
 def _uninstall_claude_code() -> dict:
+    # Embedded block in CLAUDE.md → Strategy 1
     remove_managed_block(_claude_root() / "CLAUDE.md")
-    cmds_dir = _claude_root() / "commands"
-    for name in ["pkm-recall.md", "pkm-extract-session.md", "pkm-backfill.md", "pkm-project.md"]:
-        remove_managed_file(cmds_dir / name)
-    remove_managed_dir(_claude_root() / "skills" / "pkm")
-    return {"ok": True}
+    # All files (commands + skills) → Strategy 2 manifest
+    removed = uninstall_via_manifest()
+    return {"ok": True, "files_removed": removed}
 
 
 @app.callback(invoke_without_command=True)
@@ -1773,6 +1932,34 @@ def test_backfill_idempotent_via_cli(tmp_data_repo, tmp_transcript_root_with_3_s
     r2 = runner.invoke(app, ["session", "list", "--unprocessed", "--json", "--data-repo", str(tmp_data_repo)])
     p2 = json.loads(r2.output)
     assert len(p2["sessions"]) == 0
+
+
+def test_backfill_resumes_from_partial_progress(tmp_data_repo, tmp_transcript_root_with_3_sessions, fake_project_setup, monkeypatch):
+    """Spec §16.3 M14: backfill 중단 후 재호출 시 마지막 처리된 세션 다음부터 재개.
+
+    Simulate a backfill that processed only the first session before interruption.
+    The next list --unprocessed must return the remaining 2 sessions in oldest-first order.
+    """
+    monkeypatch.setenv("PKM_TRANSCRIPT_ROOT", str(tmp_transcript_root_with_3_sessions))
+
+    # All 3 visible initially
+    r0 = runner.invoke(app, ["session", "list", "--unprocessed", "--json", "--data-repo", str(tmp_data_repo)])
+    initial = json.loads(r0.output)["sessions"]
+    assert len(initial) == 3
+    first_uuid = initial[0]["uuid"]  # oldest
+
+    # Process only the first one (simulating interruption)
+    runner.invoke(app, ["session", "mark-processed", first_uuid, "--extracted-count", "2", "--data-repo", str(tmp_data_repo)])
+
+    # Resume: list unprocessed
+    r1 = runner.invoke(app, ["session", "list", "--unprocessed", "--json", "--data-repo", str(tmp_data_repo)])
+    remaining = json.loads(r1.output)["sessions"]
+    assert len(remaining) == 2
+    assert first_uuid not in [s["uuid"] for s in remaining]
+
+    # Order is preserved (oldest-first)
+    times = [s["started_at"] for s in remaining if s.get("started_at")]
+    assert times == sorted(times)
 ```
 
 - [ ] **Step 8.3: Run + commit**

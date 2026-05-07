@@ -1457,7 +1457,7 @@ def test_knowledge_add_creates_file(tmp_data_repo, tmp_code_repo, monkeypatch):
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["ok"] is True
-    p = tmp_data_repo / "data" / "projects" / "demo" / "decisions" / payload["slug"] + ".md"
+    p = tmp_data_repo / "data" / "projects" / "demo" / "decisions" / f"{payload['slug']}.md"
     assert p.is_file()
     text = p.read_text(encoding="utf-8")
     assert "project: demo" in text
@@ -2426,14 +2426,16 @@ In `docs/FEATURES.md`:
 - §2.7 (lint) 표에 4 신규 룰 추가
 - §2.8 (dashboard) 의 graph 섹션에 `include_projects` / `project_filter` 추가
 
-- [ ] **Step 14.3: Update CLAUDE.md (if domain docs registry was set up — N/A for M13)**
+- [ ] **Step 14.3: Update SCHEMA.md (data repo template)**
 
-Not applicable — bootstrap was skipped earlier.
+If `pkm/templates/SCHEMA.md` exists (data repo's runtime SCHEMA scaffolded by `pkm init`), add a section about the 7th layer + the 5-category structure under `data/projects/<id>/`. The data-repo SCHEMA.md is what AI agents read when working in the data repo — important for operator awareness of the new layer.
+
+If the file doesn't exist in `pkm/templates/`, skip this step (it's not required for the M13 acceptance criteria).
 
 - [ ] **Step 14.4: Commit**
 
 ```bash
-git add README.md docs/FEATURES.md
+git add README.md docs/FEATURES.md pkm/templates/SCHEMA.md 2>/dev/null
 git commit -m "M13.14: docs — 6→7 layers, project commands, new scopes, lint rules"
 ```
 

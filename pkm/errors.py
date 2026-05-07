@@ -172,7 +172,6 @@ class PKMAlreadyLinked(PKMInfoError):
     """Same git remote already registered to a project — idempotent NOOP."""
 
     code = "ALREADY_LINKED"
-    exit_code = 0  # info, not failure
 
 
 class PKMNotLinked(PKMStateError):

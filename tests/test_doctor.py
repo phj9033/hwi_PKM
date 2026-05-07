@@ -17,7 +17,7 @@ def _init_pkm(tmp_path: Path) -> None:
 
 
 def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
-    """Full initialization: init + migrate + reindex + model cache stub for M3+ items."""
+    """Full initialization: init + migrate + reindex + model cache + claude-code install."""
     monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     runner.invoke(app, ["migrate", "--apply", "--root", str(tmp_path)])
@@ -29,6 +29,14 @@ def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
     snapshot.mkdir(parents=True)
     (snapshot / "config.json").write_text("{}")
     monkeypatch.setenv("PKM_MODEL_CACHE", str(model_cache))
+    # M14: simulate `pkm install --for claude-code` so the pkm_install row is OK.
+    fake_home = tmp_path / "home"
+    fake_home.mkdir(exist_ok=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    runner.invoke(
+        app,
+        ["install", "--for", "claude-code", "--data-repo", str(tmp_path)],
+    )
 
 
 def test_doctor_on_initialized_repo_passes(tmp_path: Path):
@@ -82,6 +90,58 @@ def test_doctor_json_output_contract(tmp_path: Path, monkeypatch):
     if "system" in payload:
         allowed = {"ram_total_gb", "ram_available_gb", "recommended_batch_size", "python_version"}
         assert set(payload["system"].keys()) <= allowed
+
+
+def test_doctor_pkm_install_missing(tmp_path: Path, monkeypatch):
+    """M14: pkm_install row reports `optional` when HOME has no install."""
+    fake_home = tmp_path / "empty-home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    _init_pkm(tmp_path)
+    result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    payload = json.loads(result.output)
+    install_item = next(i for i in payload["items"] if i["name"] == "pkm_install")
+    assert install_item["status"] == "optional"
+    assert "not installed" in (install_item["detail"] or "")
+
+
+def test_doctor_strict_fails_when_install_missing(tmp_path: Path, monkeypatch):
+    """M14: --strict raises PKM_INSTALL_MISSING when HOME has no install (and migrations are applied)."""
+    monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
+    _init_pkm(tmp_path)
+    runner.invoke(app, ["migrate", "--apply", "--root", str(tmp_path)])
+    runner.invoke(app, ["reindex", "db", "--full", "--root", str(tmp_path)])
+    fake_home = tmp_path / "empty-home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    result = runner.invoke(
+        app, ["doctor", "--root", str(tmp_path), "--strict", "--json"]
+    )
+    assert result.exit_code != 0
+    payload = json.loads(result.output)
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "PKM_INSTALL_MISSING"
+
+
+def test_doctor_strict_passes_after_install(tmp_path: Path, monkeypatch):
+    """M14: install + migrations + reindex + model cache → strict exits 0."""
+    _full_init_pkm(tmp_path, monkeypatch)
+    result = runner.invoke(
+        app, ["doctor", "--root", str(tmp_path), "--strict", "--json"]
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    install_item = next(i for i in payload["items"] if i["name"] == "pkm_install")
+    assert install_item["status"] == "ok"
+
+
+def test_doctor_includes_unprocessed_sessions_row(tmp_path: Path, monkeypatch):
+    """M14: pkm doctor reports an unprocessed_sessions info row."""
+    _init_pkm(tmp_path)
+    result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    payload = json.loads(result.output)
+    row = next(i for i in payload["items"] if i["name"] == "unprocessed_sessions")
+    assert row["status"] == "info"
 
 
 def test_doctor_python_version_check(tmp_path: Path):

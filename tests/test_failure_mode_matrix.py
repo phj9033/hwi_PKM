@@ -441,7 +441,18 @@ def _scenario_corrupt_transcript(repo: Path) -> list[str]:
 
 
 def _scenario_pkm_install_missing(repo: Path) -> list[str]:
-    """Strict doctor when no install has been run."""
+    """Strict doctor when no install has been run.
+
+    Migrations come first in the --strict precedence, so we apply them here
+    to clear MIGRATION_PENDING and let PKM_INSTALL_MISSING surface.
+    """
+    subprocess.run(
+        [sys.executable, "-m", "pkm", "migrate", "--apply"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=_base_env(),
+    )
     return ["doctor", "--strict", "--json"]
 
 

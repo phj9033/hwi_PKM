@@ -323,6 +323,57 @@ pkm doctor                                               # tokenizer: kiwi (...)
 
 **Schema (m003):** `chunks` 테이블에 `project`, `category`, `session_id` 컬럼이 추가됨. 기존 wiki/raw/writing 행은 NULL → 기본 검색 결과가 V2 와 호환된다.
 
+### 2.12 Session (M14)
+
+```bash
+pkm session list  [--project ID] [--unprocessed] [--since DATE] [--until DATE]
+                  [--min-messages N=5] [--limit N] [--json]
+pkm session show  <uuid> [--json]                    # transcript_path + project_id + meta
+pkm session forget <uuid>                            # remove the per-PC processed marker
+pkm session mark-processed <uuid> --extracted-count N
+                                                     # write `.pkm/sessions/<project>/<uuid>.json`
+                                                     # idempotent — re-running rewrites the file
+```
+
+`list` 가 `~/.claude/projects/**/*.jsonl` 을 스캔하여 cwd 매핑된 프로젝트 세션만 반환. `--unprocessed` 는 메타파일 없는 세션만 (resumable backfill 의 핵심).
+
+`show` 는 transcript 경로 + cwd 디코드 + 처리 상태 + 메타를 한 번에 노출. `extracting-session-knowledge` 스킬이 이 출력을 들고 `Read` 툴로 transcript 를 직접 읽는다 — CLI 가 추출하지 않음 (Claude 본인이 함).
+
+메타파일은 PC 별 (`.pkm/sessions/` gitignore — transcript 자체가 PC-local 이므로 git 추적 의미 없음). sha256 + 메시지 카운트 + 처리 시각 + 추출 요약을 보존.
+
+`PKM_TRANSCRIPT_ROOT` 환경 변수로 transcript 루트를 override 가능 (기본: `~/.claude/projects`). 테스트/멀티-사용자 셋업용.
+
+### 2.13 Install (M14)
+
+```bash
+pkm install --for claude-code [--data-repo PATH] [--uninstall] [--json]
+```
+
+PC 별 1 회 실행. 다음 4 가지를 멱등 작성:
+
+1. `~/.pkm/config.toml` — 데이터 repo 경로 SoT.
+2. `~/.claude/CLAUDE.md` — managed 블록 (HTML 코멘트 마커 사이) 삽입/교체. 마커 외부 사용자 콘텐츠 보존.
+3. `~/.claude/commands/pkm-{recall,extract-session,backfill,project}.md` — 4 슬래시 명령.
+4. `~/.claude/skills/pkm/{recalling-project-context,extracting-session-knowledge,backfilling-sessions}/` — 3 스킬 번들.
+
+3 + 4 는 frontmatter 가 필요하므로 in-file 마커를 못 쓴다 → `~/.pkm/install_manifest.json` 에 emit 한 절대 경로를 기록 → `--uninstall` 이 manifest 만큼만 정확히 삭제 + manifest 자체도 삭제.
+
+지원하지 않는 target (`codex`, `cursor`, ...) 은 `NOT_IMPLEMENTED` 로 거절 — V4 에 추가 예정.
+
+### 2.14 Context (M14)
+
+```bash
+pkm context inject [--project ID] [--max-tokens N=600]
+                   [--quiet-on-not-linked/--no-quiet]
+                   [--json]
+```
+
+cwd → 프로젝트 resolver (M13 5 단계) 후, `data/projects/<id>/index.md` 본문 (frontmatter 제외) 을 stdout 에 출력. 4-char/token 휴리스틱으로 budget 초과 시 마지막 마침표에서 잘라 `(truncated; run /pkm-recall ...)` 노티스 추가.
+
+기본은 `--quiet-on-not-linked` — NOT_LINKED 면 silent exit 0. SessionStart hook 대신 `~/.claude/CLAUDE.md` 의 managed 블록이 `pkm:recalling-project-context` 스킬을 invoke 하고, 스킬이 이 명령을 호출한다.
+
+`--no-quiet` 시 NOT_LINKED 가 JSON 에러 envelope 으로 surface (자동화 디버깅용).
+
 ---
 
 ## 3. 슬래시 커맨드 (Claude Code 세션용)
@@ -341,6 +392,12 @@ pkm doctor                                               # tokenizer: kiwi (...)
 | `/style-import <url\|file>` | URL 또는 로컬 글 | WebFetch best-effort + manual `raw-imports/style/<slug>.md` fallback → `data/style/<slug>.md` 인덱싱 | 톤 매칭용 style 샘플 |
 | `/blog "<주제>"` | 자연어 주제 | `pkm search` (wiki/raw/style) → outline → 사용자 승인 → `blog/<slug>.md` 작성 | 외부 발행용 초안 |
 | `/blog --random` | (없음) | `pkm sample` (랜덤 wiki 3-5장, 직접 링크 안 됨) → outline → 사용자 승인 → `blog/seeds/<slug>.md` | 영감용 시드 초안 |
+| `/pkm-recall <topic>` (M14) | 토픽 (선택) | `pkm:recalling-project-context` 스킬 invoke — `pkm project current` → `pkm context inject` → 옵션으로 `pkm search --scope project` | 프로젝트 컨텍스트 + (선택) 토픽별 검색 결과 |
+| `/pkm-extract-session [uuid]` (M14) | uuid (선택) | `pkm:extracting-session-knowledge` 스킬 — transcript Read → 5 카테고리 후보 → 2 라운드 사용자 검토 → `pkm project knowledge add` 호출 → `pkm session mark-processed` | `data/projects/<id>/<cat>/*.md` 신규 + 메타 |
+| `/pkm-backfill [--since ...]` (M14) | 옵션 | `pkm:backfilling-sessions` 스킬 — `pkm session list --unprocessed` → 첫 세션 자세히 / 이후 일괄 모드 → 각 세션 추출 + mark-processed | 일괄 추출 + resumable |
+| `/pkm-project [verb]` (M14) | `link\|current\|list\|show <id>` | `pkm project ...` 의 thin wrapper | CLI 결과 |
+
+**M14 스킬 ↔ 슬래시 매핑**: 슬래시는 사용자 입력 surface, 실제 워크플로우는 `~/.claude/skills/pkm/<id>/SKILL.md` 가 정의. `pkm install --for claude-code` 가 한 번에 모두 깐다.
 
 ### `/ask` 인용 계약 (Karpathy grounding)
 
@@ -554,6 +611,61 @@ PKM_AI_CLI=ollama-local pkm search "..." --expand
 해석 순서: 셸 훅 (`.pkm/hooks/<task>.sh`) → config tasks → config default → 자동탐지 → 모두 실패 시 명확한 에러.
 
 `--expand` 안 쓰면 AI CLI 자체가 불필요하다. `/ask` 도 Claude Code 자체로 동작 — 즉 본 PKM 은 **API 키 0 개, 외부 SDK 미사용** 으로도 모든 핵심 기능이 돌아간다.
+
+---
+
+### UC8. Claude Code 세션 끝난 후 지식 추출 → 프로젝트 등록
+
+상황: hwi_PKM 작업 중 OAuth 결정 + 미들웨어 함정 + SQL 스니펫이 쌓였다.
+
+```
+Claude Code 세션 안에서:
+  /pkm-extract-session
+  → pkm:extracting-session-knowledge 스킬 invoke
+  → 1. CLAUDE_SESSION_ID env 또는 최근 세션 → uuid 결정
+  → 2. pkm session show → transcript_path
+  → 3. transcript Read 툴로 읽기
+  → 4. 5 카테고리 후보 빌드 (decisions 3, pitfalls 1, snippets 5, qna 0, notes 2)
+  → 5. 사용자에게 markdown 표 제시 → "decisions 3 빼고 진행" 응답
+  → 6. 반영 후 재출력 → "OK"
+  → 7. pkm project knowledge add 항목별 호출 (10 회) — auto-commit
+  → 8. pkm session mark-processed
+  → 9. pkm project rebuild-index hwi-pkm
+  → 10. pkm reindex db --scope project:hwi-pkm
+
+결과:
+  data/projects/hwi-pkm/decisions/2026-05-07-*.md (2 개)
+  data/projects/hwi-pkm/pitfalls/2026-05-07-*.md  (1 개)
+  data/projects/hwi-pkm/snippets/2026-05-07-*.md  (5 개)
+  data/projects/hwi-pkm/notes/2026-05-07-*.md     (2 개)
+  .pkm/sessions/hwi-pkm/<uuid>.json (메타)
+  data/projects/hwi-pkm/index.md (자동 갱신)
+```
+
+다음 세션에서 `/pkm-recall OAuth` 하면 검색에 즉시 잡힘.
+
+### UC9. 과거 세션 일괄 backfill
+
+상황: PKM 처음 도입 + `~/.claude/projects/-Users-me-Code-app/` 에 47 개 세션 누적.
+
+```
+1) cd ~/Code/my-app
+2) pkm project link --id my-app
+3) Claude Code 세션 안에서:
+   /pkm-backfill --project my-app --since 2026-01-01
+
+   → pkm:backfilling-sessions 스킬:
+     - pkm session list --unprocessed → 47 세션
+     - 사용자 확인 + "첫 세션 자세히 / 이후 일괄"
+     - 첫 세션: 두 라운드 검토 → 8 항목 등록
+     - 두 번째부터: 일괄 모드 — 한 번 보여주고 yes/skip/edit/stop
+     - 세션 12 에서 사용자 stop-batch
+     - 처리: 12/47 세션, ~80 항목
+
+4) 다음에 /pkm-backfill 재호출 → 13 부터 자동 재개
+```
+
+중단 시점까지 안전 — 처리된 세션은 메타파일 (`~/Documents/pkm/.pkm/sessions/my-app/<uuid>.json`) 에 기록되어 재처리되지 않음. 특정 세션을 다시 처리하려면 `pkm session forget <uuid>` 후 backfill 재실행.
 
 ---
 

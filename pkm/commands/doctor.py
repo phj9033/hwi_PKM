@@ -147,6 +147,34 @@ def _check_model_cache() -> _Item:
     return _Item("bge-m3", "missing", "run: pkm doctor --download")
 
 
+def _check_projects(repo: Path) -> _Item:
+    from pkm.session.registry import ProjectIndex
+
+    try:
+        idx = ProjectIndex.load(repo)
+    except Exception as e:  # noqa: BLE001
+        return _Item("projects", "error", f"failed to load: {e}")
+    n = len(idx.records)
+    remotes = sum(len(r.git_remotes) for r in idx.records)
+    return _Item("projects", "ok", f"{n} linked, {remotes} remotes")
+
+
+def _check_current_project(repo: Path) -> _Item:
+    from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+    try:
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        pid = resolve_project_id(Path.cwd(), project_index=idx, local_overrides=ovs)
+    except Exception as e:  # noqa: BLE001
+        return _Item("current_project", "error", f"resolve failed: {e}")
+    return _Item(
+        "current_project",
+        "ok" if pid else "info",
+        pid or "not_linked",
+    )
+
+
 def _check_schema_version(root: Path) -> _Item:
     """M12: report schema_version (current/latest). Missing if below latest."""
     from pkm.store.index_db import connect
@@ -292,6 +320,8 @@ def register(app: typer.Typer) -> None:
         items.append(_check_index_db(root))
         items.append(_check_schema_version(root))
         items.append(_check_tokenizer(root))
+        items.append(_check_projects(root))
+        items.append(_check_current_project(root))
         items.append(_check_model_cache())
         items.append(_check_git(root))
         items.append(_check_ai_cli())

@@ -111,6 +111,26 @@ def test_doctor_shows_tokenizer(tmp_path: Path):
     assert "tokenizer" in names
 
 
+def test_doctor_includes_projects_row(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    names = [item["name"] for item in payload["items"]]
+    assert "projects" in names
+    assert "current_project" in names
+
+
+def test_doctor_projects_row_zero_when_empty(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    payload = json.loads(result.output)
+    proj_row = next(it for it in payload["items"] if it["name"] == "projects")
+    assert "0 linked" in proj_row.get("detail", "")
+    cur_row = next(it for it in payload["items"] if it["name"] == "current_project")
+    assert cur_row["status"] in ("info", "ok")  # info if not linked, ok if cwd happens to resolve
+
+
 def test_doctor_strict_fails_on_pending_migration(tmp_path: Path):
     """M12: --strict surfaces MIGRATION_PENDING when schema_version below latest."""
     _init_pkm(tmp_path)

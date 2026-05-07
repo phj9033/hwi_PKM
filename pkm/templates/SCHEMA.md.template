@@ -70,6 +70,34 @@ category: decisions     # 필수 — decisions|pitfalls|snippets|qna|notes
 
 Lint 룰: `MISSING_PROJECT_FIELD`, `INVALID_CATEGORY`, `CATEGORY_PATH_MISMATCH`, `ORPHAN_PROJECT_DIR` (error); `SIMILAR_KNOWLEDGE_CANDIDATE` (warning). 자세한 내용은 `docs/FEATURES.md §2.7`.
 
+### Sessions + Install (M14)
+
+M14 layers AI integration on top of the project layer:
+
+- **Per-PC install.** Run `pkm install --for claude-code --data-repo $(pwd)` once per machine. It writes:
+  - `~/.pkm/config.toml` — data-repo path SoT for this PC.
+  - `~/.claude/CLAUDE.md` — managed block (HTML-comment delimited) instructing Claude to call `pkm:recalling-project-context` skill at session start. User content outside the block is preserved.
+  - `~/.claude/commands/pkm-{recall,extract-session,backfill,project}.md` — 4 slash commands.
+  - `~/.claude/skills/pkm/{recalling-project-context,extracting-session-knowledge,backfilling-sessions}/` — 3 skill bundles.
+  - `~/.pkm/install_manifest.json` — tracks every emitted path for `--uninstall`.
+
+- **Session transcripts.** `pkm session list/show/forget/mark-processed` reads `~/.claude/projects/<encoded-cwd>/<uuid>.jsonl` (Claude Code's transcript root; `PKM_TRANSCRIPT_ROOT` overrides). The adapter resolves each session's project via the cwd's git remote (same M13 normalization).
+
+- **Per-PC processed metadata.** `mark-processed` writes `<repo>/.pkm/sessions/<project_id>/<uuid>.json` (gitignored — transcripts are PC-local). Records sha256 + msg count + extraction summary; enables resumable backfill (`session list --unprocessed` skips marked sessions).
+
+- **Context injection.** `pkm context inject` echoes the cwd-resolved project's `index.md` body (truncated to 600-token-equivalent by default). Silent on NOT_LINKED. Used by the `pkm:recalling-project-context` skill at session start.
+
+- **Doctor rows.** `pkm doctor` reports `pkm_install` (HOME-scoped install state) and `unprocessed_sessions` (info — count for cwd-resolved project). `--strict` raises `PKM_INSTALL_MISSING` (after `MIGRATION_PENDING`) when no install is detected.
+
+Slash command surface (after install, in any cwd):
+
+| Slash | Skill / behavior |
+| --- | --- |
+| `/pkm-recall <topic>` | `pkm:recalling-project-context` — load project context + optional topical search |
+| `/pkm-extract-session [uuid]` | `pkm:extracting-session-knowledge` — 5-category extraction with 2-round user review |
+| `/pkm-backfill [--since ...]` | `pkm:backfilling-sessions` — bulk-extract historical sessions, resumable |
+| `/pkm-project <verb>` | thin wrapper over `pkm project link/current/list/show` |
+
 ## 3. Frontmatter
 
 Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
@@ -172,6 +200,17 @@ Capture and chunk schemas landed in M2; wiki and writing schemas landed in M4.
   | --- | --- |
   | `pkm bench [--docs N --real --json]` | Synth N Korean docs + time reindex/search (soft thresholds). |
 
+- **Sessions + AI integration (M14):**
+
+  | Command | Purpose |
+  | --- | --- |
+  | `pkm install --for claude-code --data-repo PATH` | Per-PC install — managed block in `~/.claude/CLAUDE.md`, slash commands, and skill bundles. `--uninstall` to remove. |
+  | `pkm session list [--unprocessed --since DATE --min-messages N --limit N]` | Discover Claude Code transcripts for the cwd-resolved project. |
+  | `pkm session show <uuid>` | Transcript path + project_id + meta — used by the extraction skill. |
+  | `pkm session mark-processed <uuid> --extracted-count N` | Write per-PC processed marker at `.pkm/sessions/<project>/<uuid>.json`. |
+  | `pkm session forget <uuid>` | Drop the marker (reprocess on next backfill). |
+  | `pkm context inject [--max-tokens N --quiet-on-not-linked]` | Echo the project `index.md` body (frontmatter stripped, trimmed). Silent on NOT_LINKED by default. |
+
 (`pkm --help` remains authoritative for full CLI surface.)
 
 ## § Failure codes (stable contract)
@@ -190,9 +229,12 @@ each code is reachable through a real CLI invocation
 - **Files = truth.** Don't edit `.pkm/index.db`; it's regenerated.
 - **Raw immutability.** Files under `data/raw/` are immutable after `status: reviewed`. Updates go through new captures or wiki edits.
 - **No direct wiki writes (M4+).** Use `pkm promote` or `pkm wiki edit`. (Enforced by `.claude/settings.json` deny rules from M4.)
+- **No direct project knowledge writes (M13+).** Use `pkm project knowledge add` — never `Edit`/`Write` directly on `data/projects/<id>/<cat>/*.md`.
+- **Session metadata is PC-local (M14).** `.pkm/sessions/` is gitignored. Don't try to share or commit it across machines — each PC tracks its own processed-session set.
 
 ## 7. Anti-patterns
 
 - Editing `.pkm/index.db` by hand.
 - Writing to `data/wiki/**` directly without going through `pkm promote`.
 - Asserting facts in `/ask` answers without citations to wiki paths.
+- Hardcoding project ids or paths in skills (use `pkm project current` and `pkm session show` instead — see the skill bundles installed by `pkm install`).

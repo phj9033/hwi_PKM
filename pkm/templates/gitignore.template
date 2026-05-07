@@ -2,6 +2,7 @@
 /.pkm/index.db
 /.pkm/cache/
 /.pkm/config.local.toml
+/.pkm/sessions/
 /.claude/settings.local.json
 __pycache__/
 .venv/

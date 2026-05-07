@@ -226,6 +226,22 @@ class PKMSimilarKnowledgeCandidate(PKMInfoError):
     code = "SIMILAR_KNOWLEDGE_CANDIDATE"
 
 
+# ---------------------------------------------------------------------------
+# M14 error classes
+# ---------------------------------------------------------------------------
+
+class PKMCorruptTranscript(PKMValidationError):
+    """jsonl parse failed."""
+
+    code = "CORRUPT_TRANSCRIPT"
+
+
+class PKMInstallMissing(PKMStateError):
+    """`pkm install --for claude-code` not run on this PC; --strict doctor fails."""
+
+    code = "PKM_INSTALL_MISSING"
+
+
 def all_error_codes() -> dict[str, type[PKMError]]:
     """Return ``{code: cls}`` for every PKMError subclass reachable from this module.
 

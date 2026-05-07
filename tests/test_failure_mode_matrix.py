@@ -431,6 +431,20 @@ def _scenario_orphan_project_dir(repo: Path) -> list[str]:
     return ["lint", "--json"]
 
 
+def _scenario_corrupt_transcript(repo: Path) -> list[str]:
+    """Place a corrupt jsonl in the test transcript dir, then list/show."""
+    fake_root = repo.parent / ".claude-projects"
+    (fake_root / "-tmp-fake").mkdir(parents=True, exist_ok=True)
+    bad = fake_root / "-tmp-fake" / "corrupt.jsonl"
+    bad.write_text("not json {{{ broken\n", encoding="utf-8")
+    return ["session", "show", "corrupt", "--json"]
+
+
+def _scenario_pkm_install_missing(repo: Path) -> list[str]:
+    """Strict doctor when no install has been run."""
+    return ["doctor", "--strict", "--json"]
+
+
 def _scenario_similar_knowledge_candidate(repo: Path) -> list[str]:
     _seed_test_project(repo, "x")
     base_fm = (
@@ -509,6 +523,11 @@ SCENARIOS.update({
     "SIMILAR_KNOWLEDGE_CANDIDATE":  _scenario_similar_knowledge_candidate,
 })
 
+SCENARIOS.update({
+    "CORRUPT_TRANSCRIPT":           _scenario_corrupt_transcript,
+    "PKM_INSTALL_MISSING":          _scenario_pkm_install_missing,
+})
+
 
 # Per-scenario env overrides (merged on top of `_base_env()`).
 # An empty string means "remove this var from env" so we can disable a stub
@@ -531,6 +550,14 @@ SCENARIO_ENV: dict[str, dict[str, str]] = {
     },
     "MIGRATION_FAILED": {
         "PKM_TEST_FORCE_MIGRATION_FAIL": "1",
+    },
+    "CORRUPT_TRANSCRIPT": {
+        # Set in fixture below to repo.parent/.claude-projects so the adapter
+        # discovers the corrupt jsonl seeded by the scenario.
+    },
+    "PKM_INSTALL_MISSING": {
+        # HOME is rerouted to an empty tmp dir in the test below so the
+        # install manifest lookup misses on this PC.
     },
 }
 
@@ -573,6 +600,15 @@ def test_code_is_reachable(code: str, tmp_path: Path) -> None:
         fake_home.mkdir(exist_ok=True)
         env["HOME"] = str(fake_home)
         env["PKM_MODEL_CACHE"] = str(fake_home / ".cache" / "pkm" / "models")
+    # CORRUPT_TRANSCRIPT: point the adapter at the per-test transcript dir
+    # populated by the scenario function.
+    if code == "CORRUPT_TRANSCRIPT":
+        env["PKM_TRANSCRIPT_ROOT"] = str(repo.parent / ".claude-projects")
+    # PKM_INSTALL_MISSING: empty HOME so no manifest is found.
+    if code == "PKM_INSTALL_MISSING":
+        fake_home = tmp_path / "empty-home"
+        fake_home.mkdir(exist_ok=True)
+        env["HOME"] = str(fake_home)
 
     proc = subprocess.run(
         [sys.executable, "-m", "pkm", *argv],

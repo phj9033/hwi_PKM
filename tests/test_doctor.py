@@ -17,9 +17,10 @@ def _init_pkm(tmp_path: Path) -> None:
 
 
 def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
-    """Full initialization: init + reindex + model cache stub for M3 items."""
+    """Full initialization: init + migrate + reindex + model cache stub for M3+ items."""
     monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
     runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(app, ["migrate", "--apply", "--root", str(tmp_path)])
     runner.invoke(app, ["reindex", "db", "--full", "--root", str(tmp_path)])
     # Seed the HF standard cache layout so `pkm.store.model_cache.is_cached`
     # treats bge-m3 as present (mirrors what `snapshot_download` writes).

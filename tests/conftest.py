@@ -209,3 +209,122 @@ def tmp_unlinked_cwd(tmp_path):
     p = tmp_path / "unlinked-cwd"
     p.mkdir()
     return p
+
+
+# ---------------------------------------------------------------------------
+# M14 Task 2 fixtures — session adapter testing
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def tmp_transcript_root(tmp_path):
+    """A fake ~/.claude/projects tree with one cwd dir + typical_session.jsonl."""
+    import shutil
+    from pathlib import Path as _Path
+    root = tmp_path / "claude_projects"
+    root.mkdir()
+    cwd_dir = root / "-Users-me-code-demo"
+    cwd_dir.mkdir()
+    src = _Path(__file__).parent / "fixtures" / "sessions" / "typical_session.jsonl"
+    shutil.copy(str(src), str(cwd_dir / "11111111-2222-3333-4444-555555555555.jsonl"))
+    return root
+
+
+@pytest.fixture
+def typical_session_jsonl():
+    """Absolute path to tests/fixtures/sessions/typical_session.jsonl."""
+    import pathlib
+    return pathlib.Path(__file__).parent / "fixtures" / "sessions" / "typical_session.jsonl"
+
+
+@pytest.fixture
+def corrupt_session_jsonl():
+    """Absolute path to tests/fixtures/sessions/corrupt_session.jsonl."""
+    import pathlib
+    return pathlib.Path(__file__).parent / "fixtures" / "sessions" / "corrupt_session.jsonl"
+
+
+@pytest.fixture
+def fake_project_index():
+    """A ProjectIndex with one record matching github.com:test/demo."""
+    from pkm.session.registry import ProjectIndex, ProjectRecord
+    return ProjectIndex(records=[
+        ProjectRecord(
+            id="demo",
+            git_remotes=["github.com:test/demo"],
+            local_paths=[],
+        )
+    ])
+
+
+# ---------------------------------------------------------------------------
+# M14 Task 3 fixtures — session lifecycle + list filters
+# ---------------------------------------------------------------------------
+
+import json as _json_session
+
+
+def _write_synthetic_session(target, n_messages: int) -> None:
+    lines = []
+    for i in range(n_messages):
+        role = "user" if i % 2 == 0 else "assistant"
+        lines.append(_json_session.dumps({
+            "type": role,
+            "content": f"message {i} content",
+            "timestamp": f"2026-05-07T1{i % 10}:{(i * 7) % 60:02d}:00Z",
+        }))
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+@pytest.fixture
+def fake_project_setup(tmp_data_repo, monkeypatch):
+    """Seed data/projects/demo/ + stub discover_remote so adapter resolves to demo."""
+    pdir = tmp_data_repo / "data" / "projects" / "demo"
+    for cat in ["decisions", "pitfalls", "snippets", "qna", "notes"]:
+        (pdir / cat).mkdir(parents=True, exist_ok=True)
+    (pdir / "index.md").write_text(
+        "---\nproject: demo\ngit_remotes:\n  - github.com:test/test\n"
+        "created_at: 2026-05-07T00:00:00+09:00\ndata_repo_local_paths: []\n---\n\n# demo\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "pkm.session.adapters.claude_code.discover_remote",
+        lambda cwd: "github.com:test/test",
+    )
+    return tmp_data_repo
+
+
+@pytest.fixture
+def tmp_transcript_root_with_2_sessions(tmp_path):
+    """Two sessions named 'first' and 'second' under a single encoded-cwd dir."""
+    root = tmp_path / "transcripts"
+    cwd_dir = root / "-tmp-test-coderepo"
+    cwd_dir.mkdir(parents=True)
+    _write_synthetic_session(cwd_dir / "first.jsonl", n_messages=6)
+    _write_synthetic_session(cwd_dir / "second.jsonl", n_messages=7)
+    return root
+
+
+@pytest.fixture
+def tmp_transcript_root_with_3_sessions(tmp_path):
+    """Three sessions with deterministic uuids 'a', 'b', 'c'."""
+    root = tmp_path / "transcripts"
+    cwd_dir = root / "-tmp-test-coderepo"
+    cwd_dir.mkdir(parents=True)
+    for uuid_ in ["a", "b", "c"]:
+        _write_synthetic_session(cwd_dir / f"{uuid_}.jsonl", n_messages=6)
+    return root
+
+
+@pytest.fixture
+def tmp_unlinked_cwd_m14(tmp_path):
+    """A cwd that isn't linked to any project (M14 variant)."""
+    p = tmp_path / "unlinked"
+    p.mkdir()
+    return p
+
+
+@pytest.fixture
+def tmp_home(tmp_path):
+    h = tmp_path / "home"
+    h.mkdir()
+    return h

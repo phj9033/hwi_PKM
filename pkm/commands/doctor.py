@@ -211,6 +211,73 @@ def _check_schema_version(root: Path) -> _Item:
     )
 
 
+def _check_pkm_install() -> _Item:
+    """Check if `pkm install --for claude-code` has been run on this PC.
+
+    Looks at HOME (per-machine), not the data repo. Status is "optional"
+    (rather than "missing") when not installed so the row doesn't trip the
+    generic any_bad strict gate — there is a separate, named PKM_INSTALL_MISSING
+    gate for that case (raised below in the strict-mode path).
+    """
+    claude_md = Path.home() / ".claude" / "CLAUDE.md"
+    if not claude_md.is_file():
+        return _Item(
+            "pkm_install",
+            "optional",
+            "claude-code: not installed (run `pkm install --for claude-code`)",
+        )
+    try:
+        text = claude_md.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    if "<!-- pkm:start" not in text:
+        return _Item(
+            "pkm_install",
+            "optional",
+            "claude-code: managed block not found (run `pkm install --for claude-code`)",
+        )
+    skills_present = (Path.home() / ".claude" / "skills" / "pkm").is_dir()
+    cmd_present = (Path.home() / ".claude" / "commands" / "pkm-recall.md").is_file()
+    if not (skills_present and cmd_present):
+        return _Item(
+            "pkm_install",
+            "optional",
+            "claude-code: managed block ok, but skills or commands missing",
+        )
+    return _Item("pkm_install", "ok", "claude-code")
+
+
+def _check_unprocessed_sessions(repo: Path) -> _Item:
+    """Informational row — count of unprocessed sessions for the cwd-resolved project."""
+    try:
+        from pkm.session.adapters import ClaudeCodeAdapter
+        from pkm.session.meta import is_processed
+        from pkm.session.registry import (
+            ProjectIndex,
+            load_local_overrides,
+            resolve_project_id,
+        )
+
+        adapter = ClaudeCodeAdapter()
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        cwd_pid = resolve_project_id(
+            Path.cwd(), project_index=idx, local_overrides=ovs
+        )
+        if not cwd_pid:
+            return _Item("unprocessed_sessions", "info", "cwd not linked")
+        unprocessed = 0
+        for ref in adapter.discover():
+            pid = adapter.resolve_project_id(ref, idx)
+            if pid == cwd_pid and not is_processed(repo, pid, ref.uuid):
+                unprocessed += 1
+        return _Item(
+            "unprocessed_sessions", "info", f"{unprocessed} unprocessed for {cwd_pid}"
+        )
+    except Exception as e:  # noqa: BLE001
+        return _Item("unprocessed_sessions", "info", f"unavailable: {type(e).__name__}")
+
+
 def _check_tokenizer(root: Path) -> _Item:
     """M12: report active tokenizer + version (kiwi only)."""
     from pkm.search.tokenizer import detect_active, get_tokenizer
@@ -322,6 +389,8 @@ def register(app: typer.Typer) -> None:
         items.append(_check_tokenizer(root))
         items.append(_check_projects(root))
         items.append(_check_current_project(root))
+        items.append(_check_pkm_install())
+        items.append(_check_unprocessed_sessions(root))
         items.append(_check_model_cache())
         items.append(_check_git(root))
         items.append(_check_ai_cli())
@@ -347,8 +416,22 @@ def register(app: typer.Typer) -> None:
         any_bad = any(it.status in ("missing", "error") for it in items)
 
         # M12: under --strict, a pending migration surfaces as MIGRATION_PENDING
-        # in the JSON error envelope. Other failures stay as plain exit-1.
-        pending_migration = strict and schema_item is not None and schema_item.status == "missing"
+        # in the JSON error envelope. Migrations come first because they are a
+        # repo-level prerequisite for everything else.
+        pending_migration = (
+            strict and schema_item is not None and schema_item.status == "missing"
+        )
+
+        # M14: under --strict, a missing install (HOME-scoped) fires
+        # PKM_INSTALL_MISSING. Only relevant once migrations are applied; if both
+        # are pending, MIGRATION_PENDING wins.
+        install_item = next((it for it in items if it.name == "pkm_install"), None)
+        pending_install = (
+            strict
+            and not pending_migration
+            and install_item is not None
+            and install_item.status != "ok"
+        )
 
         if json_out:
             payload: dict[str, object] = {
@@ -368,9 +451,18 @@ def register(app: typer.Typer) -> None:
                 )
                 payload["ok"] = False
                 payload["error"] = err.to_dict()
+            elif pending_install:
+                from pkm.errors import PKMInstallMissing
+
+                err = PKMInstallMissing(
+                    install_item.detail or "claude-code: not installed",
+                    hint="run `pkm install --for claude-code --data-repo <path>`.",
+                )
+                payload["ok"] = False
+                payload["error"] = err.to_dict()
             typer.echo(json.dumps(payload, ensure_ascii=False))
         else:
             typer.echo(_render_human(items, system))
 
-        if strict and any_bad:
+        if strict and (any_bad or pending_install):
             raise typer.Exit(code=1)

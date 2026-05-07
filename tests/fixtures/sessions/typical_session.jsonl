@@ -1,0 +1,6 @@
+{"type":"user","content":"OAuth refresh token 어디 저장?","timestamp":"2026-05-07T14:00:00Z"}
+{"type":"assistant","content":"httpOnly secure cookie 권장.","timestamp":"2026-05-07T14:00:30Z"}
+{"type":"user","content":"localStorage 안 좋은 이유?","timestamp":"2026-05-07T14:01:00Z"}
+{"type":"assistant","content":"XSS 노출 위험.","timestamp":"2026-05-07T14:01:30Z"}
+{"type":"user","content":"좋아 cookie 로 가자","timestamp":"2026-05-07T14:02:00Z"}
+{"type":"assistant","content":"결정: refresh token 은 httpOnly cookie.","timestamp":"2026-05-07T14:02:30Z"}

@@ -1,0 +1,60 @@
+{"type": "user", "content": "인증 방식 뭐가 좋아?", "timestamp": "2026-05-07T14:00:00Z"}
+{"type": "assistant", "content": "JWT 또는 session cookie 권장.", "timestamp": "2026-05-07T14:00:30Z"}
+{"type": "user", "content": "JWT 장단점?", "timestamp": "2026-05-07T14:01:00Z"}
+{"type": "assistant", "content": "stateless지만 revoke 어려움.", "timestamp": "2026-05-07T14:01:30Z"}
+{"type": "user", "content": "refresh token 어디 저장?", "timestamp": "2026-05-07T14:02:00Z"}
+{"type": "assistant", "content": "httpOnly secure cookie 필수.", "timestamp": "2026-05-07T14:02:30Z"}
+{"type": "user", "content": "session vs token?", "timestamp": "2026-05-07T14:03:00Z"}
+{"type": "assistant", "content": "session은 서버 부하, token은 stateless.", "timestamp": "2026-05-07T14:03:30Z"}
+{"type": "user", "content": "CSRF 방어는?", "timestamp": "2026-05-07T14:04:00Z"}
+{"type": "assistant", "content": "SameSite=Strict 쿠키 사용.", "timestamp": "2026-05-07T14:04:30Z"}
+{"type": "user", "content": "httpOnly cookie 문제점?", "timestamp": "2026-05-07T14:05:00Z"}
+{"type": "assistant", "content": "CORS 설정 중요.", "timestamp": "2026-05-07T14:05:30Z"}
+{"type": "user", "content": "OAuth 2.0 flow 설명해줘", "timestamp": "2026-05-07T14:06:00Z"}
+{"type": "assistant", "content": "Authorization Code Flow 사용.", "timestamp": "2026-05-07T14:06:30Z"}
+{"type": "user", "content": "PKCE란?", "timestamp": "2026-05-07T14:07:00Z"}
+{"type": "assistant", "content": "code_challenge로 보안 강화.", "timestamp": "2026-05-07T14:07:30Z"}
+{"type": "user", "content": "Bearer token 어디에 넣어?", "timestamp": "2026-05-07T14:08:00Z"}
+{"type": "assistant", "content": "Authorization header 권장.", "timestamp": "2026-05-07T14:08:30Z"}
+{"type": "user", "content": "API gateway에서 인증 처리?", "timestamp": "2026-05-07T14:09:00Z"}
+{"type": "assistant", "content": "JWT 검증 후 라우팅.", "timestamp": "2026-05-07T14:09:30Z"}
+{"type": "user", "content": "SSO 구현 방법?", "timestamp": "2026-05-07T14:10:00Z"}
+{"type": "assistant", "content": "OAuth IdP 연동 필요.", "timestamp": "2026-05-07T14:10:30Z"}
+{"type": "user", "content": "SAML vs OAuth?", "timestamp": "2026-05-07T14:11:00Z"}
+{"type": "assistant", "content": "OAuth가 더 현대적.", "timestamp": "2026-05-07T14:11:30Z"}
+{"type": "user", "content": "토큰 만료 처리?", "timestamp": "2026-05-07T14:12:00Z"}
+{"type": "assistant", "content": "access token 짧게, refresh 길게.", "timestamp": "2026-05-07T14:12:30Z"}
+{"type": "user", "content": "silent refresh?", "timestamp": "2026-05-07T14:13:00Z"}
+{"type": "assistant", "content": "background에서 조용히 갱신.", "timestamp": "2026-05-07T14:13:30Z"}
+{"type": "user", "content": "rate limiting 어떻게?", "timestamp": "2026-05-07T14:14:00Z"}
+{"type": "assistant", "content": "sliding window 알고리즘.", "timestamp": "2026-05-07T14:14:30Z"}
+{"type": "user", "content": "2FA 구현?", "timestamp": "2026-05-07T14:15:00Z"}
+{"type": "assistant", "content": "TOTP 또는 WebAuthn.", "timestamp": "2026-05-07T14:15:30Z"}
+{"type": "user", "content": "WebAuthn이란?", "timestamp": "2026-05-07T14:16:00Z"}
+{"type": "assistant", "content": "FIDO2 기반 표준.", "timestamp": "2026-05-07T14:16:30Z"}
+{"type": "user", "content": "passkey vs password?", "timestamp": "2026-05-07T14:17:00Z"}
+{"type": "assistant", "content": "phishing resistant.", "timestamp": "2026-05-07T14:17:30Z"}
+{"type": "user", "content": "biometric 인증 안전?", "timestamp": "2026-05-07T14:18:00Z"}
+{"type": "assistant", "content": "서버에 저장, 클라이언트 토큰만.", "timestamp": "2026-05-07T14:18:30Z"}
+{"type": "user", "content": "인증 로그 어디 저장?", "timestamp": "2026-05-07T14:19:00Z"}
+{"type": "assistant", "content": "보안 감사 필수.", "timestamp": "2026-05-07T14:19:30Z"}
+{"type": "user", "content": "audit trail 필요해?", "timestamp": "2026-05-07T14:20:00Z"}
+{"type": "assistant", "content": "법적 요구사항 확인.", "timestamp": "2026-05-07T14:20:30Z"}
+{"type": "user", "content": "로그인 시도 제한?", "timestamp": "2026-05-07T14:21:00Z"}
+{"type": "assistant", "content": "5회 실패 후 잠금.", "timestamp": "2026-05-07T14:21:30Z"}
+{"type": "user", "content": "account lockout 정책?", "timestamp": "2026-05-07T14:22:00Z"}
+{"type": "assistant", "content": "점진적 지연 권장.", "timestamp": "2026-05-07T14:22:30Z"}
+{"type": "user", "content": "password hashing?", "timestamp": "2026-05-07T14:23:00Z"}
+{"type": "assistant", "content": "bcrypt 또는 argon2 사용.", "timestamp": "2026-05-07T14:23:30Z"}
+{"type": "user", "content": "bcrypt vs argon2?", "timestamp": "2026-05-07T14:24:00Z"}
+{"type": "assistant", "content": "argon2id 최신 권장.", "timestamp": "2026-05-07T14:24:30Z"}
+{"type": "user", "content": "salt 얼마나 필요?", "timestamp": "2026-05-07T14:25:00Z"}
+{"type": "assistant", "content": "unique per password.", "timestamp": "2026-05-07T14:25:30Z"}
+{"type": "user", "content": "pepper란?", "timestamp": "2026-05-07T14:26:00Z"}
+{"type": "assistant", "content": "서버 측 비밀 추가 강화.", "timestamp": "2026-05-07T14:26:30Z"}
+{"type": "user", "content": "key rotation?", "timestamp": "2026-05-07T14:27:00Z"}
+{"type": "assistant", "content": "정기 rotation 자동화.", "timestamp": "2026-05-07T14:27:30Z"}
+{"type": "user", "content": "secret management?", "timestamp": "2026-05-07T14:28:00Z"}
+{"type": "assistant", "content": "HashiCorp Vault 추천.", "timestamp": "2026-05-07T14:28:30Z"}
+{"type": "user", "content": "vault 사용법?", "timestamp": "2026-05-07T14:29:00Z"}
+{"type": "assistant", "content": "env var보다 안전.", "timestamp": "2026-05-07T14:29:30Z"}

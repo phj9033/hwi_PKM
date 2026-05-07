@@ -117,6 +117,18 @@ def _register_all() -> None:
 
     project_cmd.register(app)
 
+    from pkm.commands import session as session_cmd
+
+    session_cmd.register(app)
+
+    from pkm.commands import context as context_cmd
+
+    context_cmd.register(app)
+
+    from pkm.commands import install as install_cmd
+
+    install_cmd.register(app)
+
 
 _register_all()
 

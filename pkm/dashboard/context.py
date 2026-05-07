@@ -208,6 +208,8 @@ def _read_graph_config(root: Path) -> dict[str, Any]:
         "max_nodes": 1000,
         "include_writing": False,
         "include_captures": False,
+        "include_projects": True,
+        "project_filter": [],
         "overlay_suggestions": True,
     }
     cfg_path = root / ".pkm" / "config.toml"
@@ -236,6 +238,24 @@ def _seed_position(rel_path: str) -> tuple[int, int]:
     return x, y
 
 
+def _group_for(d: dict) -> str:
+    """Return a vis-network group string for a document row.
+
+    Wiki/writing/captures nodes keep ``bucket`` as their group so existing
+    graph.html palette assignments are unchanged.  Project-knowledge nodes get a
+    more-specific ``"projects/<category>"`` group so vis-network auto-allocates
+    distinct colours per knowledge category.
+    """
+    if d["bucket"] != "projects":
+        return d["bucket"]
+    parts = d["path"].split("/")
+    # data/projects/<id>/<category>/slug.md  → "projects/<category>"
+    if len(parts) >= 5:
+        return f"projects/{parts[3]}"
+    # data/projects/<id>/index.md  → "projects/index"
+    return "projects/index"
+
+
 def _read_graph_payload(root: Path) -> dict[str, Any] | None:
     """Build the graph payload (nodes/edges/stats/config) for the M10 graph page.
 
@@ -260,6 +280,8 @@ def _read_graph_payload(root: Path) -> dict[str, Any] | None:
             wanted_buckets.append("writing")
         if cfg.get("include_captures"):
             wanted_buckets.append("captures")
+        if cfg.get("include_projects"):
+            wanted_buckets.append("projects")
         placeholders = ",".join("?" for _ in wanted_buckets)
         rows = conn.execute(
             f"SELECT id, path, bucket, title, status FROM documents "
@@ -267,6 +289,27 @@ def _read_graph_payload(root: Path) -> dict[str, Any] | None:
             wanted_buckets,
         ).fetchall()
         docs = [dict(r) for r in rows]
+
+        # Apply project_filter whitelist
+        project_filter = cfg.get("project_filter") or []
+        if project_filter:
+            project_filter_set = set(project_filter)
+
+            def _project_id_for(path: str) -> str | None:
+                # data/projects/<id>/...
+                parts = path.split("/")
+                return (
+                    parts[2]
+                    if len(parts) >= 3 and parts[0] == "data" and parts[1] == "projects"
+                    else None
+                )
+
+            docs = [
+                d
+                for d in docs
+                if d["bucket"] != "projects"
+                or _project_id_for(d["path"]) in project_filter_set
+            ]
 
         cap = int(cfg["max_nodes"])
         trimmed = 0
@@ -291,7 +334,7 @@ def _read_graph_payload(root: Path) -> dict[str, Any] | None:
                 {
                     "id": d["path"],
                     "label": d["title"] or d["path"].rsplit("/", 1)[-1],
-                    "group": d["bucket"],
+                    "group": _group_for(d),
                     "x": x,
                     "y": y,
                 }

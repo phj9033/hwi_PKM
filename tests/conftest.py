@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import resource
+import subprocess
 import time
 
 import psutil
@@ -107,3 +108,104 @@ def _rss_guard():
         f"peak RSS {peak / (1024**3):.2f} GB exceeded §9.4 budget "
         f"{_RSS_BUDGET_BYTES / (1024**3):.0f} GB"
     )
+
+
+# ---------------------------------------------------------------------------
+# M13 Task 5 fixtures — project command testing
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def tmp_data_repo(tmp_path):
+    repo = tmp_path / "datarepo"
+    repo.mkdir()
+    (repo / "data" / "raw" / "captures").mkdir(parents=True)
+    (repo / "data" / "wiki" / "concepts").mkdir(parents=True)
+    (repo / "data" / "writing").mkdir(parents=True)
+    (repo / "data" / "projects").mkdir(parents=True)
+    (repo / ".pkm").mkdir()
+    (repo / ".pkm" / "config.toml").write_text("# scaffolded\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    return repo
+
+
+@pytest.fixture
+def tmp_code_repo(tmp_path):
+    repo = tmp_path / "code"
+    repo.mkdir()
+    return repo
+
+
+@pytest.fixture
+def tmp_code_repo_pair(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    return a, b
+
+
+# ---------------------------------------------------------------------------
+# M13 Task 8 fixtures — project search scope testing
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def tmp_indexed_data_repo(tmp_path, monkeypatch):
+    """Data repo with 1 wiki + 1 project knowledge file, both indexed."""
+    monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
+    repo = tmp_path / "indexed-datarepo"
+    repo.mkdir()
+    for sub in ("data/raw/captures", "data/wiki/concepts", "data/writing", "data/projects"):
+        (repo / sub).mkdir(parents=True)
+    (repo / ".pkm").mkdir()
+    (repo / ".pkm" / "config.toml").write_text("# scaffolded\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+
+    # Apply migrations so chunks has project/category/session_id columns
+    from typer.testing import CliRunner
+    from pkm.cli import app
+    runner = CliRunner()
+    runner.invoke(app, ["migrate", "--apply", "--root", str(repo)])
+
+    # Seed 1 wiki page
+    (repo / "data" / "wiki" / "concepts" / "oauth.md").write_text(
+        "---\nslug: oauth\ntitle: OAuth\nbucket: concepts\nstatus: active\n"
+        "lang: en\ncreated_at: 2026-05-07T00:00:00+09:00\n"
+        "updated_at: 2026-05-07T00:00:00+09:00\ntags: []\n---\n\n"
+        "OAuth refresh tokens — wiki overview.\n",
+        encoding="utf-8",
+    )
+
+    # Seed 1 project + 1 knowledge file
+    pdir = repo / "data" / "projects" / "demo"
+    for cat in ["decisions", "pitfalls", "snippets", "qna", "notes"]:
+        (pdir / cat).mkdir(parents=True)
+    (pdir / "index.md").write_text(
+        "---\nproject: demo\ngit_remotes:\n  - github.com:test/demo\n"
+        "created_at: 2026-05-07T00:00:00+09:00\ndata_repo_local_paths: []\n"
+        "---\n\n# demo\n",
+        encoding="utf-8",
+    )
+    (pdir / "decisions" / "2026-05-07-oauth-cookie.md").write_text(
+        "---\ntitle: OAuth in cookie\nslug: 2026-05-07-oauth-cookie\n"
+        "created_at: 2026-05-07T00:00:00+09:00\nstatus: reviewed\n"
+        "source_type: ai_session\nlang: en\nproject: demo\ncategory: decisions\n"
+        "tags: []\n---\n\n"
+        "OAuth refresh tokens stored in httpOnly cookies.\n",
+        encoding="utf-8",
+    )
+
+    # Build index
+    runner.invoke(app, ["reindex", "db", "--full", "--root", str(repo)])
+    return repo
+
+
+@pytest.fixture
+def tmp_unlinked_cwd(tmp_path):
+    """A directory that is NOT a git repo and won't resolve to any project."""
+    p = tmp_path / "unlinked-cwd"
+    p.mkdir()
+    return p

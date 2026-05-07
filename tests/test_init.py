@@ -108,3 +108,9 @@ def test_init_writes_indexing_tokenizer_section(tmp_path: Path):
     cfg = (tmp_path / ".pkm" / "config.toml").read_text(encoding="utf-8")
     assert "[indexing.tokenizer]" in cfg
     assert "preferred" in cfg
+
+
+def test_init_creates_projects_dir(tmp_path: Path):
+    result = runner.invoke(app, ["init", "--root", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "data" / "projects").is_dir()

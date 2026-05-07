@@ -1,12 +1,12 @@
 # 기능 상세 & 유즈케이스
 
-`pkm` CLI 의 기능을 6 레이어 → 명령 → 슬래시 커맨드 → 유즈케이스 순서로 설명한다. 디자인 사양 (`docs/superpowers/specs/2026-05-01-pkm-design.md`) 의 운영자용 발췌본.
+`pkm` CLI 의 기능을 7 레이어 → 명령 → 슬래시 커맨드 → 유즈케이스 순서로 설명한다. 디자인 사양 (`docs/superpowers/specs/2026-05-01-pkm-design.md`) 의 운영자용 발췌본.
 
 ---
 
-## 1. 6 레이어 개요
+## 1. 7 레이어 개요
 
-본 PKM 은 **사용자 요구 6 가지** 를 6 개의 레이어 (capture / chunks / wiki / writing / search / dashboard) 로 매핑한다. 각 레이어는 디렉토리 + frontmatter status 라이프사이클 + 결정론적 CLI 명령으로 구성된다.
+본 PKM 은 **사용자 요구 7 가지** 를 7 개의 레이어 (capture / chunks / wiki / writing / search / dashboard / projects) 로 매핑한다. 각 레이어는 디렉토리 + frontmatter status 라이프사이클 + 결정론적 CLI 명령으로 구성된다.
 
 | # | 레이어 | 디렉토리 | 사용자 요구 | 다루는 명령 |
 |---|---|---|---|---|
@@ -16,6 +16,7 @@
 | 4 | **Search / RAG** | (인덱스: `.pkm/index.db`) | 한국어 강한 하이브리드 검색 | `pkm search`, `pkm related`, `pkm reindex` |
 | 5 | **Writing** | `data/writing/` | AI 가 CLI 로 합성하는 워크스페이스 | `pkm write *`, `/write`, `/ask` |
 | 6 | **Dashboard** | `dashboard/` (gitignore) | 정적 HTML 8 페이지 | `pkm dashboard build`, `pkm bootstrap` |
+| 7 | **Projects** | `data/projects/<id>/` | 프로젝트별 노하우 (decisions/pitfalls/snippets/qna/notes) | `pkm project *` (M13) |
 
 ### 라이프사이클 게이트
 
@@ -95,14 +96,14 @@ pkm extract           <file> [--out PATH] [--json]           # PDF/HTML → mark
 ### 2.4 Index / Search
 
 ```bash
-pkm reindex db [<path>] [--full] [--scope wiki|raw|writing|all]
+pkm reindex db [<path>] [--full] [--scope wiki|raw|writing|all|projects]
                         [--low-memory] [--json]
                         # 기본: 증분 (content_hash 비교) — 변경분만 재임베딩
                         # <path> : 특정 파일/글롭만
                         # --full : 전부 재구축 (FTS5 + vec0 모두 drop & rebuild)
                         # --low-memory: batch=4, reranker 무로드
 
-pkm search <query> [-n N] [--scope wiki|raw|writing|all]
+pkm search <query> [-n N] [--scope wiki|raw|writing|all|projects|project[:<id>]]
                    [--expand]      # 옵트인 — AI CLI 셸아웃으로 쿼리확장
                    [--no-rerank]   # cross-encoder skip (빠른 모드)
                    [--with-related]# 각 hit 에 backlinks + 의미적 이웃 합성
@@ -117,6 +118,20 @@ pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]
 3. **RRF 융합** — `score = Σ 1/(k + rank)` (k=60). top-30 후보.
 4. **재랭킹** (`--no-rerank` 미지정 시) — bge-reranker-v2-m3 cross-encoder.
 5. **top-K** + 모든 점수 노출 (`--explain`).
+
+**Search scope (M13 추가):**
+
+| `--scope` 값 | 검색 범위 |
+| --- | --- |
+| `wiki` | `data/wiki/**` (기본 — cwd 가 미등록 프로젝트일 때) |
+| `raw` | `data/raw/**` |
+| `writing` | `data/writing/**` |
+| `all` | 전체 데이터 repo |
+| `projects` | `data/projects/**` 전체 |
+| `project:<id>` | 특정 프로젝트 (`chunks.project = <id>` 컬럼 필터) |
+| `project` | cwd resolver 로 식별된 현재 프로젝트 (NOT_LINKED 면 hard-fail) |
+
+**Default scope 변경 (M13):** cwd 가 등록된 프로젝트면 `project:<id>`; 아니면 종전대로 `wiki`.
 
 **토크나이저 (M12):** BM25 인덱싱은 토크나이저 어댑터(`pkm.search.tokenizer`)를 통해 분기한다. V1 (schema_version=1) = FTS5 trigram. M12 마이그레이션 (`m002_kiwi_tokenizer`) 적용 후 (schema_version≥2) = Kiwi 형태소 분석기로 사전 토큰화 + FTS5 `unicode61`. 한국어 BM25 recall 향상 목적. `[korean]` extra 미설치 시 m002 는 silently skip 되고 trigram 으로 유지된다. 토크나이저 상태는 `pkm doctor` 의 `tokenizer` 행에서 확인.
 
@@ -209,6 +224,11 @@ pkm lint [--fix] [--errors-only] [--json]
 | `CITATION_NOT_DERIVED` | warning (M11) | writing body 의 인용이 frontmatter `derived_from` 에 없음 — promote 시 hard gate | — |
 | `DERIVED_NOT_CITED` | warning (M11) | `derived_from` 의 path 가 body 에서 한 번도 인용되지 않음 — promote 시 hard gate | — |
 | `UNGROUNDED_WRITING` | warning (M11) | body ≥ 400 자인데 인용 0 개. `purpose: essay` / `grounding_exempt: true` 로만 면제 | — |
+| `MISSING_PROJECT_FIELD` | error (M13) | `data/projects/<id>/<cat>/x.md` frontmatter `project` 누락 또는 path 와 불일치 | ✅ path → frontmatter |
+| `INVALID_CATEGORY` | error (M13) | `category` 값이 {decisions, pitfalls, snippets, qna, notes} 외 | — |
+| `CATEGORY_PATH_MISMATCH` | error (M13) | path 의 카테고리 디렉토리와 frontmatter `category` 불일치 | ✅ path → frontmatter |
+| `ORPHAN_PROJECT_DIR` | error (M13) | `data/projects/<id>/` 에 `index.md` 없음 또는 `git_remotes` 비어있음 | — |
+| `SIMILAR_KNOWLEDGE_CANDIDATE` | warning (M13) | 두 프로젝트 노하우 항목의 코사인 유사도 ≥ 0.92 | — |
 
 `--errors-only` 는 warning 을 숨기고 error 만으로 exit 게이트 — CI/pre-commit 용.
 
@@ -227,7 +247,14 @@ pkm dashboard build [--out PATH]    # 기본 ./dashboard/. 단일 명령으로 9
 - `status.html` — `pkm doctor --json` 렌더 + 마스킹된 config + 권한 모드
 - `graph.html` — wiki 링크 그래프 (vis-network) + MISSING_LINK_CANDIDATE 제안 오버레이. 노드 색=bucket, 점선=`derived_from`, 빨간 점선=suggested. 체크박스로 엣지 종류 토글, 슬러그 부분 일치 검색, 노드 클릭 시 incoming/outgoing/suggested 사이드바.
   - 결정론: 노드 초기 좌표는 `sha256(path)` 시드 — 같은 corpus 면 같은 좌표.
-  - 컨피그: `[dashboard.graph]` (`max_nodes=1000`, `include_writing=false`, `include_captures=false`, `overlay_suggestions=true`). 노드 수 cap 초과 시 connectivity 낮은 노드부터 drop, `stats.trimmed` 에 카운트.
+  - 컨피그: `[dashboard.graph]` (`max_nodes=1000`, `include_writing=false`, `include_captures=false`, `overlay_suggestions=true`, `include_projects=true`, `project_filter=[]`). 노드 수 cap 초과 시 connectivity 낮은 노드부터 drop, `stats.trimmed` 에 카운트.
+  - M13 신규 config 키:
+    ```toml
+    [dashboard.graph]
+    include_projects = true     # 프로젝트 노하우 노드 포함 (M13)
+    project_filter = []         # 빈 리스트 = 전체; 특정 id 만 화이트리스트
+    ```
+    프로젝트 노드는 카테고리별 vis-network group (`projects/decisions`, `projects/pitfalls`, ...) 으로 구분 색상 표시.
   - 인덱스(`.pkm/index.db`) 가 없으면 unavailable 카드 렌더.
 
 빌드 트리거는 수동 (`pkm dashboard build`) — 자동화하려면 git post-commit 훅. `dashboard/` 는 gitignore.
@@ -272,6 +299,29 @@ pkm migrate --apply                                      # text_tokenized 컬럼
 pkm reindex db --full                                    # 새 토크나이저로 재인덱싱
 pkm doctor                                               # tokenizer: kiwi (...)
 ```
+
+### 2.11 Projects (M13)
+
+`pkm project` 명령은 프로젝트별 노하우 (decisions / pitfalls / snippets / qna / notes) 를 데이터 repo 의 `data/projects/<id>/` 아래에 별도 레이어로 보관한다. 코드 레포 cwd 에서 `pkm project link` 로 프로젝트를 등록하면 git remote 정규화 (SSH/HTTPS 모두 같은 형태) 로 PC 간 동일성이 자동 매칭된다.
+
+| 명령 | 설명 |
+| --- | --- |
+| `pkm project link --id <slug>` | cwd 의 git remote 를 새 프로젝트로 등록 (멱등 — 이미 등록된 remote 는 ALREADY_LINKED, exit 0) |
+| `pkm project current` | cwd → project_id 5단계 resolver (env / overrides / git remote / data_repo_local_paths / NOT_LINKED) |
+| `pkm project list` | 등록된 프로젝트 목록 + knowledge 카운트 |
+| `pkm project show <id>` | 프로젝트별 카테고리 카운트 |
+| `pkm project rebuild-index <id>` | `data/projects/<id>/index.md` 결정론적 재생성 |
+| `pkm project rm <id> [--keep-data]` | 프로젝트 제거 (기본 archived/projects/<id>/ 로 이동, --keep-data 면 index 만 삭제) |
+| `pkm project knowledge add --project <id> --category <cat> --slug <s> --title <t>` | 새 노하우 markdown 작성 (stdin = 본문) |
+
+**Resolver 우선순위 (`pkm project current` 와 `--scope project` 가 사용):**
+1. `PKM_PROJECT` 환경 변수 (1회용 override)
+2. `.pkm/config.local.toml` `[project_overrides]` cwd 매치 (PC 별 override)
+3. cwd 의 git remote 정규화 → frontmatter `git_remotes` 매치 (SoT)
+4. cwd 경로 → frontmatter `data_repo_local_paths` 매치 (드문 fallback)
+5. None → `NOT_LINKED`
+
+**Schema (m003):** `chunks` 테이블에 `project`, `category`, `session_id` 컬럼이 추가됨. 기존 wiki/raw/writing 행은 NULL → 기본 검색 결과가 V2 와 호환된다.
 
 ---
 

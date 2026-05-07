@@ -23,6 +23,7 @@ _DIRS = [
     "data/wiki/notes",
     "data/wiki/reports",
     "data/writing",
+    "data/projects",
     "data/style",
     ".pkm",
     ".claude/commands",

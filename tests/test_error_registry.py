@@ -23,7 +23,9 @@ from pkm.errors import (
     EMBED_MODEL_MISSING,  # noqa: F401
     EXPAND_FAILED,  # noqa: F401
     RERANK_MODEL_MISSING,  # noqa: F401
+    PKMAlreadyLinked,
     PKMBootstrapStepFailed,
+    PKMCategoryPathMismatch,
     PKMCitationNotDerived,
     PKMConfigError,
     PKMDemoteToWritingNotYet,
@@ -32,13 +34,22 @@ from pkm.errors import (
     PKMError,
     PKMExpandFailed,
     PKMIndexMissing,
+    PKMInfoError,
+    PKMInvalidCategory,
+    PKMInvalidProjectId,
     PKMMigrationFailed,
     PKMMigrationPending,
+    PKMMissingProjectField,
+    PKMNotAGitRepo,
     PKMNotFoundError,
     PKMNotImplementedError,
+    PKMNotLinked,
+    PKMOrphanProjectDir,
+    PKMProjectIdConflict,
     PKMPromoteFromWritingNotYet,
     PKMRerankModelMissing,
     PKMSampleInsufficientWiki,
+    PKMSimilarKnowledgeCandidate,
     PKMStateError,
     PKMStatusError,
     PKMUngroundedWriting,
@@ -90,6 +101,48 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
     "MIGRATION_PENDING": lambda: PKMMigrationPending(
         "schema_version 1 < latest 2",
         hint="run `pkm migrate --apply`.",
+    ),
+    # M13 additions
+    "PKM_INFO_ERROR": lambda: PKMInfoError("info message"),
+    "NOT_A_GIT_REPO": lambda: PKMNotAGitRepo(
+        "not inside a git repository",
+        hint="run from within a git repo or pass --allow-no-remote.",
+    ),
+    "ALREADY_LINKED": lambda: PKMAlreadyLinked(
+        "remote already linked to project hwi-pkm",
+        hint="nothing to do — this remote is already registered.",
+    ),
+    "NOT_LINKED": lambda: PKMNotLinked(
+        "cwd is not inside any registered project",
+        hint="run `pkm project link` to register this repo.",
+    ),
+    "PROJECT_ID_CONFLICT": lambda: PKMProjectIdConflict(
+        "project id 'x' is already in use",
+        hint="choose a different --id or remove the existing project first.",
+    ),
+    "INVALID_PROJECT_ID": lambda: PKMInvalidProjectId(
+        "project id 'Bad Slug!' contains invalid characters",
+        hint="use only lowercase letters, digits, and hyphens.",
+    ),
+    "MISSING_PROJECT_FIELD": lambda: PKMMissingProjectField(
+        "file missing required 'project' frontmatter field",
+        hint="add 'project: <id>' to the frontmatter.",
+    ),
+    "INVALID_CATEGORY": lambda: PKMInvalidCategory(
+        "category 'nope' is not valid",
+        hint="use one of: decisions, pitfalls, snippets, qna, notes.",
+    ),
+    "CATEGORY_PATH_MISMATCH": lambda: PKMCategoryPathMismatch(
+        "file is in 'decisions/' but frontmatter says category: pitfalls",
+        hint="move the file to the correct directory or fix the frontmatter.",
+    ),
+    "ORPHAN_PROJECT_DIR": lambda: PKMOrphanProjectDir(
+        "data/projects/orphaned has no index.md",
+        hint="create an index.md or remove the directory.",
+    ),
+    "SIMILAR_KNOWLEDGE_CANDIDATE": lambda: PKMSimilarKnowledgeCandidate(
+        "two knowledge items have similarity >= 0.92",
+        hint="review and merge or differentiate the similar items.",
     ),
 }
 

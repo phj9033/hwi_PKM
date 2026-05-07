@@ -17,9 +17,10 @@ def _init_pkm(tmp_path: Path) -> None:
 
 
 def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
-    """Full initialization: init + reindex + model cache stub for M3 items."""
+    """Full initialization: init + migrate + reindex + model cache stub for M3+ items."""
     monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
     runner.invoke(app, ["init", "--root", str(tmp_path)])
+    runner.invoke(app, ["migrate", "--apply", "--root", str(tmp_path)])
     runner.invoke(app, ["reindex", "db", "--full", "--root", str(tmp_path)])
     # Seed the HF standard cache layout so `pkm.store.model_cache.is_cached`
     # treats bge-m3 as present (mirrors what `snapshot_download` writes).
@@ -108,6 +109,26 @@ def test_doctor_shows_tokenizer(tmp_path: Path):
     payload = json.loads(res.output)
     names = [it["name"] for it in payload["items"]]
     assert "tokenizer" in names
+
+
+def test_doctor_includes_projects_row(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    names = [item["name"] for item in payload["items"]]
+    assert "projects" in names
+    assert "current_project" in names
+
+
+def test_doctor_projects_row_zero_when_empty(tmp_path: Path):
+    runner.invoke(app, ["init", "--root", str(tmp_path)])
+    result = runner.invoke(app, ["doctor", "--root", str(tmp_path), "--json"])
+    payload = json.loads(result.output)
+    proj_row = next(it for it in payload["items"] if it["name"] == "projects")
+    assert "0 linked" in proj_row.get("detail", "")
+    cur_row = next(it for it in payload["items"] if it["name"] == "current_project")
+    assert cur_row["status"] in ("info", "ok")  # info if not linked, ok if cwd happens to resolve
 
 
 def test_doctor_strict_fails_on_pending_migration(tmp_path: Path):

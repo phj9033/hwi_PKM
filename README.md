@@ -66,6 +66,7 @@ open dashboard/index.html
 | Dashboard | `pkm dashboard build [--out PATH]` (생성물: `index/captures/chunks/wiki/writing/search/help/status/graph` HTML) |
 | Bench | `pkm bench [--docs N=100] [--real] [--json]` (M7) |
 | Migrate | `pkm migrate [--check] [--apply] [--json]` (M12 — 스키마 버전 마이그레이션) |
+| Project | `pkm project {link,list,current,show,rebuild-index,rm}`, `pkm project knowledge add` (M13 — 프로젝트별 노하우) |
 | Log | `pkm log` |
 
 `pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` (`/blog --random` 으로 랜덤 wiki 카드 시드 초안 생성) — Claude Code 세션에서 바로 사용 가능.
@@ -114,7 +115,8 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [x] M7 — Hardening (V1 GA, 태그 `m7-hardening`)
 - [ ] M10 — Graph Surfacing (in progress)
 - [ ] M11 — Writing Grounding (in progress)
-- [ ] M12 — Migration Infra + Kiwi (in progress)
+- [x] M12 — Migration Infra + Kiwi
+- [x] M13 — Project Scope Foundation
 
 기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
 

@@ -52,6 +52,9 @@ DEFERRED_CODES: dict[str, str] = {
     # The plan defers these — the writing-side promote/demote is V2 work.
     "PROMOTE_FROM_WRITING_NOT_YET": "writing → wiki promotion is V2 (spec §9)",
     "DEMOTE_TO_WRITING_NOT_YET": "wiki → writing demotion is V2 (spec §9)",
+    # PKMInfoError is a base class; only its concrete subclasses (e.g. ALREADY_LINKED)
+    # are raised directly.
+    "PKM_INFO_ERROR": "base class — V1 raisers always pick a concrete info subclass",
 }
 
 
@@ -342,8 +345,136 @@ def _scenario_index_missing(repo: Path) -> list[str]:
     return ["wiki", "suggest", "demo", "--json"]
 
 
+def _seed_test_project(repo: Path, pid: str = "hwi-pkm") -> None:
+    """Create data/projects/<pid>/ with valid index.md frontmatter."""
+    pdir = repo / "data" / "projects" / pid
+    (pdir / "decisions").mkdir(parents=True, exist_ok=True)
+    (pdir / "pitfalls").mkdir(parents=True, exist_ok=True)
+    idx = pdir / "index.md"
+    idx.write_text(
+        "---\n"
+        f"project: {pid}\n"
+        "git_remotes:\n  - github.com:test/test\n"
+        "created_at: 2026-05-07T00:00:00+09:00\n"
+        "data_repo_local_paths: []\n"
+        "---\n\n# " + pid + "\n",
+        encoding="utf-8",
+    )
+
+
+def _scenario_not_a_git_repo(repo: Path) -> list[str]:
+    return ["project", "link", "--id", "x", "--json"]
+
+
+def _scenario_already_linked(repo: Path) -> list[str]:
+    _seed_test_project(repo, "hwi-pkm")
+    # Subsequent link with same remote → ALREADY_LINKED. We pass --remote to bypass git discovery.
+    return ["project", "link", "--id", "hwi-pkm", "--remote", "github.com:test/test", "--allow-no-remote", "--json"]
+
+
+def _scenario_not_linked(repo: Path) -> list[str]:
+    return ["project", "current", "--json"]
+
+
+def _scenario_project_id_conflict(repo: Path) -> list[str]:
+    _seed_test_project(repo, "x")
+    return ["project", "link", "--id", "x", "--remote", "github.com:other/other", "--allow-no-remote", "--json"]
+
+
+def _scenario_invalid_project_id(repo: Path) -> list[str]:
+    return ["project", "link", "--id", "Bad Slug!", "--remote", "github.com:t/t", "--allow-no-remote", "--json"]
+
+
+def _scenario_missing_project_field(repo: Path) -> list[str]:
+    _seed_test_project(repo, "x")
+    bad = repo / "data" / "projects" / "x" / "decisions" / "missing.md"
+    bad.write_text(
+        "---\n"
+        "title: bad\nslug: 2026-05-07-bad\ncreated_at: 2026-05-07T00:00:00+09:00\n"
+        "status: draft\nsource_type: manual\nlang: ko\ncategory: decisions\n"
+        "---\n\nbody\n",
+        encoding="utf-8",
+    )
+    return ["lint", "--errors-only", "--json"]
+
+
+def _scenario_invalid_category(repo: Path) -> list[str]:
+    _seed_test_project(repo, "x")
+    bad = repo / "data" / "projects" / "x" / "decisions" / "bad-cat.md"
+    bad.write_text(
+        "---\n"
+        "title: bad\nslug: 2026-05-07-bad-cat\ncreated_at: 2026-05-07T00:00:00+09:00\n"
+        "status: draft\nsource_type: manual\nlang: ko\nproject: x\ncategory: nope\n"
+        "---\n\nbody\n",
+        encoding="utf-8",
+    )
+    return ["lint", "--errors-only", "--json"]
+
+
+def _scenario_category_path_mismatch(repo: Path) -> list[str]:
+    _seed_test_project(repo, "x")
+    bad = repo / "data" / "projects" / "x" / "decisions" / "wrong.md"
+    bad.write_text(
+        "---\n"
+        "title: bad\nslug: 2026-05-07-wrong\ncreated_at: 2026-05-07T00:00:00+09:00\n"
+        "status: draft\nsource_type: manual\nlang: ko\nproject: x\ncategory: pitfalls\n"
+        "---\n\nbody\n",
+        encoding="utf-8",
+    )
+    return ["lint", "--errors-only", "--json"]
+
+
+def _scenario_orphan_project_dir(repo: Path) -> list[str]:
+    pdir = repo / "data" / "projects" / "orphaned"
+    (pdir / "decisions").mkdir(parents=True, exist_ok=True)
+    # No index.md → orphan
+    return ["lint", "--json"]
+
+
+def _scenario_similar_knowledge_candidate(repo: Path) -> list[str]:
+    _seed_test_project(repo, "x")
+    base_fm = (
+        "---\ntitle: oauth refresh token storage\n"
+        "slug: 2026-05-07-oauth-refresh\ncreated_at: 2026-05-07T00:00:00+09:00\n"
+        "status: reviewed\nsource_type: manual\nlang: en\nproject: x\ncategory: decisions\n---\n\n"
+    )
+    body = "Store OAuth refresh tokens in httpOnly cookies with secure flag and SameSite=Strict.\n"
+    (repo / "data" / "projects" / "x" / "decisions" / "a.md").write_text(
+        base_fm.replace("oauth-refresh", "a") + body, encoding="utf-8"
+    )
+    (repo / "data" / "projects" / "x" / "decisions" / "b.md").write_text(
+        base_fm.replace("oauth-refresh", "b") + body, encoding="utf-8"
+    )
+    # Run migrate + reindex synchronously so docs_vec is populated for the lint warning.
+    env = _base_env()
+    subprocess.run(
+        [sys.executable, "-m", "pkm", "migrate", "--apply"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "pkm", "reindex", "db", "--full"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+    return ["lint", "--json"]
+
+
+# Codes whose expected exit code is 0 (info outcomes, not failures).
+INFO_CODES: frozenset[str] = frozenset(
+    code
+    for code, cls in all_error_codes().items()
+    if getattr(cls, "exit_code", 1) == 0
+)
+
+
 SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "PKM_ERROR": _scenario_pkm_error,
+    "PKM_INFO_ERROR": _scenario_pkm_error,  # base class — deferred like PKM_ERROR
     "CONFIG_ERROR": _scenario_config_error,
     "VALIDATION_ERROR": _scenario_validation_error,
     "STATE_ERROR": _scenario_state_error,
@@ -364,6 +495,19 @@ SCENARIOS: dict[str, Callable[[Path], list[str]]] = {
     "MIGRATION_FAILED": _scenario_migration_failed,
     "MIGRATION_PENDING": _scenario_migration_pending,
 }
+
+SCENARIOS.update({
+    "NOT_A_GIT_REPO":               _scenario_not_a_git_repo,
+    "ALREADY_LINKED":               _scenario_already_linked,
+    "NOT_LINKED":                   _scenario_not_linked,
+    "PROJECT_ID_CONFLICT":          _scenario_project_id_conflict,
+    "INVALID_PROJECT_ID":           _scenario_invalid_project_id,
+    "MISSING_PROJECT_FIELD":        _scenario_missing_project_field,
+    "INVALID_CATEGORY":             _scenario_invalid_category,
+    "CATEGORY_PATH_MISMATCH":       _scenario_category_path_mismatch,
+    "ORPHAN_PROJECT_DIR":           _scenario_orphan_project_dir,
+    "SIMILAR_KNOWLEDGE_CANDIDATE":  _scenario_similar_knowledge_candidate,
+})
 
 
 # Per-scenario env overrides (merged on top of `_base_env()`).
@@ -439,11 +583,13 @@ def test_code_is_reachable(code: str, tmp_path: Path) -> None:
         timeout=30,
     )
 
-    assert proc.returncode != 0, (
-        f"{code}: exit was 0\nstdout={proc.stdout!r}\nstderr={proc.stderr!r}"
+    expected_exit = 0 if code in INFO_CODES else 1
+    assert proc.returncode == expected_exit, (
+        f"{code}: expected exit {expected_exit}, got {proc.returncode}\n"
+        f"stdout={proc.stdout!r}\nstderr={proc.stderr!r}"
     )
 
-    if "--json" in argv:
+    if "--json" in argv and code not in INFO_CODES:
         # Spec §3.1 failure JSON shape:
         # {"ok": false, "error": {"code": ..., "message": ..., "hint": ...}}
         last = proc.stdout.strip().splitlines()[-1]
@@ -453,10 +599,11 @@ def test_code_is_reachable(code: str, tmp_path: Path) -> None:
         assert err.get("code") == code, f"{code}: --json error.code mismatch: {err!r}"
         assert "message" in err, f"{code}: --json error missing message: {err!r}"
         assert "hint" in err, f"{code}: --json error missing hint: {err!r}"
-    else:
+    elif "--json" not in argv and code not in INFO_CODES:
         assert f"Error [{code}]" in proc.stderr, (
             f"{code}: stderr did not contain `Error [{code}]:`\nstderr={proc.stderr!r}"
         )
+    # info-code rendering (stdout vs stderr, JSON vs plain-text) is a Task 5 design call
 
 
 @pytest.mark.parametrize("code", sorted(DEFERRED_CODES))

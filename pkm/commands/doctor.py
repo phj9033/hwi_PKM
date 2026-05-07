@@ -147,6 +147,34 @@ def _check_model_cache() -> _Item:
     return _Item("bge-m3", "missing", "run: pkm doctor --download")
 
 
+def _check_projects(repo: Path) -> _Item:
+    from pkm.session.registry import ProjectIndex
+
+    try:
+        idx = ProjectIndex.load(repo)
+    except Exception as e:  # noqa: BLE001
+        return _Item("projects", "error", f"failed to load: {e}")
+    n = len(idx.records)
+    remotes = sum(len(r.git_remotes) for r in idx.records)
+    return _Item("projects", "ok", f"{n} linked, {remotes} remotes")
+
+
+def _check_current_project(repo: Path) -> _Item:
+    from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+    try:
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        pid = resolve_project_id(Path.cwd(), project_index=idx, local_overrides=ovs)
+    except Exception as e:  # noqa: BLE001
+        return _Item("current_project", "error", f"resolve failed: {e}")
+    return _Item(
+        "current_project",
+        "ok" if pid else "info",
+        pid or "not_linked",
+    )
+
+
 def _check_schema_version(root: Path) -> _Item:
     """M12: report schema_version (current/latest). Missing if below latest."""
     from pkm.store.index_db import connect
@@ -214,7 +242,7 @@ def _render_human(items: list[_Item], system: dict[str, object]) -> str:
     lines: list[str] = []
     lines.append("[ Doctor ]")
     for it in items:
-        marker = {"ok": "✓", "missing": "✗", "error": "!", "optional": "~"}[it.status]
+        marker = {"ok": "✓", "missing": "✗", "error": "!", "optional": "~", "info": "i"}.get(it.status, "?")
         detail = f"  {it.detail}" if it.detail else ""
         lines.append(f"  {marker} {it.name:<30} {it.status.upper()}{detail}")
     lines.append("")
@@ -248,8 +276,23 @@ def register(app: typer.Typer) -> None:
             "--download",
             help="Fetch missing models (BAAI/bge-m3) into the cache.",
         ),
+        acknowledge_release_notes: bool = typer.Option(
+            False,
+            "--acknowledge-release-notes",
+            hidden=True,
+            help="Silence the M13.8 search-default release note.",
+        ),
     ) -> None:
         """Report PKM environment & structure status."""
+        if acknowledge_release_notes:
+            marker = root / ".pkm" / "release_notes_acknowledged"
+            marker.touch()
+            if json_out:
+                typer.echo(json.dumps({"ok": True, "acknowledged": True}, ensure_ascii=False))
+            else:
+                typer.echo("Release notes acknowledged.")
+            return
+
         if download:
             from pkm.store.model_cache import cache_dir, download_models
 
@@ -277,16 +320,34 @@ def register(app: typer.Typer) -> None:
         items.append(_check_index_db(root))
         items.append(_check_schema_version(root))
         items.append(_check_tokenizer(root))
+        items.append(_check_projects(root))
+        items.append(_check_current_project(root))
         items.append(_check_model_cache())
         items.append(_check_git(root))
         items.append(_check_ai_cli())
         system = _system_info()
 
+        # M13.8: release-note row (info status — does NOT fail strict mode).
+        schema_item = next((it for it in items if it.name == "schema_version"), None)
+        schema_version_value = 0
+        if schema_item is not None and schema_item.detail:
+            try:
+                schema_version_value = int(schema_item.detail.split("/")[0])
+            except (ValueError, IndexError):
+                pass
+        release_note_marker = root / ".pkm" / "release_notes_acknowledged"
+        if schema_version_value >= 3 and not release_note_marker.exists():
+            items.append(_Item(
+                "release_notes",
+                "info",
+                "Search default changed when cwd is linked: project:<id>. "
+                "Use --scope all to override. Run `pkm doctor --acknowledge-release-notes` to silence.",
+            ))
+
         any_bad = any(it.status in ("missing", "error") for it in items)
 
         # M12: under --strict, a pending migration surfaces as MIGRATION_PENDING
         # in the JSON error envelope. Other failures stay as plain exit-1.
-        schema_item = next((it for it in items if it.name == "schema_version"), None)
         pending_migration = strict and schema_item is not None and schema_item.status == "missing"
 
         if json_out:

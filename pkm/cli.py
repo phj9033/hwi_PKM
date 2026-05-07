@@ -113,6 +113,10 @@ def _register_all() -> None:
 
     migrate_cmd.register(app)
 
+    from pkm.commands import project as project_cmd
+
+    project_cmd.register(app)
+
 
 _register_all()
 
@@ -122,10 +126,17 @@ def main() -> None:
     try:
         app()
     except PKMError as e:
-        typer.echo(f"Error [{e.code}]: {e.message}", err=True)
-        if e.hint:
-            typer.echo(f"  hint: {e.hint}", err=True)
-        sys.exit(1)
+        exit_code = getattr(e, "exit_code", 1)
+        if exit_code == 0:
+            # Info-level outcome: emit to stdout with [INFO] prefix, exit 0.
+            typer.echo(f"[INFO] [{e.code}]: {e.message}")
+            if e.hint:
+                typer.echo(f"  hint: {e.hint}")
+        else:
+            typer.echo(f"Error [{e.code}]: {e.message}", err=True)
+            if e.hint:
+                typer.echo(f"  hint: {e.hint}", err=True)
+        sys.exit(exit_code)
 
 
 if __name__ == "__main__":

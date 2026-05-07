@@ -18,6 +18,7 @@ Look at the args:
 
 - If args contain the literal token `--random`: go to **Random mode** (R1 onwards).
 - Else: go to **Topic mode** (T1 onwards) with the args as the topic string.
+- Args may also include `--style <name>` (or `--style <name1>,<name2>`). When present, skip `--scope style` retrieval (T1) / the all-styles glob (R2) and instead read every `.md` under `data/style/<name>/` for each listed name. If any name has no directory, print available styles (`ls -d data/style/*/`) and STOP.
 
 ---
 
@@ -33,7 +34,9 @@ pkm search "<주제>" --scope style   -n 3 --json --root .
 
 Read every returned `path` (Read tool, full body).
 
-**T2. Cold-start check.** If `pkm search ... --scope style` returns 0 hits AND `data/style/` is empty, print: `스타일 샘플이 없어 중립적인 한국어 블로그 톤으로 진행합니다. /style-import 로 샘플을 추가할 수 있어요.` Continue with neutral tone.
+When `--style <name>` is in the args, skip the `--scope style` search above and instead read every `.md` under `data/style/<name>/` for each listed name (e.g., `ls data/style/<name>/*.md`) and Read each path.
+
+**T2. Cold-start check.** If `pkm search ... --scope style` returns 0 hits AND `ls -d data/style/*/ 2>/dev/null` is empty (no style directories), print: `스타일 샘플이 없어 중립적인 한국어 블로그 톤으로 진행합니다. /style-import 로 샘플을 추가할 수 있어요.` Continue with neutral tone.
 
 **T3. Outline.** Compose and show the user:
 
@@ -47,7 +50,7 @@ Wait for user approval / edits to the outline.
 
 **T4. Draft.** With user-approved outline:
 
-- Match the *tone, sentence length, paragraph density, and headline conventions* of the retrieved style samples (top-3 from `--scope style`). Do NOT copy phrasing — match cadence and structure.
+- Match the *tone, sentence length, paragraph density, and headline conventions* of the retrieved style samples (top-3 from `--scope style` (or the explicit `--style` selection if provided)). Do NOT copy phrasing — match cadence and structure.
 - Each section follows the outline's 핵심 메시지 + draws facts/examples from cited wiki/raw paths.
 - **Citation contract:** at the end of the post, add `## 참고 / Sources` listing every wiki/raw path used + any external URLs from style samples' `source_url`. Format:
 
@@ -99,7 +102,7 @@ If `constraint_relaxed: true`, prepend this note when showing the outline in R3:
 
 Read every returned `path` (Read tool, full body).
 
-**R2. Style retrieval.** Glob `data/style/*.md` (Bash: `ls data/style/*.md 2>/dev/null` or Glob tool). Read each. If empty, print: `스타일 샘플이 없어 중립적인 한국어 블로그 톤으로 진행합니다. /style-import 로 샘플을 추가할 수 있어요.` Continue with neutral tone.
+**R2. Style retrieval.** Glob `data/style/*/*.md` (Bash: `ls data/style/*/*.md 2>/dev/null` or Glob tool). If `--style <name>[,<name2>]` was passed, glob only `data/style/<name>/*.md` for each listed name. Read each. If no files match, print: `스타일 샘플이 없어 중립적인 한국어 블로그 톤으로 진행합니다. /style-import 로 샘플을 추가할 수 있어요.` Continue with neutral tone.
 
 **R3. Outline.** Compose and show the user (same shape as Topic mode):
 

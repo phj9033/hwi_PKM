@@ -87,11 +87,17 @@ def apply(conn: sqlite3.Connection) -> dict:
 
 def _rebuild_fts(conn: sqlite3.Connection) -> None:
     """Create the new content-table form of chunks_fts and populate it via FTS5
-    'rebuild' from `chunks.text_tokenized`."""
+    'rebuild' from `chunks.text_tokenized`.
+
+    The pre-m002 schema declared a `title UNINDEXED` column for chunks_fts,
+    but it was never populated (V1 used contentless FTS5) and never read
+    (search/bm25.py + reindex.py only touch `text` / rowid). Carrying it
+    into the post-m002 external-content form would make `'rebuild'` try to
+    read `chunks.title`, which does not exist (title lives on `documents`).
+    """
     conn.execute(
         "CREATE VIRTUAL TABLE chunks_fts USING fts5("
         "  text_tokenized,"
-        "  title UNINDEXED,"
         "  content=chunks,"
         "  content_rowid=id,"
         "  tokenize='unicode61'"

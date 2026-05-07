@@ -1,6 +1,6 @@
 """Lint rules — pure detection (no mutation).
 
-13 rules: 6 errors + 7 warnings. Each returns Iterator[LintFinding]. The
+14 rules: 7 errors + 7 warnings. Each returns Iterator[LintFinding]. The
 CLI orchestrator (commands/lint.py) calls `collect_findings(root)`.
 
 Spec reference: §6.5.
@@ -260,6 +260,22 @@ def _orphan_promoted_source(root: Path, snap: _Snapshot) -> Iterator[LintFinding
             )
 
 
+def _style_flat_file(snap: _Snapshot) -> Iterator[LintFinding]:
+    """Reject markdown files outside data/style/<style>/<sample>.md (wrong nesting depth)."""
+    for d in snap.docs:
+        if d.kind != "style":
+            continue
+        # Valid path: exactly data/style/<style>/<sample>.md → 4 parts.
+        parts = d.rel.split("/")
+        if len(parts) != 4:
+            yield LintFinding(
+                "STYLE_FLAT_FILE",
+                "error",
+                d.rel,
+                "Style samples must live in data/style/<style>/<sample>.md (wrong nesting depth).",
+            )
+
+
 # --------- Warnings ---------
 
 _NOW = time.time  # indirection so tests can monkeypatch if needed
@@ -450,6 +466,7 @@ def collect_findings(root: Path) -> list[LintFinding]:
     out.extend(_broken_wikilink(snap))
     out.extend(_broken_derived_from(root, snap))
     out.extend(_orphan_promoted_source(root, snap))
+    out.extend(_style_flat_file(snap))
     out.extend(_stale_draft(snap))
     out.extend(_stale_stub(snap))
     out.extend(_orphan_wiki(snap))

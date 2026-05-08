@@ -228,6 +228,82 @@ def test_resolve_project_id_matches(
     assert result == "demo"
 
 
+def test_discover_uses_cwd_from_jsonl_payload(
+    tmp_path: Path,
+    fake_project_index: ProjectIndex,
+) -> None:
+    """When the jsonl contains a `cwd` field, adapter must use it as ref.cwd
+    instead of the lossy decode_cwd(dir-name).
+
+    Claude Code encodes both `/` and `_` as `-` in transcript dir names, so
+    `-Claude-lab-hwi-PKM` is ambiguous (could be `/Claude/lab/hwi/PKM` or
+    `/Claude_lab/hwi_PKM`). The jsonl payload records the actual cwd; that's
+    the canonical source.
+    """
+    import subprocess
+
+    # Real repo at a path containing underscores — its lossy decode would
+    # produce a different path that is NOT a git repo.
+    real_repo = tmp_path / "Claude_lab" / "hwi_PKM"
+    real_repo.mkdir(parents=True)
+    subprocess.run(["git", "init"], cwd=real_repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=real_repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "T"], cwd=real_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/test/demo.git"],
+        cwd=real_repo, check=True, capture_output=True,
+    )
+
+    transcript_root = tmp_path / "claude_projects"
+    transcript_root.mkdir()
+    cwd_dir = transcript_root / "-Claude-lab-hwi-PKM"
+    cwd_dir.mkdir()
+    jsonl = cwd_dir / "abcd1234.jsonl"
+    line = json.dumps({
+        "type": "user",
+        "content": "hi",
+        "cwd": str(real_repo),
+        "timestamp": "2026-05-07T14:00:00Z",
+    })
+    jsonl.write_text(line + "\n", encoding="utf-8")
+
+    adapter = ClaudeCodeAdapter(transcript_root=transcript_root)
+    refs = list(adapter.discover())
+    assert len(refs) == 1
+    assert refs[0].cwd == real_repo, (
+        f"expected ref.cwd == {real_repo}, got {refs[0].cwd} "
+        f"(adapter must read `cwd` from jsonl payload, not decode the dir-name)"
+    )
+
+    # Sanity: project resolution now succeeds via the real repo's git remote.
+    assert adapter.resolve_project_id(refs[0], fake_project_index) == "demo"
+
+
+def test_discover_falls_back_to_decoded_dirname_when_no_cwd_field(
+    tmp_path: Path,
+) -> None:
+    """If no message in the jsonl carries a `cwd` field, fall back to the
+    legacy lossy decode of the dir-name (preserves prior behavior for
+    transcripts that don't embed cwd)."""
+    transcript_root = tmp_path / "claude_projects"
+    transcript_root.mkdir()
+    cwd_dir = transcript_root / "-app-no-cwd-field"
+    cwd_dir.mkdir()
+    (cwd_dir / "deadbeef.jsonl").write_text(
+        json.dumps({
+            "type": "user",
+            "content": "hi",
+            "timestamp": "2026-05-07T14:00:00Z",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    adapter = ClaudeCodeAdapter(transcript_root=transcript_root)
+    refs = list(adapter.discover())
+    assert len(refs) == 1
+    # Legacy behavior: decoded dir-name (lossy).
+    assert str(refs[0].cwd) == "/app/no/cwd/field"
+
+
 def test_resolve_project_id_no_remote(
     tmp_path: Path,
     fake_project_index: ProjectIndex,

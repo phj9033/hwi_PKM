@@ -1,521 +1,400 @@
 # 기능 상세 & 유즈케이스
 
-`pkm` CLI 의 기능을 7 레이어 → 명령 → 슬래시 커맨드 → 유즈케이스 순서로 설명한다. 디자인 사양 (`docs/superpowers/specs/2026-05-01-pkm-design.md`) 의 운영자용 발췌본.
+`pkm` CLI 의 운영자용 매뉴얼. CLI surface 한 줄 요약은 `README.md` 에, 디자인 근거는 `docs/superpowers/specs/` 에. 이 문서는 **무엇을 어떻게 쓰는가**와 **언제 쓰는가** 두 가지에 집중한다.
+
+목차:
+
+- [기능 상세](#기능-상세) — 9 개 그룹, 각 그룹마다 명령 · 게이트 · 게이트가 만드는 에러 코드
+- [슬래시 커맨드](#슬래시-커맨드) — Claude Code 세션용 워크플로우 표
+- [유즈케이스](#유즈케이스) — 9 시나리오 walk-through
+- [더 깊이](#더-깊이) — 사양·플랜·에러 단일 진실 포인터
 
 ---
 
-## 1. 7 레이어 개요
+## 기능 상세
 
-본 PKM 은 **사용자 요구 7 가지** 를 7 개의 레이어 (capture / chunks / wiki / writing / search / dashboard / projects) 로 매핑한다. 각 레이어는 디렉토리 + frontmatter status 라이프사이클 + 결정론적 CLI 명령으로 구성된다.
+### 1. Capture · Chunks · Extract
 
-| # | 레이어 | 디렉토리 | 사용자 요구 | 다루는 명령 |
-|---|---|---|---|---|
-| 1 | **Capture** | `data/raw/captures/` | URL·텍스트 단건 수집 | `pkm capture *`, `/collect` `/research` |
-| 2 | **Chunks** | `data/raw/chunks/<topic>/` | 다중 소스 토픽 폴더 | `pkm chunks *`, `pkm extract` |
-| 3 | **Wiki** | `data/wiki/{concepts,entities,notes,reports}/` | 정제된 누적 지식 (compounding) | `pkm promote`, `pkm demote`, `pkm wiki edit` |
-| 4 | **Search / RAG** | (인덱스: `.pkm/index.db`) | 한국어 강한 하이브리드 검색 | `pkm search`, `pkm related`, `pkm reindex` |
-| 5 | **Writing** | `data/writing/` | AI 가 CLI 로 합성하는 워크스페이스 | `pkm write *`, `/write`, `/ask` |
-| 6 | **Dashboard** | `dashboard/` (gitignore) | 정적 HTML 8 페이지 | `pkm dashboard build`, `pkm bootstrap` |
-| 7 | **Projects** | `data/projects/<id>/` | 프로젝트별 노하우 (decisions/pitfalls/snippets/qna/notes) | `pkm project *` (M13) |
+| 명령 | 용도 |
+|---|---|
+| `pkm capture create --slug S --title T [--url U] [--from-file F]` | 단건 노트 — stdin 또는 `--from-file` 로 본문 |
+| `pkm capture {list,show,set-status,rm}` | 라이프사이클 조회·전환 |
+| `pkm chunks new <topic>` | `data/raw/chunks/<topic>/` 폴더 + `README.md` |
+| `pkm chunks {add,list,show,set-status,rm}` | 다중 소스 큐레이션 (collecting → curating → ready) |
+| `pkm extract <file> [--out P]` | PDF/HTML → markdown (`[extract]` extra 필요) |
 
-### 라이프사이클 게이트
-
-```
-  capture(draft) ──reviewed──→ promote ──→ wiki(stub) ──active──→ deprecated
-                  │                               ▲
-                  └──archived (자동, --keep-source 으로 보존)
-                                                  │
-  writing(draft) ────final──→ promote ────────────┘
-                  │
-                  └─ abandoned
-```
-
-- raw 본문은 `reviewed` 이후 immutable. 정정은 새 capture 또는 wiki 에서.
-- wiki 는 strict 모드에서 **deny-write**. 변경은 `pkm promote` 또는 `pkm wiki edit` 두 경로뿐.
-- 모든 mutate 명령은 자동 git 커밋 (감사로그 = `git log` + `data/log.md`).
+**라이프사이클 규칙:**
+- 슬러그에 날짜 prefix 가 없으면 `YYYY-MM-DD-` 자동 추가
+- `status: reviewed` 이후 본문 변경은 `RAW_BODY_MUTATED` warning (compounding 위반 감지)
+- chunks `set-status ready` → `pkm write new --from-chunks <topic>` 으로 합성 진입
 
 ---
 
-## 2. 명령별 상세
-
-전체 명령 surface 는 `pkm --help`, 각 서브명령은 `pkm <cmd> --help`. 아래는 그룹별 핵심.
-
-### 2.1 Setup
+### 2. Index · Search · Related
 
 ```bash
-pkm init                                 # 빈 디렉토리 → data/ .pkm/ SCHEMA.md .claude/ 스캐폴드
-pkm doctor [--strict] [--download] [--json]
-                                         # 환경/모델/AI CLI/DB 헬스체크
-                                         # --download: HF 에서 bge-m3 + reranker 페치 (~8 GB)
-                                         # --strict:   누락 1 건이라도 있으면 exit ≠ 0 (CI 게이트)
-                                         # --json:     status.html 이 그대로 렌더 (보안 화이트리스트)
-pkm bootstrap [--json]                   # 새 PC / 새 dir idempotent 셋업:
-                                         # (init 필요 시) → doctor --download → reindex --full → dashboard build
+pkm reindex db [<path>] [--full] [--scope wiki|raw|writing|all|projects] [--low-memory]
+pkm search <q> [-n N] [--scope ...|project[:<id>]] [--expand] [--no-rerank] [--with-related] [--explain]
+pkm related <path> [--mode backlinks|semantic|both]
 ```
 
-`pkm doctor` 출력 항목 (모두 `--json` 의 `items` 배열):
-- `index.db` — 존재 + chunk count
-- `bge-m3` / `bge-reranker` — `~/.cache/pkm/models/` 안 모델 무결성
-- `ai_cli` — PATH 자동탐지 결과 (이름만 노출, exec 미노출)
-- `system` — 가용 RAM + 권장 batch_size
+**Search 파이프라인 (5 단계):**
 
-기본 종료코드는 항상 0 — 누락이 있어도 리포트만 한다 (대시보드 빌드가 내부 호출해도 안전). `--strict` 만 게이트 모드.
+1. **쿼리확장** (`--expand` 옵트인) — AI CLI 셸아웃, 변형 2~3 개. 실패 시 `EXPAND_FAILED` hard-fail
+2. **병렬 retrieval** — 변형마다 BM25 (FTS5) top-50 + 벡터 (bge-m3 → vec0 코사인) top-50
+3. **RRF 융합** — `score = Σ 1/(60 + rank)`, top-30 후보
+4. **Cross-encoder rerank** — `bge-reranker-v2-m3` (`--no-rerank` 시 skip)
+5. **top-K 노출** + 모든 점수 (`--explain` 시)
 
-### 2.2 Capture (URL·텍스트 단건)
+**Scope (`--scope`):**
 
-```bash
-pkm capture create --slug SLUG --title "..." [--url URL]
-                                  [--from-file PATH]   # 본문은 stdin 또는 --from-file
-                                  [--status draft|reviewed]
-                                  [--lang ko|en|mixed] [--json]
-pkm capture list   [--status draft|reviewed|archived] [--lang ...] [--json]
-pkm capture show   <id-or-slug> [--json]
-pkm capture set-status <id-or-slug> <status>
-pkm capture rm     <id-or-slug>
-```
-
-- 슬러그에 날짜 prefix 가 없으면 `YYYY-MM-DD-` 자동 추가.
-- frontmatter: `title slug created_at status source_type lang` (필수) + `source_url fetched_at tags summary` (옵션).
-- `status: reviewed` 이후 본문 변경은 `RAW_BODY_MUTATED` warning 으로 감지됨 (compounding 깨짐 방지).
-
-### 2.3 Chunks (다중 소스 토픽 폴더)
-
-```bash
-pkm chunks new        <topic> [--description ...] [--json]   # 폴더 + README.md 스캐폴드
-pkm chunks add        <topic> <files...> [--json]            # 파일 복사
-pkm chunks list       [<topic>] [--json]
-pkm chunks show       <topic> [--json]
-pkm chunks set-status <topic> <collecting|curating|ready>
-pkm chunks rm         <topic>
-pkm extract           <file> [--out PATH] [--json]           # PDF/HTML → markdown
-```
-
-- chunks/ 는 multi-source 큐레이션 워크스페이스. 큐레이션 끝나면 `set-status ready` → `pkm write new --from-chunks <topic>` 으로 합성.
-- `pkm extract` 는 `[extract]` extra 필요 (`pdfplumber`, `markdownify`).
-
-### 2.4 Index / Search
-
-```bash
-pkm reindex db [<path>] [--full] [--scope wiki|raw|writing|all|projects]
-                        [--low-memory] [--json]
-                        # 기본: 증분 (content_hash 비교) — 변경분만 재임베딩
-                        # <path> : 특정 파일/글롭만
-                        # --full : 전부 재구축 (FTS5 + vec0 모두 drop & rebuild)
-                        # --low-memory: batch=4, reranker 무로드
-
-pkm search <query> [-n N] [--scope wiki|raw|writing|all|projects|project[:<id>]]
-                   [--expand]      # 옵트인 — AI CLI 셸아웃으로 쿼리확장
-                   [--no-rerank]   # cross-encoder skip (빠른 모드)
-                   [--with-related]# 각 hit 에 backlinks + 의미적 이웃 합성
-                   [--explain] [--json]
-
-pkm related <path> [--mode backlinks|semantic|both] [-n N] [--json]
-```
-
-검색 파이프라인 (5 단계):
-1. **쿼리확장** (`--expand` 시) — AI CLI 가 원 쿼리 + 영문 + 패러프레이즈 2~3 개 생성. 실패 시 `EXPAND_FAILED` hard-fail.
-2. **병렬 retrieval** — 변형마다 BM25(FTS5) top-50 + 벡터(bge-m3 → vec0 코사인) top-50.
-3. **RRF 융합** — `score = Σ 1/(k + rank)` (k=60). top-30 후보.
-4. **재랭킹** (`--no-rerank` 미지정 시) — bge-reranker-v2-m3 cross-encoder.
-5. **top-K** + 모든 점수 노출 (`--explain`).
-
-**Search scope (M13 추가):**
-
-| `--scope` 값 | 검색 범위 |
-| --- | --- |
-| `wiki` | `data/wiki/**` (기본 — cwd 가 미등록 프로젝트일 때) |
-| `raw` | `data/raw/**` |
-| `writing` | `data/writing/**` |
+| 값 | 검색 범위 |
+|---|---|
+| `wiki` | `data/wiki/**` (cwd 가 미등록 프로젝트일 때 디폴트) |
+| `raw` / `writing` | 각각 `data/raw/**` / `data/writing/**` |
 | `all` | 전체 데이터 repo |
 | `projects` | `data/projects/**` 전체 |
-| `project:<id>` | 특정 프로젝트 (`chunks.project = <id>` 컬럼 필터) |
-| `project` | cwd resolver 로 식별된 현재 프로젝트 (NOT_LINKED 면 hard-fail) |
+| `project:<id>` | 특정 프로젝트만 |
+| `project` | cwd resolver 가 식별한 현재 프로젝트 (`NOT_LINKED` 면 hard-fail) |
 
-**Default scope 변경 (M13):** cwd 가 등록된 프로젝트면 `project:<id>`; 아니면 종전대로 `wiki`.
+> **Default scope (M13):** cwd 가 등록된 프로젝트면 `project:<id>`, 아니면 `wiki`.
 
-**토크나이저 (M12):** BM25 인덱싱은 토크나이저 어댑터(`pkm.search.tokenizer`)를 통해 분기한다. V1 (schema_version=1) = FTS5 trigram. M12 마이그레이션 (`m002_kiwi_tokenizer`) 적용 후 (schema_version≥2) = Kiwi 형태소 분석기로 사전 토큰화 + FTS5 `unicode61`. 한국어 BM25 recall 향상 목적. `[korean]` extra 미설치 시 m002 는 silently skip 되고 trigram 으로 유지된다. 토크나이저 상태는 `pkm doctor` 의 `tokenizer` 행에서 확인.
+**한국어 토크나이저 (M12):** `[korean]` extra 설치 후 `pkm migrate --apply` 로 `m002` 가 적용되면 BM25 가 Kiwi 형태소 분석 + FTS5 `unicode61` 로 전환. 미설치 시 trigram 으로 silently 유지. 상태는 `pkm doctor` 의 `tokenizer` 행.
 
-`--with-related` 는 결과 각 hit 에 다음 추가:
+`--with-related` 출력 (각 hit 에 합성):
+
 ```json
 "related": {
-  "wikilinks_out": ["..."], "wikilinks_in": ["..."],
-  "derived_from": ["..."], "tags": ["..."],
+  "wikilinks_out": [...], "wikilinks_in": [...],
+  "derived_from": [...], "tags": [...],
   "semantic_neighbors": [{"path":"...","similarity":0.78}]
 }
 ```
 
-### 2.5 Promote / Demote / Wiki edit (라이프사이클 게이트)
+---
+
+### 3. Promote · Demote · Wiki edit (라이프사이클 게이트)
 
 ```bash
-pkm promote <ref> --to concepts|entities|notes|reports
-                  [--slug NEW_SLUG]    # 기본: 캡처 슬러그에서 날짜 prefix 제거
-                  [--keep-source]      # 미지정 시 source 가 archived 로
-                  [--json]
-                  # <ref> 는 (a) capture slug, (b) capture full path,
-                  # (c) writing/<slug>.md 모두 받음
-
-pkm demote <wiki-path>                 # promoted_from 따라 source 복원
-
-pkm wiki edit <ref> --replace|--patch [--json]
-                                       # strict 모드에서 wiki 변경의 유일한 escape valve
-                                       # --replace: stdin = 전체 본문 (frontmatter 포함) 교체
-                                       # --patch:   stdin = unified diff (git apply)
-                                       # 둘 다 frontmatter + wikilink 무결성 검증 후 쓰기
-
-pkm wiki suggest <slug> [-n K] [--threshold T] [--json]
-                                       # 단일 wiki 페이지에 대한 MISSING_LINK_CANDIDATE 후보 출력.
-                                       # `[lint.missing_link]` 설정을 따르되 -n / --threshold 로 인-라인 override.
-                                       # `.pkm/index.db` 부재 시 `INDEX_MISSING` 으로 비-0 종료.
-                                       # JSON 모드: {"ok":true,"slug":"...","suggestions":[{path,slug,similarity}]}
+pkm promote <ref> --to concepts|entities|notes|reports [--slug S] [--keep-source]
+pkm demote <wiki-path>
+pkm wiki edit <ref> --replace|--patch          # stdin = 본문 또는 unified diff
+pkm wiki suggest <slug> [-n K] [--threshold T] # 단일 페이지 MISSING_LINK_CANDIDATE
 ```
 
-게이트 조건:
-- capture → wiki 승격: `status: reviewed` 필수. draft 면 `STATUS_NOT_REVIEWED` 에러.
-- writing → wiki 승격: `status: final` 필수 + **M11 grounding gate** (4 룰):
-  - **R1 `CITATION_NOT_DERIVED`** — body 의 `[<path>]` 인용은 모두 `derived_from` 안에 있어야 함.
-  - **R2 `DERIVED_NOT_CITED`** — `derived_from` 의 모든 항목은 body 에 한 번 이상 인용돼야 함.
-  - **R3 `UNGROUNDED_WRITING`** — body 가 400 자 이상이면 ≥1 인용 필수. `purpose: essay` 또는 frontmatter `grounding_exempt: true` 로만 면제 (R3 만 면제, R1/R2/R4 는 그대로 적용).
-  - **R4 `BROKEN_CITATION`** — 인용 경로는 디스크에 존재해야 함.
-  - 같은 4 룰이 `pkm lint` 의 warning 으로도 노출 — promote 전에 미리 본다.
-- wiki 페이지는 `status: stub` 으로 시작 + `promoted_from: <source path>` 자동 기재.
-- 자동 부수효과: source 가 `archived` 로 (기본), git 자동 커밋, `data/log.md` append.
+`<ref>` 은 capture slug · 절대 path · `data/writing/<slug>.md` 모두 받음.
 
-### 2.6 Writing (AI 합성 워크스페이스)
+**게이트:**
+
+- **Capture → wiki**: `status: reviewed` 필수. 아니면 `STATUS_NOT_REVIEWED`
+- **Writing → wiki (M11 grounding gate)**: `status: final` + 4 룰
+  - `R1 CITATION_NOT_DERIVED` — 본문의 `[<path>]` 인용은 모두 frontmatter `derived_from` 안에 있어야 함
+  - `R2 DERIVED_NOT_CITED` — `derived_from` 의 모든 path 는 본문에 ≥1 회 인용
+  - `R3 UNGROUNDED_WRITING` — 본문 ≥ 400자 인데 인용 0 개. `purpose: essay` 또는 `grounding_exempt: true` 만 면제 (R1/R2/R4 는 그대로 적용)
+  - `R4 BROKEN_CITATION` — 인용 path 가 디스크에 존재
+  - 같은 4 룰이 `pkm lint` warning 으로도 노출 (promote 전 미리보기)
+- **부수효과**: source = `archived` (기본; `--keep-source` 면 보존), wiki = `status: stub` + `promoted_from`, auto-commit, `data/log.md` append
+
+**`pkm wiki edit` 는 strict 모드에서 wiki 변경의 유일한 escape valve** — `.claude/settings.json` 이 `data/wiki/**` 를 deny-write 하기 때문에 AI 의 `Edit` 툴은 직접 못 쓴다.
+
+---
+
+### 4. Writing (AI 합성 워크스페이스)
 
 ```bash
-pkm write new --slug SLUG [--title ...]
-              [--from-search "..." | --from-chunks <topic>]
-              [--purpose guideline|report|summary|essay]
-              [--lang ko] [--json]
-                                         # 본문은 비움 — frontmatter 만 시드.
-                                         # --from-chunks 는 derived_from 을 chunks 파일 목록으로 자동 채움.
-
-pkm write list [--json]
-pkm write set-status <id-or-slug> <draft|final|abandoned>
-                                         # 별도 finalize 명령 없음 — pkm promote 가 writing/* 도 받음.
+pkm write new --slug S [--from-search "..." | --from-chunks <topic>] [--purpose guideline|report|summary|essay]
+pkm write {list,set-status}    # set-status: draft | final | abandoned
 ```
 
-writing/ 는 `data/wiki/**` 와 달리 strict 모드에서도 **AI 가 직접 `Edit` 가능**. workflow:
-1. `pkm write new --from-chunks <topic>` → frontmatter 시드 (본문 비움).
-2. AI 가 `Edit` 로 본문 작성 — 인용 `[<wiki-path>]` 필수.
-3. `pkm write set-status <s> final` → `pkm promote data/writing/<s>.md --to <bucket>`.
+`data/writing/` 는 wiki 와 달리 **AI 가 `Edit` 로 직접 작성 가능** (strict 모드에서도). 표준 흐름:
 
-### 2.7 Lint (정합성 게이트)
+1. `pkm write new --from-chunks <topic>` → frontmatter 의 `derived_from` 이 chunks 파일들로 자동 시드
+2. AI 가 `Edit` 로 본문 작성 — `[<path>]` 인용 필수
+3. `pkm write set-status <s> final` → `pkm promote data/writing/<s>.md --to <bucket>`
+
+별도의 `finalize` 명령은 없다 — `promote` 가 writing 도 받는다.
+
+---
+
+### 5. Lint (정합성 게이트)
 
 ```bash
 pkm lint [--fix] [--errors-only] [--json]
 ```
 
-| 코드 | 종류 | 의미 | --fix |
-|---|---|---|---|
-| `MISSING_FIELD` | error | frontmatter 필수 필드 누락 (`title`, `slug`, `created_at`, `status`, `lang` 등) | ✅ `created_at`, `slug` |
-| `INVALID_VALUE` | error | enum 위반 (`status: foo`) | — |
+| 코드 | 종류 | 의미 | `--fix` |
+|---|---|---|:-:|
+| `MISSING_FIELD` | error | 필수 frontmatter 누락 | ✅ `created_at`, `slug` |
+| `INVALID_VALUE` | error | enum 위반 (e.g. `status: foo`) | — |
 | `DUPLICATE_SLUG` | error | 같은 slug 가 2 곳 이상 | — |
 | `BROKEN_WIKILINK` | error | `[[link]]` 가 실재하지 않는 경로 | — |
 | `BROKEN_DERIVED_FROM` | error | `derived_from:` 의 source 누락 | — |
 | `ORPHAN_PROMOTED_SOURCE` | error | wiki 의 `promoted_from` 이 source 와 mismatch | ✅ |
-| `STALE_DRAFT` | warning | draft 가 N 일 이상 방치 | — |
-| `STALE_STUB` | warning | wiki stub 이 N 일 이상 방치 | — |
-| `ORPHAN_WIKI` | warning | 인바운드 link 0 인 wiki 페이지 | — |
+| `MISSING_PROJECT_FIELD` (M13) | error | `data/projects/<id>/` frontmatter `project` 누락/불일치 | ✅ |
+| `INVALID_CATEGORY` (M13) | error | category 가 {decisions, pitfalls, snippets, qna, notes} 외 | — |
+| `CATEGORY_PATH_MISMATCH` (M13) | error | path 카테고리와 frontmatter `category` 불일치 | ✅ |
+| `ORPHAN_PROJECT_DIR` (M13) | error | `data/projects/<id>/` 에 `index.md` 없음 또는 `git_remotes` 비어있음 | — |
+| `STALE_DRAFT` / `STALE_STUB` | warning | N 일 이상 방치 | — |
+| `ORPHAN_WIKI` | warning | 인바운드 link 0 인 wiki | — |
 | `LARGE_CHUNK_NEVER_PROMOTED` | warning | chunks 가 ready 인데 미승격 | — |
 | `LANG_INCONSISTENT` | warning | 본문 언어와 frontmatter `lang` 불일치 | — |
-| `RAW_BODY_MUTATED` | warning | reviewed 이후 본문 해시 변경 (compounding 위반) | — |
-| `BROKEN_CITATION` | warning | `[<path>]` 인용이 실존 path 아님 | — |
-| `CITATION_NOT_DERIVED` | warning (M11) | writing body 의 인용이 frontmatter `derived_from` 에 없음 — promote 시 hard gate | — |
-| `DERIVED_NOT_CITED` | warning (M11) | `derived_from` 의 path 가 body 에서 한 번도 인용되지 않음 — promote 시 hard gate | — |
-| `UNGROUNDED_WRITING` | warning (M11) | body ≥ 400 자인데 인용 0 개. `purpose: essay` / `grounding_exempt: true` 로만 면제 | — |
-| `MISSING_PROJECT_FIELD` | error (M13) | `data/projects/<id>/<cat>/x.md` frontmatter `project` 누락 또는 path 와 불일치 | ✅ path → frontmatter |
-| `INVALID_CATEGORY` | error (M13) | `category` 값이 {decisions, pitfalls, snippets, qna, notes} 외 | — |
-| `CATEGORY_PATH_MISMATCH` | error (M13) | path 의 카테고리 디렉토리와 frontmatter `category` 불일치 | ✅ path → frontmatter |
-| `ORPHAN_PROJECT_DIR` | error (M13) | `data/projects/<id>/` 에 `index.md` 없음 또는 `git_remotes` 비어있음 | — |
-| `SIMILAR_KNOWLEDGE_CANDIDATE` | warning (M13) | 두 프로젝트 노하우 항목의 코사인 유사도 ≥ 0.92 | — |
+| `RAW_BODY_MUTATED` | warning | reviewed 이후 본문 해시 변경 | — |
+| `BROKEN_CITATION` | warning | `[<path>]` 인용 경로 없음 | — |
+| `CITATION_NOT_DERIVED` (M11) | warning | promote 시 hard gate (R1) | — |
+| `DERIVED_NOT_CITED` (M11) | warning | promote 시 hard gate (R2) | — |
+| `UNGROUNDED_WRITING` (M11) | warning | promote 시 hard gate (R3) | — |
+| `SIMILAR_KNOWLEDGE_CANDIDATE` (M13) | warning | 두 프로젝트 항목 코사인 유사도 ≥ 0.92 | — |
 
-`--errors-only` 는 warning 을 숨기고 error 만으로 exit 게이트 — CI/pre-commit 용.
-
-### 2.8 Dashboard
-
-```bash
-pkm dashboard build [--out PATH]    # 기본 ./dashboard/. 단일 명령으로 9 페이지 생성.
-```
-
-생성물 (모두 정적 HTML, 외부 CDN 없음, 오프라인 동작):
-- `index.html` — 통계, lint 요약, 최근 log 20 개, 빠른 링크
-- `captures.html` / `chunks.html` / `wiki.html` / `writing.html` — 필터바 (status/lang/tags) + 표
-- `doc/<path>.html` — frontmatter 사이드바 + 본문 + Backlinks/Outgoing/Semantic neighbors/Provenance
-- `search.html` — 클라이언트 사이드 substring + 태그 매칭 (진지한 검색은 `pkm search`)
-- `help.html` — `SCHEMA.md` 렌더 + CLI 치트시트
-- `status.html` — `pkm doctor --json` 렌더 + 마스킹된 config + 권한 모드
-- `graph.html` — wiki 링크 그래프 (vis-network) + MISSING_LINK_CANDIDATE 제안 오버레이. 노드 색=bucket, 점선=`derived_from`, 빨간 점선=suggested. 체크박스로 엣지 종류 토글, 슬러그 부분 일치 검색, 노드 클릭 시 incoming/outgoing/suggested 사이드바.
-  - 결정론: 노드 초기 좌표는 `sha256(path)` 시드 — 같은 corpus 면 같은 좌표.
-  - 컨피그: `[dashboard.graph]` (`max_nodes=1000`, `include_writing=false`, `include_captures=false`, `overlay_suggestions=true`, `include_projects=true`, `project_filter=[]`). 노드 수 cap 초과 시 connectivity 낮은 노드부터 drop, `stats.trimmed` 에 카운트.
-  - M13 신규 config 키:
-    ```toml
-    [dashboard.graph]
-    include_projects = true     # 프로젝트 노하우 노드 포함 (M13)
-    project_filter = []         # 빈 리스트 = 전체; 특정 id 만 화이트리스트
-    ```
-    프로젝트 노드는 카테고리별 vis-network group (`projects/decisions`, `projects/pitfalls`, ...) 으로 구분 색상 표시.
-  - 인덱스(`.pkm/index.db`) 가 없으면 unavailable 카드 렌더.
-
-빌드 트리거는 수동 (`pkm dashboard build`) — 자동화하려면 git post-commit 훅. `dashboard/` 는 gitignore.
-
-### 2.9 Bench / Log / Index
-
-```bash
-pkm bench [--docs N=100] [--real] [--json]
-                                     # 합성 한국어 N 문서 → 인덱싱/검색 latency 측정 (soft 임계 — 출력만)
-                                     # --real 은 stub 임베더 대신 실제 bge-m3 사용 (doctor --download 선행 필수)
-
-pkm log                              # data/log.md tail
-pkm index rebuild                    # data/index.md (TOC) 재생성 — 검색 인덱스와 별개
-```
-
-### 2.10 Migration (M12)
-
-```bash
-pkm migrate                # 기본 = dry-run (--check 와 동일).
-pkm migrate --apply        # 실제 적용. 각 마이그레이션은 SAVEPOINT 안에서 동작.
-pkm migrate --json         # 머신용 출력. 실패 시 `error.code = MIGRATION_FAILED`.
-```
-
-각 마이그레이션은 `pkm/store/migrations/m<NNN>_*.py` 모듈로 등록 — `ID`, `DESCRIPTION`, 옵션으로 `DEPENDS_ON_EXTRA`, `check(conn)`, `apply(conn)` 를 export. 런타임 시 ID 순으로 발견 + 정렬 + `schema_version` 보다 높은 ID 만 적용.
-
-- **의존성 체크.** `DEPENDS_ON_EXTRA` 가 import 안 되면 silently skip — 에러 아님, schema_version 그대로. 해당 extra 설치 후 다시 실행하면 그때 적용.
-- **실패 격리.** 마이그레이션이 raise 하면 SAVEPOINT 롤백 + `MIGRATION_FAILED` exit. 단 FTS5 DDL 은 SAVEPOINT 보장이 약해서 `m002` 는 내부적으로 swap 가드를 둔다 (`chunks_fts_old` 로 rename → 검증 → drop, 실패 시 복원).
-- **doctor 통합.** `pkm doctor` 가 `schema_version: <current>/<latest>` + `tokenizer` 행을 표시. `--strict` + 미적용 마이그레이션 있으면 `MIGRATION_PENDING` 으로 exit 1.
-
-현재 등록된 마이그레이션:
-
-| ID | DEPENDS_ON_EXTRA | 설명 |
-|----|---|---|
-| 1 | — | V1 baseline (스키마는 `index_db.connect` 가 이미 만들어줌; no-op marker) |
-| 2 | `korean` | `chunks_fts` 토크나이저를 Kiwi 사전토큰화 + FTS5 unicode61 로 전환 (한국어 BM25 recall 향상) |
-
-```bash
-# 한국어 토크나이저 활성화 워크플로우
-uv tool install --reinstall -e ".[ml,extract,korean]"   # `[korean]` 추가
-pkm migrate --check                                      # m002 가 pending 으로 보임
-pkm migrate --apply                                      # text_tokenized 컬럼 추가 + FTS swap
-pkm reindex db --full                                    # 새 토크나이저로 재인덱싱
-pkm doctor                                               # tokenizer: kiwi (...)
-```
-
-### 2.11 Projects (M13)
-
-`pkm project` 명령은 프로젝트별 노하우 (decisions / pitfalls / snippets / qna / notes) 를 데이터 repo 의 `data/projects/<id>/` 아래에 별도 레이어로 보관한다. 코드 레포 cwd 에서 `pkm project link` 로 프로젝트를 등록하면 git remote 정규화 (SSH/HTTPS 모두 같은 형태) 로 PC 간 동일성이 자동 매칭된다.
-
-| 명령 | 설명 |
-| --- | --- |
-| `pkm project link --id <slug>` | cwd 의 git remote 를 새 프로젝트로 등록 (멱등 — 이미 등록된 remote 는 ALREADY_LINKED, exit 0) |
-| `pkm project current` | cwd → project_id 5단계 resolver (env / overrides / git remote / data_repo_local_paths / NOT_LINKED) |
-| `pkm project list` | 등록된 프로젝트 목록 + knowledge 카운트 |
-| `pkm project show <id>` | 프로젝트별 카테고리 카운트 |
-| `pkm project rebuild-index <id>` | `data/projects/<id>/index.md` 결정론적 재생성 |
-| `pkm project rm <id> [--keep-data]` | 프로젝트 제거 (기본 archived/projects/<id>/ 로 이동, --keep-data 면 index 만 삭제) |
-| `pkm project knowledge add --project <id> --category <cat> --slug <s> --title <t>` | 새 노하우 markdown 작성 (stdin = 본문) |
-
-**Resolver 우선순위 (`pkm project current` 와 `--scope project` 가 사용):**
-1. `PKM_PROJECT` 환경 변수 (1회용 override)
-2. `.pkm/config.local.toml` `[project_overrides]` cwd 매치 (PC 별 override)
-3. cwd 의 git remote 정규화 → frontmatter `git_remotes` 매치 (SoT)
-4. cwd 경로 → frontmatter `data_repo_local_paths` 매치 (드문 fallback)
-5. None → `NOT_LINKED`
-
-**Schema (m003):** `chunks` 테이블에 `project`, `category`, `session_id` 컬럼이 추가됨. 기존 wiki/raw/writing 행은 NULL → 기본 검색 결과가 V2 와 호환된다.
-
-### 2.12 Session (M14)
-
-```bash
-pkm session list  [--project ID] [--unprocessed] [--since DATE] [--until DATE]
-                  [--min-messages N=5] [--limit N] [--json]
-pkm session show  <uuid> [--json]                    # transcript_path + project_id + meta
-pkm session forget <uuid>                            # remove the per-PC processed marker
-pkm session mark-processed <uuid> --extracted-count N
-                                                     # write `.pkm/sessions/<project>/<uuid>.json`
-                                                     # idempotent — re-running rewrites the file
-```
-
-`list` 가 `~/.claude/projects/**/*.jsonl` 을 스캔하여 cwd 매핑된 프로젝트 세션만 반환. `--unprocessed` 는 메타파일 없는 세션만 (resumable backfill 의 핵심).
-
-`show` 는 transcript 경로 + cwd 디코드 + 처리 상태 + 메타를 한 번에 노출. `extracting-session-knowledge` 스킬이 이 출력을 들고 `Read` 툴로 transcript 를 직접 읽는다 — CLI 가 추출하지 않음 (Claude 본인이 함).
-
-메타파일은 PC 별 (`.pkm/sessions/` gitignore — transcript 자체가 PC-local 이므로 git 추적 의미 없음). sha256 + 메시지 카운트 + 처리 시각 + 추출 요약을 보존.
-
-`PKM_TRANSCRIPT_ROOT` 환경 변수로 transcript 루트를 override 가능 (기본: `~/.claude/projects`). 테스트/멀티-사용자 셋업용.
-
-### 2.13 Install (M14)
-
-```bash
-pkm install --for claude-code [--data-repo PATH] [--uninstall] [--json]
-```
-
-PC 별 1 회 실행. 다음 4 가지를 멱등 작성:
-
-1. `~/.pkm/config.toml` — 데이터 repo 경로 SoT.
-2. `~/.claude/CLAUDE.md` — managed 블록 (HTML 코멘트 마커 사이) 삽입/교체. 마커 외부 사용자 콘텐츠 보존.
-3. `~/.claude/commands/pkm-{recall,extract-session,backfill,project}.md` — 4 슬래시 명령.
-4. `~/.claude/skills/pkm/{recalling-project-context,extracting-session-knowledge,backfilling-sessions}/` — 3 스킬 번들.
-
-3 + 4 는 frontmatter 가 필요하므로 in-file 마커를 못 쓴다 → `~/.pkm/install_manifest.json` 에 emit 한 절대 경로를 기록 → `--uninstall` 이 manifest 만큼만 정확히 삭제 + manifest 자체도 삭제.
-
-지원하지 않는 target (`codex`, `cursor`, ...) 은 `NOT_IMPLEMENTED` 로 거절 — V4 에 추가 예정.
-
-### 2.14 Context (M14)
-
-```bash
-pkm context inject [--project ID] [--max-tokens N=600]
-                   [--quiet-on-not-linked/--no-quiet]
-                   [--json]
-```
-
-cwd → 프로젝트 resolver (M13 5 단계) 후, `data/projects/<id>/index.md` 본문 (frontmatter 제외) 을 stdout 에 출력. 4-char/token 휴리스틱으로 budget 초과 시 마지막 마침표에서 잘라 `(truncated; run /pkm-recall ...)` 노티스 추가.
-
-기본은 `--quiet-on-not-linked` — NOT_LINKED 면 silent exit 0. SessionStart hook 대신 `~/.claude/CLAUDE.md` 의 managed 블록이 `pkm:recalling-project-context` 스킬을 invoke 하고, 스킬이 이 명령을 호출한다.
-
-`--no-quiet` 시 NOT_LINKED 가 JSON 에러 envelope 으로 surface (자동화 디버깅용).
+`--errors-only` 는 warning 무시 + error 만으로 exit 게이트 (CI/pre-commit 용).
 
 ---
 
-## 3. 슬래시 커맨드 (Claude Code 세션용)
+### 6. Dashboard
 
-`pkm init` 이 데이터 repo 의 `.claude/commands/` 에 9 개 템플릿을 깔아준다. 모두 SCHEMA.md 의 워크플로우를 5~10 줄로 요약한 것.
+```bash
+pkm dashboard build [--out PATH]   # 기본 ./dashboard/, 단일 명령으로 9 페이지 생성
+```
 
-| 커맨드 | 입력 | 동작 | 결과 |
-|---|---|---|---|
-| `/collect <url\|text>` | URL 또는 텍스트 | WebFetch → 1~3 줄 요약 + 1~4 태그 → `pkm capture create --status draft` | `data/raw/captures/<slug>.md` |
-| `/research <topic>` | 토픽 | 다중 WebSearch + WebFetch → 3~6 capture 일괄 생성 → 선택적으로 `pkm chunks new` + `add` 로 묶음 | 다수 capture + 옵션 chunk |
-| `/review-captures` | (없음) | `pkm capture list --status draft --json` 순회 → 각각 `set-status reviewed` 또는 `rm` | draft 청소 |
-| `/promote` | (없음) | `pkm capture list --status reviewed --json` 검토 → bucket 결정 → `pkm promote --to ...` | 새 wiki stub |
-| `/lint [--fix]` | (옵션) | `pkm lint --json` 보고 + 필요 시 `--fix` 자동수리 + 잔여물 사용자 안내 | 리포트 + 수정 |
-| `/ask <question>` | 질문 | `pkm search --json` → top-K Read → Claude 본인이 인용 합성 (외부 AI CLI 불필요) | 인용 grounded 답변 |
-| `/write <topic>` | 토픽/시드 | `pkm write new` (search/chunks/freeform 시드) → Edit 로 본문 + 인용 → `set-status final` → `pkm promote` | wiki 게시 |
-| `/style-import <url\|file>` | URL 또는 로컬 글 | WebFetch best-effort + manual `raw-imports/style/<slug>.md` fallback → `data/style/<slug>.md` 인덱싱 | 톤 매칭용 style 샘플 |
-| `/blog "<주제>"` | 자연어 주제 | `pkm search` (wiki/raw/style) → outline → 사용자 승인 → `blog/<slug>.md` 작성 | 외부 발행용 초안 |
-| `/blog --random` | (없음) | `pkm sample` (랜덤 wiki 3-5장, 직접 링크 안 됨) → outline → 사용자 승인 → `blog/seeds/<slug>.md` | 영감용 시드 초안 |
-| `/pkm-recall <topic>` (M14) | 토픽 (선택) | `pkm:recalling-project-context` 스킬 invoke — `pkm project current` → `pkm context inject` → 옵션으로 `pkm search --scope project` | 프로젝트 컨텍스트 + (선택) 토픽별 검색 결과 |
-| `/pkm-extract-session [uuid]` (M14) | uuid (선택) | `pkm:extracting-session-knowledge` 스킬 — transcript Read → 5 카테고리 후보 → 2 라운드 사용자 검토 → `pkm project knowledge add` 호출 → `pkm session mark-processed` | `data/projects/<id>/<cat>/*.md` 신규 + 메타 |
-| `/pkm-backfill [--since ...]` (M14) | 옵션 | `pkm:backfilling-sessions` 스킬 — `pkm session list --unprocessed` → 첫 세션 자세히 / 이후 일괄 모드 → 각 세션 추출 + mark-processed | 일괄 추출 + resumable |
-| `/pkm-project [verb]` (M14) | `link\|current\|list\|show <id>` | `pkm project ...` 의 thin wrapper | CLI 결과 |
+생성물 (모두 정적 HTML, 외부 CDN 없음, 오프라인 동작):
 
-**M14 스킬 ↔ 슬래시 매핑**: 슬래시는 사용자 입력 surface, 실제 워크플로우는 `~/.claude/skills/pkm/<id>/SKILL.md` 가 정의. `pkm install --for claude-code` 가 한 번에 모두 깐다.
+- `index.html` — 통계 · lint 요약 · 최근 log 20개 · 빠른 링크
+- `captures.html` / `chunks.html` / `wiki.html` / `writing.html` — 필터바 (status/lang/tags) + 표
+- `doc/<path>.html` — frontmatter 사이드바 + 본문 + Backlinks/Outgoing/Semantic neighbors/Provenance
+- `search.html` — 클라이언트 substring + 태그 매칭 (진지한 검색은 `pkm search`)
+- `help.html` — `SCHEMA.md` 렌더 + CLI 치트시트
+- `status.html` — `pkm doctor --json` + 마스킹된 config + 권한 모드
+- `graph.html` — wiki 링크 그래프 (vis-network) + MISSING_LINK_CANDIDATE 제안 오버레이
+
+**Graph 페이지 (M10):**
+- 노드 색 = bucket, 점선 = `derived_from`, 빨간 점선 = suggested
+- 결정론: 초기 좌표 = `sha256(path)` 시드 (같은 corpus → 같은 좌표)
+- M13 신규 그룹: `projects/{decisions,pitfalls,snippets,qna,notes}`
+- 노드 cap (`max_nodes=1000`) 초과 시 connectivity 낮은 순 drop, `stats.trimmed` 카운트
+- 인덱스 (`.pkm/index.db`) 부재 시 unavailable 카드
+
+```toml
+# .pkm/config.toml
+[dashboard.graph]
+max_nodes              = 1000
+include_writing        = false
+include_captures       = false
+overlay_suggestions    = true
+include_projects       = true   # M13
+project_filter         = []     # 빈 = 전체
+```
+
+빌드 트리거는 수동 (`pkm dashboard build`) — 자동화하려면 git post-commit 훅. `dashboard/` 는 gitignore.
+
+---
+
+### 7. Migration (M12)
+
+```bash
+pkm migrate              # = --check (dry-run)
+pkm migrate --apply      # 각 마이그레이션은 SAVEPOINT 안에서 동작
+```
+
+`pkm/store/migrations/m<NNN>_*.py` 모듈을 자동 발견 → ID 순 정렬 → `schema_version` 보다 큰 것만 적용.
+
+| ID | DEPENDS_ON_EXTRA | 설명 |
+|---|---|---|
+| 1 | — | V1 baseline (no-op marker) |
+| 2 | `korean` | `chunks_fts` 토크나이저 → Kiwi pre-tokenization (한국어 BM25 recall ↑) |
+| 3 | — | `chunks` 테이블에 `project`, `category`, `session_id` 컬럼 + `idx_chunks_project_category` |
+
+**격리:**
+- 의존 extra 가 import 안 되면 silently skip — 에러 아님, schema_version 그대로
+- 마이그레이션 raise → SAVEPOINT 롤백 + `MIGRATION_FAILED`
+- FTS5 DDL 은 SAVEPOINT 보장이 약해 m002 는 swap 가드 사용 (`chunks_fts_old` 로 rename → 검증 → drop, 실패 시 복원)
+- `pkm doctor --strict` + 미적용 마이그레이션 = `MIGRATION_PENDING` 으로 exit 1
+
+---
+
+### 8. Projects (M13)
+
+`data/projects/<id>/` 아래에 프로젝트별 노하우를 5 카테고리로 (decisions / pitfalls / snippets / qna / notes) 별도 레이어로 보관. 코드 repo cwd 에서 `pkm project link` 한 번 박아두면 git remote 정규화로 PC 간 동일성이 자동 매칭.
+
+| 명령 | 용도 |
+|---|---|
+| `pkm project link --id <slug>` | cwd git remote 등록 (멱등 — 이미면 `ALREADY_LINKED`, exit 0) |
+| `pkm project current` | cwd → project_id 5단계 resolver (env / overrides / git remote / local_paths / NOT_LINKED) |
+| `pkm project {list,show,rm}` | 조회 / 제거 (`--keep-data` 면 index 만 삭제) |
+| `pkm project rebuild-index <id>` | `data/projects/<id>/index.md` 결정론적 재생성 |
+| `pkm project knowledge add --project <id> --category <cat> --slug <s> --title <t>` | 새 노하우 markdown (stdin = 본문) |
+
+**Resolver 우선순위 (`pkm project current` · `--scope project` 가 사용):**
+
+1. `PKM_PROJECT` env (1회용 override)
+2. `.pkm/config.local.toml` `[project_overrides]` cwd 매치 (PC 별)
+3. cwd git remote 정규화 → frontmatter `git_remotes` 매치 (SoT)
+4. cwd 경로 → `data_repo_local_paths` 매치 (드문 fallback)
+5. None → `NOT_LINKED`
+
+---
+
+### 9. Sessions · Skills · Install · Context (M14)
+
+Claude Code 세션 transcript 를 발견 · 추출 · 프로젝트 노하우로 저장하는 V3 레이어.
+
+```bash
+# Session — transcript 메타 관리 (CLI 가 추출하지 않음)
+pkm session list  [--project ID] [--unprocessed] [--since DATE] [--until DATE] [--min-messages N=5]
+pkm session show  <uuid>                                # transcript_path + project_id + 메타
+pkm session forget <uuid>                               # PC-local 처리 마커 제거
+pkm session mark-processed <uuid> --extracted-count N   # 메타파일 emit (idempotent)
+
+# Install — PC 별 1 회 글로벌 통합
+pkm install --for claude-code --data-repo <PATH> [--uninstall]
+
+# Context — cwd 프로젝트 → index.md 본문을 stdout 에 주입
+pkm context inject [--project ID] [--max-tokens N=600] [--quiet-on-not-linked/--no-quiet]
+```
+
+**Session 동작:** `~/.claude/projects/**/*.jsonl` 스캔 → cwd 매핑 프로젝트 세션만 반환. `--unprocessed` 는 메타파일 (`.pkm/sessions/<project>/<uuid>.json`, gitignore — PC-local) 없는 것만. `pkm session show` 의 출력을 `extracting-session-knowledge` 스킬이 받아 `Read` 툴로 transcript 직접 읽음 — **CLI 는 추출하지 않음, Claude 본인이 함**.
+
+`PKM_TRANSCRIPT_ROOT` env 로 transcript 루트 override 가능 (기본 `~/.claude/projects`).
+
+**Install 산출물 (4 가지, 모두 멱등):**
+
+1. `~/.pkm/config.toml` — `data_repo` SoT
+2. `~/.claude/CLAUDE.md` — managed 블록 (HTML 코멘트 마커 사이) 삽입/교체. 마커 외부 사용자 콘텐츠 보존
+3. `~/.claude/commands/pkm-{recall,extract-session,backfill,project}.md` — 4 슬래시 명령
+4. `~/.claude/skills/pkm/{recalling-project-context,extracting-session-knowledge,backfilling-sessions}/` — 3 스킬 번들
+
+3+4 는 frontmatter 가 필요해 in-file 마커 못 씀 → `~/.pkm/install_manifest.json` 에 emit 절대 경로 기록 → `--uninstall` 이 manifest 만큼 정확히 삭제.
+
+> 지원하지 않는 target (`codex`, `cursor`, ...) 은 `NOT_IMPLEMENTED` — V4 예정.
+
+**Context inject 동작:** cwd → 프로젝트 resolver 후 `data/projects/<id>/index.md` 본문 (frontmatter 제외) 출력. 4-char/token 휴리스틱으로 budget 초과 시 마지막 마침표에서 cut + `(truncated; run /pkm-recall ...)` 노티스 추가. 기본 `--quiet-on-not-linked` (NOT_LINKED 면 silent exit 0). `~/.claude/CLAUDE.md` 의 managed 블록이 `pkm:recalling-project-context` 스킬 invoke → 스킬이 이 명령을 호출.
+
+---
+
+## 슬래시 커맨드
+
+설치 경로는 두 갈래 — `pkm init` 이 깔아주는 데이터 repo 9 종 (워크플로우용) + `pkm install --for claude-code` 가 깔아주는 글로벌 4 종 (M14 전용).
+
+### 데이터 repo `.claude/commands/` (V1~V2)
+
+| 커맨드 | 입력 | 핵심 동작 |
+|---|---|---|
+| `/collect <url\|text>` | URL/텍스트 | WebFetch → 요약 + 태그 → `pkm capture create --status draft` |
+| `/research <topic>` | 토픽 | 다중 WebSearch + WebFetch → 3~6 capture + 옵션 chunks 묶음 |
+| `/review-captures` | (없음) | draft 순회 → `set-status reviewed` 또는 `rm` |
+| `/promote` | (없음) | reviewed 검토 → bucket 결정 → `pkm promote` |
+| `/lint [--fix]` | (옵션) | `pkm lint --json` 보고 + 필요 시 `--fix` |
+| `/ask <question>` | 질문 | `pkm search` → top-K Read → 인용 grounded 답변 |
+| `/write <topic>` | 토픽 | `pkm write new` → Edit 본문+인용 → `final` → `promote` |
+| `/style-import <url\|file>` | URL/파일 | WebFetch + manual fallback → `data/style/<slug>.md` |
+| `/blog "<주제>" \| --random` | 주제 또는 무인자 | search/sample 기반 outline → `blog/<slug>.md` 또는 `blog/seeds/` |
+
+### 글로벌 `~/.claude/commands/` (M14)
+
+| 커맨드 | 핵심 동작 (스킬 invoke) |
+|---|---|
+| `/pkm-recall <topic>` | `pkm:recalling-project-context` — `pkm project current` → `pkm context inject` → 옵션 `pkm search --scope project` |
+| `/pkm-extract-session [uuid]` | `pkm:extracting-session-knowledge` — transcript Read → 5 카테고리 후보 → 2 라운드 사용자 검토 → `pkm project knowledge add` × N + `pkm session mark-processed` |
+| `/pkm-backfill [--since ...]` | `pkm:backfilling-sessions` — `pkm session list --unprocessed` → 첫 세션 자세히 / 이후 일괄 모드 / 중단 시점부터 재개 |
+| `/pkm-project [verb]` | `pkm project link/current/list/show` 의 thin wrapper |
+
+> **슬래시 ↔ 스킬 매핑**: 슬래시는 사용자 입력 surface, 실제 워크플로우는 `~/.claude/skills/pkm/<id>/SKILL.md` 가 정의. `pkm install` 한 번에 모두 설치.
 
 ### `/ask` 인용 계약 (Karpathy grounding)
 
-- 모든 사실 주장은 끝에 `[<wiki-path>]` 를 붙인다. 다중 출처는 `[a.md][b.md]`.
-- 검색에 없는 내용은 주장 금지 — 결과 부족 시 "wiki 에 관련 내용이 부족합니다" 라고 답하고 종료.
-- 인용 경로는 path-resolvable 해야 함 — `pkm lint` 가 `BROKEN_CITATION` warning 으로 사후 검증.
-- 답변을 capture 로 저장하려면 frontmatter `derived_from: [...인용 경로 모두]` 필수. (compounding)
+- 모든 사실 주장 끝에 `[<wiki-path>]`. 다중 출처는 `[a.md][b.md]`
+- 검색 결과 부족 시 "wiki 에 관련 내용이 부족합니다" + 종료 — 추측 금지
+- 인용 경로는 path-resolvable — `pkm lint` 가 `BROKEN_CITATION` warning 으로 사후 검증
+- 답변을 capture 로 저장하려면 frontmatter `derived_from: [...인용 경로 모두]` 필수 (compounding)
 
 **Anti-pattern**: "내가 알기로는...", "일반적으로는...", 인용 없는 일반 지식 — 모두 금지.
 
 ---
 
-## 4. 유즈케이스 (시나리오 walk-through)
+## 유즈케이스
 
 ### UC1. 새 PC 셋업부터 첫 캡처까지
 
-상황: 노트북 한 대 더 추가, GitHub 에 PKM 데이터 repo 가 있음.
-
 ```bash
-# 1) 의존성
+# 의존성 + 소스 repo
 brew install uv
-git clone <소스 repo> ~/Downloads/Claude_lab/hwi_PKM
-cd ~/Downloads/Claude_lab/hwi_PKM
-uv sync --all-extras
-uv tool install --reinstall -e ".[ml,extract]"
+git clone <소스-repo> ~/Downloads/Claude_lab/hwi_PKM
+cd $_ && uv sync --all-extras
+uv tool install --reinstall -e ".[ml,extract,korean]"
 
-# 2) 데이터 repo
-git clone <데이터 repo> ~/Documents/pkm
+# 데이터 repo (이미 있으면 clone, 없으면 빈 dir)
+git clone <데이터-repo> ~/Documents/pkm
 cd ~/Documents/pkm
-pkm bootstrap                    # init 은 자동 스킵 (이미 init 됨), doctor --download → reindex --full → dashboard build
+pkm bootstrap                    # init 자동 skip → doctor --download → reindex --full → dashboard build
+pkm doctor --strict              # 모두 ✓
 
-# 3) 인수 검증
-pkm doctor --strict              # 모두 ✓ 여야 함
-
-# 4) 첫 캡처
-echo "테스트 본문" | pkm capture create --slug hello --title "첫 노트" --status draft
+# 첫 캡처
+echo "본문" | pkm capture create --slug hello --title "첫 노트"
 pkm capture set-status hello reviewed
 pkm reindex db data/raw/captures/2026-05-04-hello.md
-pkm search "테스트" --scope raw
+pkm search "첫" --scope raw
 ```
 
-빈 디렉토리에서 시작하는 경우는 `mkdir ~/Documents/pkm && cd $_ && pkm bootstrap` — `pkm init` 도 자동으로 prepend 됨. 모델 캐시 (~8 GB) 는 `~/.cache/pkm/models/` 에 한 번만 받고 모든 venv·repo 가 공유한다.
+빈 디렉토리에서 시작하면 `mkdir + cd + pkm bootstrap` 만 — `init` 도 자동 prepend. 모델 캐시 (~8 GB) 는 `~/.cache/pkm/models/` 한 번만 받고 모든 venv·repo 가 공유.
 
-### UC2. 단일 URL 캡처 → 검토 → wiki 승격
-
-상황: 블로그 글 하나를 wiki 의 `concepts/oauth-token-storage.md` 로 만들고 싶다.
+### UC2. 단일 URL → wiki 승격
 
 ```
-Claude Code 세션에서:
+Claude Code 세션:
   /collect https://example.com/oauth-tokens
-  → 자동: WebFetch + 요약 + tags 추론 + pkm capture create
-  → 결과: data/raw/captures/2026-05-04-oauth-tokens.md (status: draft)
+  → WebFetch + 요약 + tags → data/raw/captures/2026-05-04-oauth-tokens.md (draft)
 
   /review-captures
-  → draft 본문 확인 → keep
-  → pkm capture set-status oauth-tokens reviewed
+  → 본문 확인 → set-status reviewed
 
   /promote
   → bucket = "concepts" 결정
   → pkm promote oauth-tokens --to concepts
-  → 결과: data/wiki/concepts/oauth-tokens.md (status: stub, promoted_from: ...)
-         + capture status → archived (자동)
-         + git commit (자동)
+  → data/wiki/concepts/oauth-tokens.md (stub)
+  → 원본 capture status → archived (자동), git commit (자동)
 
-수정이 필요하면:
-  pkm wiki edit concepts/oauth-tokens --replace < new_full_body.md
-  또는
-  pkm wiki edit concepts/oauth-tokens --patch < unified.diff
+수정이 필요하면 (escape valve):
+  pkm wiki edit concepts/oauth-tokens --replace < new_body.md
+  pkm wiki edit concepts/oauth-tokens --patch   < unified.diff
 ```
 
-키 포인트: `data/wiki/**` 는 `.claude/settings.json` 으로 deny-write — Claude 의 `Edit` 툴이 직접 못 쓴다. 유일한 escape valve 가 `pkm wiki edit`.
+`data/wiki/**` 는 `.claude/settings.json` 으로 deny-write — Claude `Edit` 툴이 못 쓴다. 유일한 경로가 `pkm wiki edit`.
 
-### UC3. 다중 소스 리서치 → chunk 큐레이션 → writing 합성 → 승격
+### UC3. 다중 소스 → writing 합성 → 승격
 
-상황: "Embedding 모델 비교" 같은 여러 소스를 종합해야 하는 토픽.
+"Embedding 모델 비교" 같은 종합 토픽.
 
 ```
 1) 리서치
-  /research "embedding model comparison 2026"
-  → 다중 WebSearch + WebFetch → 5~6 개 capture 생성
-  → pkm chunks new embedding-comparison
-  → pkm chunks add embedding-comparison data/raw/captures/<5-6 files>
-  (옵션) PDF 가 있으면: pkm extract paper.pdf --out data/raw/chunks/embedding-comparison/paper.md
-  → pkm chunks set-status embedding-comparison ready
+   /research "embedding model comparison 2026"
+   → 5~6 capture 자동 생성
+   → pkm chunks new embedding-comparison
+   → pkm chunks add embedding-comparison <captures...>
+   (옵션) PDF: pkm extract paper.pdf --out data/raw/chunks/embedding-comparison/paper.md
+   → pkm chunks set-status embedding-comparison ready
 
-2) 합성 워크스페이스 만들기
-  /write embedding-comparison
-  → pkm write new --slug embedding-models --from-chunks embedding-comparison --purpose summary
-  → frontmatter 의 derived_from 이 chunks 파일들로 자동 시드됨
-  → AI 가 Edit 로 본문 작성:
-      - 각 derived_from 파일 Read
-      - 종합 + 인라인 인용 [<chunk path>]
-      - 결론 + 비교표
-  → pkm write set-status embedding-models final
+2) 합성
+   /write embedding-comparison
+   → pkm write new --slug embedding-models --from-chunks embedding-comparison --purpose summary
+   → derived_from 자동 시드 (chunks 파일 목록)
+   → AI 가 Edit: derived_from 각 파일 Read → 종합 + [<chunk-path>] 인라인 인용
+   → pkm write set-status embedding-models final
 
-3) wiki 로 게시
-  → pkm promote data/writing/embedding-models.md --to reports
-  → 결과: data/wiki/reports/embedding-models.md (status: stub)
-         + writing artifact status → promoted (또는 archived)
+3) 승격 (M11 grounding gate 통과 필수)
+   pkm promote data/writing/embedding-models.md --to reports
+   → data/wiki/reports/embedding-models.md (stub)
 ```
 
-이 경로가 본 PKM 의 **compounding** 핵심이다 — 매 검색마다 재합성하지 않고 wiki 가 누적된다.
+이 경로가 본 PKM 의 **compounding** 핵심 — 매 검색마다 재합성하지 않고 wiki 가 누적된다.
 
 ### UC4. wiki 에 답이 있는지 `/ask` 로 묻기
 
-상황: "OAuth refresh token 어떻게 저장해야 하지?" 같은 질문.
-
 ```
-Claude Code 세션:
-  /ask "OAuth refresh token은 어디에 저장하나요?"
+/ask "OAuth refresh token 은 어디에 저장하나요?"
 
-내부 동작:
-  1. pkm search "OAuth refresh token 저장" --scope wiki -n 8 --json
-     (만약 .pkm/config.local.toml 에 expand_query 가 정의되어 있으면 --expand 사용)
-  2. top-K 결과의 파일을 Read 툴로 읽기
-  3. Claude 가 본문만 근거로 합성 — 모든 사실 주장에 [<wiki-path>] 인용 첨부
-  4. wiki 가 비어있으면 "wiki 에 관련 내용이 부족합니다. /collect 로 자료를 모아주세요" 후 종료
-  5. (옵션) 답변을 capture 로 저장 — derived_from: [모든 인용 경로]
+내부:
+  1. pkm search "..." --scope wiki -n 8 --json    # config 에 expand_query 정의 시 --expand
+  2. top-K 파일을 Read 툴로 읽기
+  3. 본문만 근거로 합성 — 모든 사실에 [<wiki-path>] 첨부
+  4. wiki 가 비면 "관련 내용 부족" + 종료
 
 답변 예:
   OAuth refresh token 은 httpOnly secure cookie 에 저장한다.
@@ -524,62 +403,52 @@ Claude Code 세션:
   [data/wiki/concepts/oauth-token-storage.md][data/wiki/notes/web-auth-pitfalls.md]
 ```
 
-검증: 다음 `pkm lint` 실행 시 `[<path>]` 인용이 실존 경로인지 자동 검사 (`BROKEN_CITATION`).
+검증: 다음 `pkm lint` 가 인용 경로 실재 여부 자동 검사 (`BROKEN_CITATION`).
 
-### UC5. lint 실패 흐름 + `--fix` 자동 수리
-
-상황: 캡처 만들 때 frontmatter 빠뜨렸거나, wiki 페이지에서 깨진 wikilink 가 있다.
+### UC5. lint 실패 흐름 + `--fix`
 
 ```bash
 pkm lint --json
-# 출력 예 (요약):
-# - error MISSING_FIELD       data/raw/captures/foo.md  (slug 누락)
-# - error MISSING_FIELD       data/raw/captures/bar.md  (created_at 누락)
-# - error BROKEN_WIKILINK     data/wiki/concepts/baz.md → [[non-existent]]
-# - error ORPHAN_PROMOTED_SOURCE data/wiki/notes/qux.md (promoted_from 이 archived 안 됨)
-# - warn  STALE_DRAFT         data/raw/captures/old.md  (45 일 방치)
-# - warn  BROKEN_CITATION     data/wiki/notes/qux.md   ([data/wiki/missing.md])
+# error MISSING_FIELD            data/raw/captures/foo.md  (slug 누락)
+# error BROKEN_WIKILINK          data/wiki/concepts/baz.md → [[non-existent]]
+# error ORPHAN_PROMOTED_SOURCE   data/wiki/notes/qux.md
+# warn  STALE_DRAFT              data/raw/captures/old.md  (45일 방치)
+# warn  BROKEN_CITATION          data/wiki/notes/qux.md   ([data/wiki/missing.md])
 
 pkm lint --fix --json
-# 자동 수리: MISSING_FIELD(slug, created_at), ORPHAN_PROMOTED_SOURCE
-# 잔여: BROKEN_WIKILINK, BROKEN_CITATION, STALE_DRAFT — 사람이 결정
+# 자동: MISSING_FIELD(slug, created_at), ORPHAN_PROMOTED_SOURCE
+# 잔여: BROKEN_WIKILINK, BROKEN_CITATION, STALE_DRAFT — 사람 결정
 
-# CI 게이트 (warning 무시, error 만으로 exit ≠ 0)
-pkm lint --errors-only
+pkm lint --errors-only          # CI/pre-commit 게이트
 ```
 
-`/lint` 슬래시는 위 흐름을 한 번에 — `--json` 보고 + 필요 시 `--fix` + 잔여 수동 안내.
+`/lint` 슬래시가 위 흐름을 한 번에 — `--json` 보고 + 필요 시 `--fix` + 잔여 수동 안내.
 
-### UC6. 대시보드 빌드 + 새 PC 에서 복원
+### UC6. 대시보드 빌드 + 새 PC 복원
 
-대시보드는 매 mutate 마다 자동 빌드되지 않는다 — 명시적으로:
 ```bash
 pkm dashboard build
 open dashboard/index.html
+
+# 새 PC 에서 데이터 repo 통째로 복원
+git clone <데이터-repo> && cd $_
+pkm bootstrap                    # doctor --download → reindex --full → dashboard build
 ```
 
-새 PC 에서 데이터 repo 통째로 복원:
-```bash
-git clone <데이터 repo> && cd $_
-pkm bootstrap          # doctor --download → reindex --full → dashboard build
-```
+`dashboard/` · `.pkm/index.db` 는 gitignore — markdown 만으로 결정론적 재생성. 첫 1 회 모델 다운로드 후엔 추가 다운로드 0.
 
-`dashboard/` · `.pkm/index.db` 는 gitignore 이지만 markdown 만으로 결정론적 재생성 — 첫 1 회 모델 다운로드 후엔 매번 추가 다운로드 0.
-
-자동화 (선택): 데이터 repo 의 `.git/hooks/post-commit` 에
+자동화 (선택): `.git/hooks/post-commit` 에:
 ```bash
 #!/usr/bin/env bash
 pkm dashboard build > /dev/null
 ```
 
-GitHub Pages 로 배포하려면 별도 브랜치 (`dashboard-build`) 또는 별도 repo 분리. `status.html` 이 config 를 렌더하므로 공개 노출 시 `.pkm/config.local.toml` 미커밋 + 시크릿 마스킹 (자동) 확인.
-
-### UC7. AI CLI 셸아웃 옵트인 (`--expand`)
+### UC7. AI CLI 셸아웃 옵트인 (`search --expand`)
 
 기본 검색은 결정론 (BM25 + vec0 + RRF + reranker — 모두 로컬). 쿼리확장이 정확도에 도움이 될 때만 옵트인.
 
-`.pkm/config.local.toml` (gitignore — 머신별 비공개):
 ```toml
+# .pkm/config.local.toml (gitignore — PC 별 비공개)
 [ai_cli.commands.my-claude]
 exec    = ["claude", "--model", "haiku", "-p", "{prompt}"]
 input   = "arg"          # arg | stdin | file:{path}
@@ -590,89 +459,85 @@ env     = { ANTHROPIC_LOG = "error" }
 expand_query = "my-claude"
 ```
 
-`.pkm/config.toml` (커밋 — 공용 디폴트만):
 ```toml
+# .pkm/config.toml (커밋 — 공용 디폴트만)
 [ai_cli]
 default        = "my-claude"
 fallback_order = ["my-claude", "codex", "gemini"]
 ```
 
-⚠️ **`exec` / `env` / credentials 패턴 키는 `config.toml` 에 두면 `pkm doctor` 가 에러로 차단** — `config.local.toml` 로 옮기라는 hint 를 준다.
+> ⚠️ `exec` / `env` / credentials 패턴 키를 `.pkm/config.toml` 에 두면 `pkm doctor` 가 에러로 차단 — `config.local.toml` 로 옮기라는 hint 출력.
 
-확인 + 사용:
 ```bash
-pkm doctor                                        # ai_cli row 가 detected: my-claude
-pkm search "OAuth 토큰 저장" --expand            # 셸아웃 + 변형 2~3 개 → 병렬 검색
-
-# 한 회성 오버라이드 (config 변경 없이)
-PKM_AI_CLI=ollama-local pkm search "..." --expand
+pkm doctor                                  # ai_cli row: detected: my-claude
+pkm search "OAuth 토큰 저장" --expand       # 셸아웃 + 변형 2~3 → 병렬 검색
+PKM_AI_CLI=ollama-local pkm search "..." --expand   # 1회용 override
 ```
 
 해석 순서: 셸 훅 (`.pkm/hooks/<task>.sh`) → config tasks → config default → 자동탐지 → 모두 실패 시 명확한 에러.
 
-`--expand` 안 쓰면 AI CLI 자체가 불필요하다. `/ask` 도 Claude Code 자체로 동작 — 즉 본 PKM 은 **API 키 0 개, 외부 SDK 미사용** 으로도 모든 핵심 기능이 돌아간다.
+`--expand` 안 쓰면 AI CLI 자체 불필요 — 본 PKM 은 **API 키 0 개, 외부 SDK 미사용** 으로도 모든 핵심 기능이 돈다.
 
----
+### UC8. 세션 추출 → 프로젝트 등록 (M14)
 
-### UC8. Claude Code 세션 끝난 후 지식 추출 → 프로젝트 등록
-
-상황: hwi_PKM 작업 중 OAuth 결정 + 미들웨어 함정 + SQL 스니펫이 쌓였다.
+상황: hwi_PKM 작업 중 결정 + 함정 + 스니펫이 transcript 에 쌓였다.
 
 ```
 Claude Code 세션 안에서:
   /pkm-extract-session
-  → pkm:extracting-session-knowledge 스킬 invoke
-  → 1. CLAUDE_SESSION_ID env 또는 최근 세션 → uuid 결정
-  → 2. pkm session show → transcript_path
-  → 3. transcript Read 툴로 읽기
-  → 4. 5 카테고리 후보 빌드 (decisions 3, pitfalls 1, snippets 5, qna 0, notes 2)
-  → 5. 사용자에게 markdown 표 제시 → "decisions 3 빼고 진행" 응답
-  → 6. 반영 후 재출력 → "OK"
-  → 7. pkm project knowledge add 항목별 호출 (10 회) — auto-commit
-  → 8. pkm session mark-processed
-  → 9. pkm project rebuild-index hwi-pkm
-  → 10. pkm reindex db --scope project:hwi-pkm
+  → pkm:extracting-session-knowledge 스킬:
+    1. CLAUDE_SESSION_ID env 또는 최근 세션 → uuid 결정
+    2. pkm session show <uuid> → transcript_path
+    3. transcript Read 툴로 읽기
+    4. 5 카테고리 후보 빌드 (decisions 3, pitfalls 1, snippets 5, qna 0, notes 2)
+    5. 사용자에게 markdown 표 제시 → "decisions 3 빼고 진행" 응답
+    6. 반영 후 재출력 → "OK"
+    7. pkm project knowledge add 항목별 호출 (× N) — auto-commit
+    8. pkm session mark-processed
+    9. pkm project rebuild-index hwi-pkm
+   10. pkm reindex db --scope project:hwi-pkm
 
 결과:
-  data/projects/hwi-pkm/decisions/2026-05-07-*.md (2 개)
-  data/projects/hwi-pkm/pitfalls/2026-05-07-*.md  (1 개)
-  data/projects/hwi-pkm/snippets/2026-05-07-*.md  (5 개)
-  data/projects/hwi-pkm/notes/2026-05-07-*.md     (2 개)
-  .pkm/sessions/hwi-pkm/<uuid>.json (메타)
-  data/projects/hwi-pkm/index.md (자동 갱신)
+  data/projects/hwi-pkm/decisions/2026-05-07-*.md (2)
+  data/projects/hwi-pkm/pitfalls/2026-05-07-*.md  (1)
+  data/projects/hwi-pkm/snippets/2026-05-07-*.md  (5)
+  data/projects/hwi-pkm/notes/2026-05-07-*.md     (2)
+  .pkm/sessions/hwi-pkm/<uuid>.json (메타, gitignore)
+  data/projects/hwi-pkm/index.md  (자동 갱신)
 ```
 
 다음 세션에서 `/pkm-recall OAuth` 하면 검색에 즉시 잡힘.
 
-### UC9. 과거 세션 일괄 backfill
+### UC9. 과거 세션 일괄 backfill (M14)
 
-상황: PKM 처음 도입 + `~/.claude/projects/-Users-me-Code-app/` 에 47 개 세션 누적.
+상황: PKM 처음 도입, `~/.claude/projects/-Users-me-Code-app/` 에 47 개 세션 누적.
 
 ```
 1) cd ~/Code/my-app
 2) pkm project link --id my-app
-3) Claude Code 세션 안에서:
-   /pkm-backfill --project my-app --since 2026-01-01
+3) /pkm-backfill --project my-app --since 2026-01-01
 
    → pkm:backfilling-sessions 스킬:
      - pkm session list --unprocessed → 47 세션
-     - 사용자 확인 + "첫 세션 자세히 / 이후 일괄"
-     - 첫 세션: 두 라운드 검토 → 8 항목 등록
-     - 두 번째부터: 일괄 모드 — 한 번 보여주고 yes/skip/edit/stop
+     - 사용자 확인 + 모드 선택: "첫 세션 자세히 / 이후 일괄"
+     - 첫 세션: 2 라운드 검토 → 8 항목 등록
+     - 두 번째부터 일괄 모드 — 한 번 보여주고 yes/skip/edit/stop
      - 세션 12 에서 사용자 stop-batch
-     - 처리: 12/47 세션, ~80 항목
+     - 처리: 12/47, ~80 항목
 
 4) 다음에 /pkm-backfill 재호출 → 13 부터 자동 재개
 ```
 
-중단 시점까지 안전 — 처리된 세션은 메타파일 (`~/Documents/pkm/.pkm/sessions/my-app/<uuid>.json`) 에 기록되어 재처리되지 않음. 특정 세션을 다시 처리하려면 `pkm session forget <uuid>` 후 backfill 재실행.
+중단 안전 — 처리된 세션은 `.pkm/sessions/my-app/<uuid>.json` 에 기록되어 재처리 안 됨. 특정 세션 재처리는 `pkm session forget <uuid>` 후 backfill 재실행.
 
 ---
 
-## 5. 더 깊이 들어가려면
+## 더 깊이
 
-- **디자인 사양** (1266 줄, 한국어): `docs/superpowers/specs/2026-05-01-pkm-design.md`
-- **마일스톤 플랜**: `docs/superpowers/plans/2026-05-{01..03}-pkm-m{1..7}-*.md`
-- **운영자 매뉴얼** (AI 진입점): 데이터 repo 의 `SCHEMA.md`
-- **에러 코드 단일 진실**: `pkm/errors.py` (커버리지: `tests/test_failure_mode_matrix.py`)
-- **CLI surface 단일 진실**: `pkm --help` + 각 서브명령 `--help`
+| 자료 | 위치 |
+|---|---|
+| 디자인 사양 (V1, V2, V3) | `docs/superpowers/specs/2026-05-{01,06,07}-*.md` |
+| 마일스톤 플랜 (M1~M14) | `docs/superpowers/plans/2026-05-*-pkm-m*.md` |
+| 운영자 매뉴얼 (AI 진입점) | 데이터 repo 의 `SCHEMA.md` |
+| 에러 코드 단일 진실 | `pkm/errors.py` (커버리지: `tests/test_failure_mode_matrix.py`) |
+| CLI surface 단일 진실 | `pkm --help` + 각 서브명령 `--help` |

@@ -2,7 +2,7 @@
 
 마크다운을 단일 진실(source of truth)로 두는 1인용 PKM. 결정론적 `pkm` CLI 가 capture · curation · indexing · wiki promotion · AI 보조 작성 · 정적 HTML 대시보드까지 담당하며, 일상 운용은 Claude Code 세션에서 한다.
 
-전체 V1 디자인 사양: `docs/superpowers/specs/2026-05-01-pkm-design.md` (한국어).
+디자인 사양 (한국어, 누적): `docs/superpowers/specs/` — V1 `2026-05-01-pkm-design.md`, V2 `2026-05-06-pkm-v2-design.md`, V3 `2026-05-07-pkm-projects-and-sessions-design.md`.
 
 ## 두 개의 repo — 소스 vs 데이터
 
@@ -37,21 +37,25 @@ which pkm                         # 예: ~/.local/bin/pkm
 # 4) 데이터 repo 생성 + 한 번에 셋업
 #    빈 dir 이면 `pkm bootstrap` 이 자동으로 init → doctor --download (~8 GB)
 #    → reindex → dashboard 까지 한 흐름으로 처리 (이미 init 된 dir 이면 init 단계는 스킵).
-mkdir -p ~/Documents/pkm && cd ~/Documents/pkm
+mkdir -p ~/Documents/pkm && cd ~/Documents/pkm  # 데이터 repo 위치는 자유 (예시는 Documents/pkm)
 pkm bootstrap
 
 # 5) 인수 검증 — 모든 row 가 ✓ 여야 정상
 pkm doctor --strict
 
-# 6) 첫 캡쳐 → 검색 → 대시보드 미리보기
+# 6) 첫 캡쳐 → 검색 → 대시보드 미리보기 ( 옵션 )
 pkm capture create --slug hello --title "첫 노트" --url https://example.com <<<"본문"
 pkm capture set-status hello reviewed
 pkm reindex db --full
 pkm search "첫"
 open dashboard/index.html
+
+# 7) (옵션, V3) Claude Code 글로벌 통합 — 어떤 코드 repo 에서든 `/pkm-*` 슬래시 사용
+pkm install --for claude-code --data-repo "~/Documents/pkm"  # 4) 데이터 repo 지정한 위치
+cd <코드-repo> && pkm project link --id <slug>
 ```
 
-> 단계를 분리해서 가고 싶다면: `pkm init` → `pkm doctor --download` → `pkm reindex db --full` → `pkm dashboard build`. `pkm bootstrap` 은 이 4단계의 idempotent wrapper.
+> 단계를 분리해서 가고 싶다면: `pkm init` → `pkm doctor --download` → `pkm reindex db --full` → `pkm dashboard build`. `pkm bootstrap` 은 이 4단계의 idempotent wrapper. 7) 은 V3 (M13+M14) 기능 — projects · sessions · 글로벌 skills/commands.
 
 ## 명령어 한눈에
 
@@ -68,11 +72,14 @@ open dashboard/index.html
 | Migrate | `pkm migrate [--check] [--apply] [--json]` (M12 — 스키마 버전 마이그레이션) |
 | Project | `pkm project {link,list,current,show,rebuild-index,rm}`, `pkm project knowledge add` (M13 — 프로젝트별 노하우) |
 | Session | `pkm session {list,show,forget,mark-processed}` (M14 — Claude Code transcript discovery) |
-| Install | `pkm install --for claude-code [--data-repo PATH] [--uninstall]` (M14 — global CLAUDE.md + skills + slash commands) |
+| Install | `pkm install --for claude-code --data-repo <PATH> [--uninstall]` (M14 — global CLAUDE.md + skills + slash commands; `--data-repo` 필수) |
 | Context | `pkm context inject [--max-tokens N]` (M14 — project index → AI session) |
 | Log | `pkm log` |
 
-`pkm init` 이 데이터 repo 에 자동으로 깔아주는 슬래시 커맨드: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` (`/blog --random` 으로 랜덤 wiki 카드 시드 초안 생성) — Claude Code 세션에서 바로 사용 가능.
+슬래시 커맨드는 두 경로로 설치된다:
+
+- `pkm init` → 데이터 repo `.claude/commands/` 에 9종: `/collect`, `/research`, `/review-captures`, `/promote`, `/lint`, `/ask`, `/write`, `/style-import`, `/blog` (`/blog --random` 으로 랜덤 wiki 카드 시드 초안)
+- `pkm install --for claude-code` → 글로벌 `~/.claude/commands/` 에 4종 (`/pkm-recall`, `/pkm-extract-session`, `/pkm-backfill`, `/pkm-project`) + `~/.claude/skills/pkm/` 에 3종 (`recalling-project-context`, `extracting-session-knowledge`, `backfilling-sessions`) + `~/.claude/CLAUDE.md` managed block (M14 — 어떤 코드 repo 안에서든 호출 가능)
 
 ## 디렉토리 구조 (데이터 repo 기준)
 
@@ -116,11 +123,13 @@ SCHEMA.md            # AI 에이전트가 따르는 워크플로우 룰북
 - [x] M5 — AI bridge & Writing
 - [x] M6 — Dashboard
 - [x] M7 — Hardening (V1 GA, 태그 `m7-hardening`)
-- [ ] M10 — Graph Surfacing (in progress)
-- [ ] M11 — Writing Grounding (in progress)
-- [x] M12 — Migration Infra + Kiwi
+- [x] M8 — Blog Style
+- [x] M9 — Blog Random
+- [x] M10 — Graph Surfacing
+- [x] M11 — Writing Grounding
+- [x] M12 — Migration Infra + Kiwi (V2 GA)
 - [x] M13 — Project Scope Foundation
-- [x] M14 — Session Adapter + Claude Code Skills
+- [x] M14 — Session Adapter + Claude Code Skills (V3 GA)
 
 기능별 상세와 유즈케이스 walk-through 는 `docs/FEATURES.md` 참조.
 

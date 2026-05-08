@@ -61,13 +61,25 @@ DEFERRED_CODES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _base_env() -> dict[str, str]:
-    """Shared env: stub embedder + reranker so tests don't need real models."""
-    return {
+def _base_env(repo: Path | None = None) -> dict[str, str]:
+    """Shared env: stub embedder + reranker, and pin PKM_DATA_REPO to the
+    test repo so subprocess `pkm` invocations can't fall back to the
+    developer's real `~/.pkm/config.toml` and pollute their data repo
+    (issue: tests creating data/projects/x or running capture lifecycle
+    against the real repo).
+
+    Pass ``repo`` whenever the test has an isolated tmp repo it wants pkm
+    to operate on. Omit it only for invocations that legitimately must
+    *not* see a data_repo (e.g. PKM_INSTALL_MISSING with rerouted HOME).
+    """
+    env = {
         **os.environ,
         "PKM_TEST_STUB_EMBEDDER": "1",
         "PKM_TEST_STUB_RERANKER": "1",
     }
+    if repo is not None:
+        env["PKM_DATA_REPO"] = str(repo)
+    return env
 
 
 def _init_repo(tmp_path: Path) -> Path:
@@ -76,7 +88,7 @@ def _init_repo(tmp_path: Path) -> Path:
         cwd=tmp_path,
         check=True,
         capture_output=True,
-        env=_base_env(),
+        env=_base_env(tmp_path),
     )
     return tmp_path
 
@@ -101,7 +113,7 @@ def _create_capture(repo: Path, slug: str, body: str = "indexed body content") -
         input=body,
         text=True,
         capture_output=True,
-        env=_base_env(),
+        env=_base_env(repo),
     )
     assert proc.returncode == 0, proc.stderr
 
@@ -113,7 +125,7 @@ def _reindex(repo: Path) -> None:
         cwd=repo,
         check=True,
         capture_output=True,
-        env=_base_env(),
+        env=_base_env(repo),
     )
     import sqlite3
 
@@ -451,7 +463,7 @@ def _scenario_pkm_install_missing(repo: Path) -> list[str]:
         cwd=repo,
         check=True,
         capture_output=True,
-        env=_base_env(),
+        env=_base_env(repo),
     )
     return ["doctor", "--strict", "--json"]
 
@@ -471,7 +483,7 @@ def _scenario_similar_knowledge_candidate(repo: Path) -> list[str]:
         base_fm.replace("oauth-refresh", "b") + body, encoding="utf-8"
     )
     # Run migrate + reindex synchronously so docs_vec is populated for the lint warning.
-    env = _base_env()
+    env = _base_env(repo)
     subprocess.run(
         [sys.executable, "-m", "pkm", "migrate", "--apply"],
         cwd=repo,
@@ -590,7 +602,7 @@ def test_code_is_reachable(code: str, tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     argv = SCENARIOS[code](repo)
 
-    env = _base_env()
+    env = _base_env(repo)
     overrides = dict(SCENARIO_ENV.get(code, {}))
     # Empty-string override = unset (remove from env).
     for k, v in list(overrides.items()):

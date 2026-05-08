@@ -47,26 +47,42 @@ class ClaudeCodeAdapter:
                 yield self._build_ref(jsonl, cwd_dir)
 
     def _build_ref(self, jsonl: Path, cwd_dir: Path) -> SessionRef:
-        # Read header only (first line + line count) — full parse happens in parse().
+        # Header scan: count messages, capture first timestamp, capture first
+        # `cwd` field. Claude Code records the actual cwd in each message
+        # payload — this is the canonical source, since the dir-name encoding
+        # (replaces both `/` and `_` with `-`) is lossy.
+        started_at = None
+        payload_cwd: str | None = None
+        msg_count = 0
         try:
             with jsonl.open("r", encoding="utf-8") as f:
-                first_line = f.readline()
-                msg_count = 1 + sum(1 for _ in f)
+                for line in f:
+                    if not line.strip():
+                        continue
+                    msg_count += 1
+                    if started_at is not None and payload_cwd is not None:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if started_at is None:
+                        ts = obj.get("timestamp")
+                        if ts:
+                            try:
+                                started_at = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                            except ValueError:
+                                pass
+                    if payload_cwd is None:
+                        c = obj.get("cwd")
+                        if isinstance(c, str) and c:
+                            payload_cwd = c
         except OSError:
-            first_line = ""
-            msg_count = 0
-        started_at = None
-        if first_line:
-            try:
-                first = json.loads(first_line)
-                ts = first.get("timestamp")
-                if ts:
-                    started_at = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            except (json.JSONDecodeError, ValueError):
-                pass
+            pass
+        cwd = Path(payload_cwd) if payload_cwd else Path(decode_cwd(cwd_dir.name))
         return SessionRef(
             uuid=jsonl.stem,
-            cwd=Path(decode_cwd(cwd_dir.name)),
+            cwd=cwd,
             started_at=started_at,
             last_message_at=None,
             message_count=msg_count,

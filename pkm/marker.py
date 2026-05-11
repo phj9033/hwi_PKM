@@ -35,3 +35,34 @@ def read(cwd: Path) -> str | None:
         if stripped:
             return stripped
     return None
+
+
+def write(cwd: Path, project_id: str) -> bool:
+    """Write `<cwd>/.pkm-link` with `<project_id>\n`. Overwrites if present.
+
+    Returns False on any IO failure (readonly fs, permission, missing dir).
+    """
+    path = cwd / MARKER_FILENAME
+    try:
+        path.write_text(f"{project_id}\n", encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def delete(cwd: Path) -> bool:
+    """Remove `<cwd>/.pkm-link`. Idempotent — absence counts as success.
+
+    Returns False if the marker exists but cannot be removed (e.g. it is a
+    directory or permission is denied).
+    """
+    path = cwd / MARKER_FILENAME
+    try:
+        if not path.exists():
+            return True
+        if path.is_dir():
+            return False
+        path.unlink()
+        return True
+    except OSError:
+        return False

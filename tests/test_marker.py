@@ -84,3 +84,49 @@ def test_delete_missing_returns_true(tmp_path: Path):
 def test_delete_directory_returns_false(tmp_path: Path):
     (tmp_path / ".pkm-link").mkdir()
     assert marker.delete(tmp_path) is False
+
+
+def test_diagnose_clean_when_linked_with_matching_marker(tmp_path: Path):
+    marker.write(tmp_path, "my-app")
+    assert marker.diagnose(tmp_path, resolved_id="my-app") is None
+
+
+def test_diagnose_clean_when_not_linked_and_no_marker(tmp_path: Path):
+    assert marker.diagnose(tmp_path, resolved_id=None) is None
+
+
+def test_diagnose_marker_missing(tmp_path: Path):
+    d = marker.diagnose(tmp_path, resolved_id="my-app")
+    assert d is not None
+    assert d.code == "MARKER_MISSING"
+    assert "my-app" in d.detail
+
+
+def test_diagnose_marker_mismatch(tmp_path: Path):
+    marker.write(tmp_path, "old-id")
+    d = marker.diagnose(tmp_path, resolved_id="new-id")
+    assert d is not None
+    assert d.code == "MARKER_MISMATCH"
+    assert "old-id" in d.detail and "new-id" in d.detail
+
+
+def test_diagnose_marker_orphan(tmp_path: Path):
+    marker.write(tmp_path, "stale-id")
+    d = marker.diagnose(tmp_path, resolved_id=None)
+    assert d is not None
+    assert d.code == "MARKER_ORPHAN"
+    assert "stale-id" in d.detail
+
+
+def test_diagnose_marker_invalid_directory(tmp_path: Path):
+    (tmp_path / ".pkm-link").mkdir()
+    d = marker.diagnose(tmp_path, resolved_id="my-app")
+    assert d is not None
+    assert d.code == "MARKER_INVALID"
+
+
+def test_diagnose_marker_invalid_empty(tmp_path: Path):
+    (tmp_path / ".pkm-link").write_text("\n  \n", encoding="utf-8")
+    d = marker.diagnose(tmp_path, resolved_id="my-app")
+    assert d is not None
+    assert d.code == "MARKER_INVALID"

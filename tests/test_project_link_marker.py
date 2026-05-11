@@ -7,7 +7,6 @@ import os
 import subprocess
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pkm.cli import app

@@ -380,8 +380,8 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Report PKM environment & structure status."""
         if acknowledge_release_notes:
-            marker = root / ".pkm" / "release_notes_acknowledged"
-            marker.touch()
+            ack_marker = root / ".pkm" / "release_notes_acknowledged"
+            ack_marker.touch()
             if json_out:
                 typer.echo(json.dumps({"ok": True, "acknowledged": True}, ensure_ascii=False))
             else:

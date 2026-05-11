@@ -331,7 +331,6 @@ def register(app: typer.Typer) -> None:
             cwd = Path.cwd()
             cwd_matches = False
             try:
-                from pkm.session.git_remote import discover_remote, normalize_remote
                 raw = discover_remote(cwd)
                 canon = normalize_remote(raw) if raw else None
                 if canon and canon in record.git_remotes:

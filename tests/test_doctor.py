@@ -17,7 +17,13 @@ def _init_pkm(tmp_path: Path) -> None:
 
 
 def _full_init_pkm(tmp_path: Path, monkeypatch) -> None:
-    """Full initialization: init + migrate + reindex + model cache + claude-code install."""
+    """Full initialization: init + migrate + reindex + model cache + claude-code install.
+
+    Also chdirs into `tmp_path` so cwd-local doctor checks (e.g. `_check_marker`,
+    `_check_current_project`) don't pick up stray `.pkm-link` files from the
+    developer's working directory and trip `--strict`.
+    """
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PKM_TEST_STUB_EMBEDDER", "1")
     runner.invoke(app, ["init", "--root", str(tmp_path)])
     runner.invoke(app, ["migrate", "--apply", "--root", str(tmp_path)])

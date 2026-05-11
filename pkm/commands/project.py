@@ -15,6 +15,7 @@ from pathlib import Path
 import typer
 import yaml
 
+from pkm import marker
 from pkm.config.global_config import resolve_data_repo
 from pkm.errors import (
     PKMAlreadyLinked,
@@ -144,13 +145,35 @@ def register(app: typer.Typer) -> None:
                     capture_output=True,
                 )
 
-            payload = {"ok": True, "project_id": pid, "data_dir": f"data/projects/{pid}"}
+            marker_written = marker.write(cwd, pid)
+            if not marker_written:
+                typer.echo(
+                    f"warning: failed to write {marker.MARKER_FILENAME} marker in {cwd}",
+                    err=True,
+                )
+
+            payload = {
+                "ok": True,
+                "project_id": pid,
+                "data_dir": f"data/projects/{pid}",
+                "marker_written": marker_written,
+            }
             if json_out:
                 typer.echo(json.dumps(payload, ensure_ascii=False))
             else:
                 typer.echo(f"linked: {pid} -> data/projects/{pid}")
 
-        except (PKMNotAGitRepo, PKMAlreadyLinked, PKMProjectIdConflict, PKMInvalidProjectId, PKMValidationError) as e:
+        except PKMAlreadyLinked as e:
+            if "pid" in locals():
+                marker.write(cwd, pid)  # best-effort idempotent marker recreate
+            if json_out:
+                typer.echo(json.dumps(
+                    {"ok": False, "error": {"code": e.code, "message": e.message, "hint": e.hint}},
+                    ensure_ascii=False,
+                ))
+                raise typer.Exit(getattr(e, "exit_code", 1))
+            raise
+        except (PKMNotAGitRepo, PKMProjectIdConflict, PKMInvalidProjectId, PKMValidationError) as e:
             if json_out:
                 typer.echo(json.dumps(
                     {"ok": False, "error": {"code": e.code, "message": e.message, "hint": e.hint}},

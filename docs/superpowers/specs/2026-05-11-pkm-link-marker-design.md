@@ -83,7 +83,8 @@ Claude Code harness 는 exit 1 을 `Error: Exit code 1` 헤더와 함께 사용�
 | 라이프사이클 소유자 | `pkm project link` (생성), `pkm project rm` (cwd 매칭 시 삭제), `pkm project doctor --fix` (sync) |
 | git 권장 | `.gitignore` 등재 (per-machine link 상태) |
 | 잘못된 형식일 때 | 무시 후 NOT_LINKED 처럼 fallback (CLAUDE.md `2>/dev/null` 로 silent) |
-| 디렉토리/심볼릭일 때 | 무시 |
+| 디렉토리일 때 | INVALID 처리 (무시) |
+| 심볼릭일 때 | target 이 정상 regular file 이면 정상 처리 (read 가 `is_file()` 따라감), broken/dangling 이면 무시 |
 | 읽기 의미론 | 파일 전체를 UTF-8 로 읽고, 첫 번째 비-공백 라인을 `strip()` 한 결과를 project_id 로 채택. 비어 있거나 첫 라인이 공백뿐이면 INVALID. |
 
 ### 3.1 신뢰 모델

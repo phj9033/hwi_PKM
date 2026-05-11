@@ -57,6 +57,8 @@ cd <코드-repo> && pkm project link --id <slug>
 
 > 단계를 분리해서 가고 싶다면: `pkm init` → `pkm doctor --download` → `pkm reindex db --full` → `pkm dashboard build`. `pkm bootstrap` 은 이 4단계의 idempotent wrapper. 7) 은 V3 (M13+M14) 기능 — projects · sessions · 글로벌 skills/commands.
 
+- `pkm project link` 은 cwd 에 `.pkm-link` 마커를 생성합니다 (CLAUDE.md fast-path 용 hint; gitignore 권장).
+
 ## 명령어 한눈에
 
 | 그룹 | 명령 |

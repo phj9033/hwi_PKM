@@ -84,3 +84,48 @@ def test_doctor_marker_ok_when_not_linked_and_no_marker(tmp_data_repo, tmp_code_
     item = _doctor_marker_item(result.output)
     assert item is not None
     assert item["status"] == "ok"
+
+
+def test_doctor_fix_creates_missing_marker(tmp_data_repo, tmp_code_repo, monkeypatch):
+    _git_init(tmp_code_repo)
+    monkeypatch.chdir(tmp_code_repo)
+    runner.invoke(app, ["project", "link", "--id", "my-app", "--no-commit", "--data-repo", str(tmp_data_repo)])
+    (tmp_code_repo / ".pkm-link").unlink()
+    result = runner.invoke(app, ["doctor", "--fix", "--json", "--root", str(tmp_data_repo)])
+    assert result.exit_code == 0
+    assert (tmp_code_repo / ".pkm-link").is_file()
+    assert (tmp_code_repo / ".pkm-link").read_text(encoding="utf-8").strip() == "my-app"
+
+
+def test_doctor_fix_overwrites_mismatched_marker(tmp_data_repo, tmp_code_repo, monkeypatch):
+    _git_init(tmp_code_repo)
+    monkeypatch.chdir(tmp_code_repo)
+    runner.invoke(app, ["project", "link", "--id", "my-app", "--no-commit", "--data-repo", str(tmp_data_repo)])
+    (tmp_code_repo / ".pkm-link").write_text("wrong\n", encoding="utf-8")
+    runner.invoke(app, ["doctor", "--fix", "--root", str(tmp_data_repo)])
+    assert (tmp_code_repo / ".pkm-link").read_text(encoding="utf-8").strip() == "my-app"
+
+
+def test_doctor_fix_removes_orphan_marker(tmp_data_repo, tmp_code_repo, monkeypatch):
+    monkeypatch.chdir(tmp_code_repo)
+    (tmp_code_repo / ".pkm-link").write_text("stale\n", encoding="utf-8")
+    runner.invoke(app, ["doctor", "--fix", "--root", str(tmp_data_repo)])
+    assert not (tmp_code_repo / ".pkm-link").exists()
+
+
+def test_doctor_fix_removes_invalid_marker(tmp_data_repo, tmp_code_repo, monkeypatch):
+    monkeypatch.chdir(tmp_code_repo)
+    (tmp_code_repo / ".pkm-link").mkdir()
+    runner.invoke(app, ["doctor", "--fix", "--root", str(tmp_data_repo)])
+    # Invalid removed; nothing recreated since cwd is NOT_LINKED
+    assert not (tmp_code_repo / ".pkm-link").exists()
+
+
+def test_doctor_without_fix_does_not_mutate(tmp_data_repo, tmp_code_repo, monkeypatch):
+    _git_init(tmp_code_repo)
+    monkeypatch.chdir(tmp_code_repo)
+    runner.invoke(app, ["project", "link", "--id", "my-app", "--no-commit", "--data-repo", str(tmp_data_repo)])
+    (tmp_code_repo / ".pkm-link").unlink()
+    runner.invoke(app, ["doctor", "--root", str(tmp_data_repo)])
+    # No --fix → marker remains absent
+    assert not (tmp_code_repo / ".pkm-link").exists()

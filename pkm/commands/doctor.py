@@ -366,6 +366,11 @@ def register(app: typer.Typer) -> None:
             "--download",
             help="Fetch missing models (BAAI/bge-m3) into the cache.",
         ),
+        fix: bool = typer.Option(
+            False,
+            "--fix",
+            help="Repair marker drift (creates/overwrites/removes .pkm-link as needed).",
+        ),
         acknowledge_release_notes: bool = typer.Option(
             False,
             "--acknowledge-release-notes",
@@ -413,6 +418,46 @@ def register(app: typer.Typer) -> None:
         items.append(_check_projects(root))
         items.append(_check_current_project(root))
         items.append(_check_marker(root))
+
+        if fix:
+            from pkm import marker
+            from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+            cwd = Path.cwd()
+            try:
+                idx = ProjectIndex.load(root)
+                ovs = load_local_overrides(root)
+                resolved_pid = resolve_project_id(cwd, project_index=idx, local_overrides=ovs)
+            except Exception:  # noqa: BLE001
+                resolved_pid = None
+
+            diag = marker.diagnose(cwd, resolved_pid)
+            if diag is not None:
+                if diag.code in ("MARKER_MISSING", "MARKER_MISMATCH"):
+                    marker.write(cwd, resolved_pid)  # type: ignore[arg-type]
+                elif diag.code == "MARKER_ORPHAN":
+                    marker.delete(cwd)
+                elif diag.code == "MARKER_INVALID":
+                    # delete() refuses directories; fall back to rmtree/unlink
+                    # so `--fix` can recover from a `.pkm-link/` directory or
+                    # other quirky leftovers.
+                    if not marker.delete(cwd):
+                        target = cwd / marker.MARKER_FILENAME
+                        try:
+                            if target.is_dir():
+                                import shutil
+
+                                shutil.rmtree(target)
+                            elif target.exists():
+                                target.unlink()
+                        except OSError:
+                            pass
+                # Refresh the marker row after fix
+                for i, it in enumerate(items):
+                    if it.name == "marker":
+                        items[i] = _check_marker(root)
+                        break
+
         items.append(_check_pkm_install())
         items.append(_check_unprocessed_sessions(root))
         items.append(_check_model_cache())

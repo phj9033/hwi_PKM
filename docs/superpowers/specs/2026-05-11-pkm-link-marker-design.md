@@ -84,6 +84,7 @@ Claude Code harness 는 exit 1 을 `Error: Exit code 1` 헤더와 함께 사용�
 | git 권장 | `.gitignore` 등재 (per-machine link 상태) |
 | 잘못된 형식일 때 | 무시 후 NOT_LINKED 처럼 fallback (CLAUDE.md `2>/dev/null` 로 silent) |
 | 디렉토리/심볼릭일 때 | 무시 |
+| 읽기 의미론 | 파일 전체를 UTF-8 로 읽고, 첫 번째 비-공백 라인을 `strip()` 한 결과를 project_id 로 채택. 비어 있거나 첫 라인이 공백뿐이면 INVALID. |
 
 ### 3.1 신뢰 모델
 
@@ -116,7 +117,7 @@ Claude Code harness 는 exit 1 을 `Error: Exit code 1` 헤더와 함께 사용�
 
 **추가 동작 (성공 경로 끝):**
 1. 현재 cwd 가 해당 project 의 `git_remotes` 또는 `local_paths` 와 매칭되는가?
-   - 매칭: `.pkm-link` 가 존재하면 삭제 시도. 실패 시 stderr 경고.
+   - 매칭: `.pkm-link` 가 존재하면 **내용까지 일치 (`marker_id == removed_id`)** 확인 후 삭제 시도. 내용 불일치(다른 project_id) 시: 다른 project 의 마커일 수 있으므로 보존, stderr 경고 1줄. 실패 시 stderr 경고.
    - 비매칭: 마커는 그대로 둠 (다른 cwd 에 있을 수도 있으므로 추측 금지). `doctor` 가 orphan 으로 탐지하게 위임.
 
 ### 4.3 `pkm project doctor`
@@ -131,6 +132,8 @@ Claude Code harness 는 exit 1 을 `Error: Exit code 1` 헤더와 함께 사용�
 | `MARKER_INVALID` | 마커가 디렉토리/심볼릭/비-UTF8/공백 | warning | 마커 삭제 후 (조건부) 재생성 |
 
 `--fix` 없이는 출력만, exit code 는 `--strict` 에서만 1. 기존 doctor 의 `--strict` 룰을 그대로 따른다.
+
+**스코프 한정:** 마커 검사는 **cwd 한 곳만** 대상. ProjectIndex 전체를 순회하거나 파일시스템을 walk 해서 다른 디렉토리의 마커를 찾지 않는다. 멀티-cwd 환경에서는 각 디렉토리에서 `pkm project doctor` 를 별도 실행해야 한다.
 
 ### 4.4 `pkm project current`
 

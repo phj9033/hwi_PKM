@@ -325,6 +325,44 @@ def register(app: typer.Typer) -> None:
             except OSError:
                 pass
 
+            # Best-effort marker cleanup: only when cwd matches this project's
+            # registered remote/local_paths AND the marker content matches the
+            # removed id. Content mismatch = different project's marker → leave.
+            cwd = Path.cwd()
+            cwd_matches = False
+            try:
+                from pkm.session.git_remote import discover_remote, normalize_remote
+                raw = discover_remote(cwd)
+                canon = normalize_remote(raw) if raw else None
+                if canon and canon in record.git_remotes:
+                    cwd_matches = True
+                else:
+                    cwd_str = str(cwd.resolve())
+                    for lp in record.local_paths:
+                        try:
+                            rp = str(Path(lp).expanduser().resolve())
+                        except OSError:
+                            rp = lp
+                        if cwd_str == rp or cwd_str.startswith(rp + "/"):
+                            cwd_matches = True
+                            break
+            except Exception:
+                cwd_matches = False
+
+            if cwd_matches:
+                marker_id = marker.read(cwd)
+                if marker_id == project_id:
+                    if not marker.delete(cwd):
+                        typer.echo(
+                            f"warning: failed to delete {marker.MARKER_FILENAME} in {cwd}",
+                            err=True,
+                        )
+                elif marker_id is not None and marker_id != project_id:
+                    typer.echo(
+                        f"warning: {marker.MARKER_FILENAME} contains {marker_id!r}, not {project_id!r} — left in place",
+                        err=True,
+                    )
+
             if not no_commit:
                 subprocess.run(
                     ["git", "rm", "-r", "--cached", "--ignore-unmatch", f"data/projects/{project_id}"],

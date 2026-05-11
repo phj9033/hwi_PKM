@@ -220,6 +220,7 @@ pkm migrate --apply      # 각 마이그레이션은 SAVEPOINT 안에서 동작
 | `pkm project current` | cwd → project_id 5단계 resolver (env / overrides / git remote / local_paths / NOT_LINKED) |
 | `pkm project {list,show,rm}` | 조회 / 제거 (`--keep-data` 면 index 만 삭제) |
 | `pkm project rebuild-index <id>` | `data/projects/<id>/index.md` 결정론적 재생성 |
+| `pkm doctor --fix` | `.pkm-link` 마커 누락/불일치/orphan/invalid 4종 자동 복구 |
 | `pkm project knowledge add --project <id> --category <cat> --slug <s> --title <t>` | 새 노하우 markdown (stdin = 본문) |
 
 **Resolver 우선순위 (`pkm project current` · `--scope project` 가 사용):**
@@ -229,6 +230,21 @@ pkm migrate --apply      # 각 마이그레이션은 SAVEPOINT 안에서 동작
 3. cwd git remote 정규화 → frontmatter `git_remotes` 매치 (SoT)
 4. cwd 경로 → `data_repo_local_paths` 매치 (드문 fallback)
 5. None → `NOT_LINKED`
+
+**cwd 마커 (`.pkm-link`):** `pkm project link` 는 cwd 에 `.pkm-link` 파일을 생성한다 (내용: `<project_id>\n`). 이 마커는 `~/.claude/CLAUDE.md` 의 PKM 컨텍스트 로딩 fast-path 가 미링크 디렉토리에서 `pkm project current` 호출을 회피하기 위한 hint 다. ProjectIndex 가 여전히 SoT 이므로 마커 동기화 실수가 데이터 무결성에 영향을 주지 않는다. `pkm doctor --fix` 가 4종 진단 (`MARKER_MISSING/MISMATCH/ORPHAN/INVALID`) 을 자동 복구. 팀이 같은 PKM data repo 를 공유하지 않는다면 `.pkm-link` 를 `.gitignore` 에 추가하는 것을 권장 (per-machine link state).
+
+권장 `~/.claude/CLAUDE.md` 블록 (사용자가 직접 교체):
+
+````markdown
+## PKM project context loading
+
+When you start working in a directory, **before** any non-trivial work:
+
+1. Quick check: is `.pkm-link` present in cwd? If not, silently proceed.
+2. If marker exists, run `pkm project current --json 2>/dev/null`.
+3. If `ok: true`: invoke the `pkm:recalling-project-context` skill.
+4. If marker exists but `ok: false`: silently proceed.
+````
 
 ---
 

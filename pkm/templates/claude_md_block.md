@@ -3,9 +3,10 @@
 
 When you start working in a directory, **before** any non-trivial work:
 
-1. Check if the cwd is a linked PKM project: run `pkm project current --json`.
-2. If linked (`ok: true`): invoke the `pkm:recalling-project-context` skill — it loads the project's index.md and recent decisions/pitfalls into context.
-3. If not linked (`code: NOT_LINKED`): silently proceed. Do not surface this to the user unless they ask about PKM.
+1. Quick check: is `.pkm-link` present in cwd? If not, silently proceed. No PKM call, no user-facing output.
+2. If marker exists, run `pkm project current --json 2>/dev/null`.
+3. If `ok: true`: invoke the `pkm:recalling-project-context` skill — it loads the project's index.md and recent decisions/pitfalls into context.
+4. If marker exists but `ok: false` (stale marker, env misconfig, pkm missing): silently proceed. Do not surface unless the user asks about PKM.
 
-This applies to any cwd, any project — the skill resolves which project automatically.
+The marker `.pkm-link` is created by `pkm project link` and contains the project_id. Run `pkm doctor --fix` from a project cwd to repair drift. Recommended to gitignore (per-machine link state).
 <!-- pkm:end managed by pkm install -->

@@ -175,6 +175,29 @@ def _check_current_project(repo: Path) -> _Item:
     )
 
 
+def _check_marker(repo: Path) -> _Item:
+    """cwd-local .pkm-link consistency check.
+
+    Returns status=ok when marker state matches resolver, else status=missing
+    with detail prefixed by the diagnosis code (MARKER_MISSING/MISMATCH/
+    ORPHAN/INVALID).
+    """
+    from pkm import marker
+    from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+    try:
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        pid = resolve_project_id(Path.cwd(), project_index=idx, local_overrides=ovs)
+    except Exception as e:  # noqa: BLE001
+        return _Item("marker", "error", f"resolve failed: {type(e).__name__}")
+
+    diag = marker.diagnose(Path.cwd(), pid)
+    if diag is None:
+        return _Item("marker", "ok", None)
+    return _Item("marker", "missing", f"{diag.code}: {diag.detail}")
+
+
 def _check_schema_version(root: Path) -> _Item:
     """M12: report schema_version (current/latest). Missing if below latest."""
     from pkm.store.index_db import connect
@@ -389,6 +412,7 @@ def register(app: typer.Typer) -> None:
         items.append(_check_tokenizer(root))
         items.append(_check_projects(root))
         items.append(_check_current_project(root))
+        items.append(_check_marker(root))
         items.append(_check_pkm_install())
         items.append(_check_unprocessed_sessions(root))
         items.append(_check_model_cache())

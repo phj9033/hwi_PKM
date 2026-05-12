@@ -55,3 +55,37 @@ def test_search_n_limit(tmp_path: Path):
     res = runner.invoke(app, ["search", "알파", "-n", "1", "--root", str(tmp_path), "--json"])
     payload = json.loads(res.output)
     assert len(payload["results"]) <= 1
+
+
+def test_search_uses_resolve_data_repo_when_root_not_passed(tmp_path: Path, monkeypatch):
+    """When -r is omitted, search falls back to resolve_data_repo() (env/config/cwd)."""
+    data_repo = tmp_path / "datarepo"
+    data_repo.mkdir()
+    _scaffold(data_repo)
+    runner = CliRunner()
+    runner.invoke(app, ["reindex", "db", "--full", "--root", str(data_repo)])
+
+    # cwd is elsewhere; PKM_DATA_REPO points to the indexed repo.
+    other_cwd = tmp_path / "elsewhere"
+    other_cwd.mkdir()
+    monkeypatch.chdir(other_cwd)
+    monkeypatch.setenv("PKM_DATA_REPO", str(data_repo))
+
+    res = runner.invoke(app, ["search", "OAuth", "--json"])
+    assert res.exit_code == 0, res.output
+    payload = json.loads(res.output)
+    assert payload["ok"] is True
+    assert payload["results"]
+
+
+def test_search_errors_when_no_data_repo_resolvable(tmp_path: Path, monkeypatch):
+    """No env, no config, no .pkm/ in cwd → friendly CONFIG_ERROR."""
+    monkeypatch.delenv("PKM_DATA_REPO", raising=False)
+    monkeypatch.setattr(
+        "pkm.config.global_config.GLOBAL_CONFIG_PATH", tmp_path / "missing.toml"
+    )
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    res = runner.invoke(app, ["search", "OAuth", "--json"])
+    assert res.exit_code != 0
+    assert "CONFIG_ERROR" in res.output or "CONFIG_ERROR" in (res.stderr or "")

@@ -84,7 +84,7 @@ def test_full_flow_capture_through_dashboard(tmp_path: Path) -> None:
 
     # 5. search — captures live in `raw`, default --scope is `wiki`, so use `all`.
     #    The CLI emits {"query":..., "results":[...], ...} — not a bare list.
-    out = _pkm(tmp_path, "search", "임베딩", "--scope", "all", "--json")
+    out = _pkm(tmp_path, "search", "임베딩", "--scope", "all", "--json", "--root", str(tmp_path))
     payload = json.loads(out.stdout)
     assert isinstance(payload, dict)
     results = payload.get("results")

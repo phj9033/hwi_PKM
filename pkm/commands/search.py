@@ -18,7 +18,8 @@ from pathlib import Path
 
 import typer
 
-from pkm.errors import PKMError, PKMNotLinked
+from pkm.config.global_config import resolve_data_repo
+from pkm.errors import PKMConfigError, PKMError, PKMNotLinked
 from pkm.search import pipeline
 
 _VALID_SCOPES = frozenset({"wiki", "raw", "writing", "style", "projects", "all"})
@@ -87,11 +88,19 @@ def register(app: typer.Typer) -> None:
             False, "--with-related", help="Add backlinks + semantic neighbors per hit."
         ),
         json_out: bool = typer.Option(False, "--json"),
-        root: Path = typer.Option(Path("."), "--root", "-r"),
+        root: Path | None = typer.Option(None, "--root", "-r"),
     ) -> None:
         """Search across the indexed corpus."""
         try:
             cwd = Path.cwd()
+            if root is None:
+                resolved = resolve_data_repo()
+                if resolved is None:
+                    raise PKMConfigError(
+                        "Cannot resolve data repo for search.",
+                        hint="Pass -r <path>, set PKM_DATA_REPO, or run `pkm install`.",
+                    )
+                root = resolved
             effective_scope = _resolve_search_scope(scope, root.resolve(), cwd)
             out = pipeline.search(
                 root,

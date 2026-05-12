@@ -16,7 +16,7 @@ def test_with_related_adds_block_per_hit(tmp_path, monkeypatch):
     """--with-related attaches a 'related' block to every hit."""
     monkeypatch.chdir(tmp_path)
     seed_wiki_for_search(tmp_path, n=4, with_links=True)
-    res = runner.invoke(app, ["search", "test", "--with-related", "--no-rerank", "--json"])
+    res = runner.invoke(app, ["search", "test", "--with-related", "--no-rerank", "--json", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     out = json.loads(res.stdout)
     assert len(out["results"]) > 0
@@ -28,7 +28,7 @@ def test_without_with_related_no_block(tmp_path, monkeypatch):
     """Without --with-related, hits have no 'related' key."""
     monkeypatch.chdir(tmp_path)
     seed_wiki_for_search(tmp_path, n=3)
-    res = runner.invoke(app, ["search", "test", "--no-rerank", "--json"])
+    res = runner.invoke(app, ["search", "test", "--no-rerank", "--json", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     out = json.loads(res.stdout)
     for hit in out["results"]:
@@ -39,7 +39,7 @@ def test_with_related_text_output(tmp_path, monkeypatch):
     """--with-related works in plain-text mode without errors."""
     monkeypatch.chdir(tmp_path)
     seed_wiki_for_search(tmp_path, n=2, with_links=True)
-    res = runner.invoke(app, ["search", "test", "--with-related", "--no-rerank"])
+    res = runner.invoke(app, ["search", "test", "--with-related", "--no-rerank", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
 
 
@@ -47,7 +47,7 @@ def test_with_related_wikilinks_in_populated(tmp_path, monkeypatch):
     """When with_links=True, doc0 should appear as wikilinks_in for at least one hit."""
     monkeypatch.chdir(tmp_path)
     seed_wiki_for_search(tmp_path, n=4, with_links=True)
-    res = runner.invoke(app, ["search", "test", "--with-related", "--no-rerank", "--json"])
+    res = runner.invoke(app, ["search", "test", "--with-related", "--no-rerank", "--json", "--root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     out = json.loads(res.stdout)
     # doc0 is linked-to by doc1, doc1 by doc2, etc.

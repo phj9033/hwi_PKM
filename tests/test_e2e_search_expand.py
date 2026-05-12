@@ -119,6 +119,8 @@ def test_expand_happy_path_returns_hits(repo_with_fake_claude):
             "--scope",
             "all",
             "--json",
+            "--root",
+            str(repo),
         ],
         cwd=repo,
         capture_output=True,
@@ -143,7 +145,7 @@ def test_expand_failure_surfaces_canonical_code(repo_with_fake_claude):
     # error envelope to stdout. The plan asserts on stderr `Error [CODE]`,
     # which is the human-readable branch.
     out = subprocess.run(
-        [sys.executable, "-m", "pkm", "search", "임베딩", "--expand", "--scope", "all"],
+        [sys.executable, "-m", "pkm", "search", "임베딩", "--expand", "--scope", "all", "--root", str(repo)],
         cwd=repo,
         capture_output=True,
         text=True,

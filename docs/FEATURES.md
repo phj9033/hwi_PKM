@@ -242,7 +242,7 @@ When you start working in a directory, **before** any non-trivial work:
 
 1. Quick check: is `.pkm-link` present in cwd? If not, silently proceed.
 2. If marker exists, run `pkm project current --json 2>/dev/null`.
-3. If `ok: true`: invoke the `pkm:recalling-project-context` skill.
+3. If `ok: true`: invoke the `pkm-recall` skill.
 4. If marker exists but `ok: false`: silently proceed.
 ````
 
@@ -281,7 +281,7 @@ pkm context inject [--project ID] [--max-tokens N=600] [--quiet-on-not-linked/--
 
 > 지원하지 않는 target (`codex`, `cursor`, ...) 은 `NOT_IMPLEMENTED` — V4 예정.
 
-**Context inject 동작:** cwd → 프로젝트 resolver 후 `data/projects/<id>/index.md` 본문 (frontmatter 제외) 출력. 4-char/token 휴리스틱으로 budget 초과 시 마지막 마침표에서 cut + `(truncated; run /pkm-recall ...)` 노티스 추가. 기본 `--quiet-on-not-linked` (NOT_LINKED 면 silent exit 0). `~/.claude/CLAUDE.md` 의 managed 블록이 `pkm:recalling-project-context` 스킬 invoke → 스킬이 이 명령을 호출.
+**Context inject 동작:** cwd → 프로젝트 resolver 후 `data/projects/<id>/index.md` 본문 (frontmatter 제외) 출력. 4-char/token 휴리스틱으로 budget 초과 시 마지막 마침표에서 cut + `(truncated; run /pkm-recall ...)` 노티스 추가. 기본 `--quiet-on-not-linked` (NOT_LINKED 면 silent exit 0). `~/.claude/CLAUDE.md` 의 managed 블록이 `pkm-recall` 스킬 invoke → 스킬이 이 명령을 호출.
 
 ---
 
@@ -307,9 +307,9 @@ pkm context inject [--project ID] [--max-tokens N=600] [--quiet-on-not-linked/--
 
 | 커맨드 | 핵심 동작 (스킬 invoke) |
 |---|---|
-| `/pkm-recall <topic>` | `pkm:recalling-project-context` — `pkm project current` → `pkm context inject` → 옵션 `pkm search --scope project` |
-| `/pkm-extract-session [uuid]` | `pkm:extracting-session-knowledge` — transcript Read → 5 카테고리 후보 → 2 라운드 사용자 검토 → `pkm project knowledge add` × N + `pkm session mark-processed` |
-| `/pkm-backfill [--since ...]` | `pkm:backfilling-sessions` — `pkm session list --unprocessed` → 첫 세션 자세히 / 이후 일괄 모드 / 중단 시점부터 재개 |
+| `/pkm-recall <topic>` | `pkm-recall` — `pkm project current` → `pkm context inject` → 옵션 `pkm search --scope project` |
+| `/pkm-extract-session [uuid]` | `pkm-extract-session` — transcript Read → 5 카테고리 후보 → 2 라운드 사용자 검토 → `pkm project knowledge add` × N + `pkm session mark-processed` |
+| `/pkm-backfill [--since ...]` | `pkm-backfill` — `pkm session list --unprocessed` → 첫 세션 자세히 / 이후 일괄 모드 / 중단 시점부터 재개 |
 | `/pkm-project [verb]` | `pkm project link/current/list/show` 의 thin wrapper |
 
 > **슬래시 ↔ 스킬 매핑**: 슬래시는 사용자 입력 surface, 실제 워크플로우는 `~/.claude/skills/pkm/<id>/SKILL.md` 가 정의. `pkm install` 한 번에 모두 설치.
@@ -501,7 +501,7 @@ PKM_AI_CLI=ollama-local pkm search "..." --expand   # 1회용 override
 ```
 Claude Code 세션 안에서:
   /pkm-extract-session
-  → pkm:extracting-session-knowledge 스킬:
+  → pkm-extract-session 스킬:
     1. CLAUDE_SESSION_ID env 또는 최근 세션 → uuid 결정
     2. pkm session show <uuid> → transcript_path
     3. transcript Read 툴로 읽기
@@ -533,7 +533,7 @@ Claude Code 세션 안에서:
 2) pkm project link --id my-app
 3) /pkm-backfill --project my-app --since 2026-01-01
 
-   → pkm:backfilling-sessions 스킬:
+   → pkm-backfill 스킬:
      - pkm session list --unprocessed → 47 세션
      - 사용자 확인 + 모드 선택: "첫 세션 자세히 / 이후 일괄"
      - 첫 세션: 2 라운드 검토 → 8 항목 등록

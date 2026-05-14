@@ -1,9 +1,9 @@
 ---
-name: pkm:extracting-session-knowledge
+name: pkm-extract-session
 description: Use when user wants to harvest knowledge from a Claude Code session (e.g., "정리해줘", "이 세션에서 배운 거 저장하자", "끝!"), or signals work is complete in a linked PKM project. Reads transcript, produces 5-category candidates, reviews with user, writes to data/projects/<id>/.
 ---
 
-# pkm:extracting-session-knowledge
+# pkm-extract-session (extracting-session-knowledge)
 
 Turns an AI conversation into permanent project knowledge. Two-round user review gate — extracts everything that could matter, then narrows by user feedback.
 

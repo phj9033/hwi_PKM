@@ -1,6 +1,6 @@
 """pkm context inject — print project index.md content (or silent if NOT_LINKED).
 
-Used by the `pkm:recalling-project-context` skill at session start: the skill
+Used by the `pkm-recall` skill at session start: the skill
 calls `pkm context inject` and either echoes the trimmed body into the AI
 session, or stays silent when cwd is not linked to any project.
 """

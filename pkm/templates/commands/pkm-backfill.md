@@ -9,4 +9,4 @@ User has invoked `/pkm-backfill $ARGUMENTS`. Parse args:
 - `--min-messages <N>` — override default 5
 - `--limit <N>` — process at most N sessions
 
-Invoke the `pkm:backfilling-sessions` skill with these args.
+Read `~/.claude/skills/pkm/backfilling-sessions/SKILL.md` and follow its procedure with these args.

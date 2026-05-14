@@ -1,9 +1,9 @@
 ---
-name: pkm:backfilling-sessions
+name: pkm-backfill
 description: Use when user wants to process historical Claude Code sessions in bulk to seed project knowledge ("과거 세션 다 정리하자", "backfill", "분석해서 등록"). Resumable — interrupted backfill picks up from last completed session.
 ---
 
-# pkm:backfilling-sessions
+# pkm-backfill (backfilling-sessions)
 
 Bulk-extract knowledge from past Claude Code sessions. Idempotent + resumable: interrupted backfills resume from the last completed session.
 
@@ -48,7 +48,7 @@ a. Get transcript: `pkm session show <uuid> --json` → `transcript_path`, `proj
 b. Read transcript via `Read` tool. Window if long (50 messages, overlap 5).
 
 c. **First session OR per-session mode**:
-   - Run the full `pkm:extracting-session-knowledge` two-round review.
+   - Run the full `pkm-extract-session` two-round review.
    - After completion, ask: "다음 세션도 같은 방식? 아니면 일괄 모드?"
 
    **Batch mode after first session**:
@@ -87,4 +87,4 @@ Report:
 
 ## Portability rules
 
-Same as `pkm:extracting-session-knowledge`. Always use `pkm` CLI for paths/ids.
+Same as `pkm-extract-session`. Always use `pkm` CLI for paths/ids.

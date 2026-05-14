@@ -1,9 +1,9 @@
 ---
-name: pkm:recalling-project-context
+name: pkm-recall
 description: Use at the start of work in any project (after the CLAUDE.md instruction) or whenever the user references prior decisions, patterns, or pitfalls in their codebase. Loads project knowledge from the linked PKM data repo. Self-resolves the current project from cwd; do NOT hardcode project ids.
 ---
 
-# pkm:recalling-project-context
+# pkm-recall (recalling-project-context)
 
 Loads the user's project knowledge into your context so you can ground recommendations in prior decisions, avoid known pitfalls, and reuse vetted snippets.
 
@@ -52,4 +52,4 @@ Loads the user's project knowledge into your context so you can ground recommend
 ## See also
 
 - `search-scope-guidelines.md` — choosing `--scope wiki|project|projects|all`.
-- `pkm:extracting-session-knowledge` — the inverse skill, used at end of session.
+- `pkm-extract-session` — the inverse skill, used at end of session.

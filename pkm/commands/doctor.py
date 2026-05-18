@@ -149,6 +149,57 @@ def _check_model_cache() -> _Item:
     return _Item("bge-m3", "missing", "run: pkm doctor --download")
 
 
+def _check_projects(repo: Path) -> _Item:
+    from pkm.session.registry import ProjectIndex
+
+    try:
+        idx = ProjectIndex.load(repo)
+    except Exception as e:  # noqa: BLE001
+        return _Item("projects", "error", f"failed to load: {e}")
+    n = len(idx.records)
+    remotes = sum(len(r.git_remotes) for r in idx.records)
+    return _Item("projects", "ok", f"{n} linked, {remotes} remotes")
+
+
+def _check_current_project(repo: Path) -> _Item:
+    from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+    try:
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        pid = resolve_project_id(Path.cwd(), project_index=idx, local_overrides=ovs)
+    except Exception as e:  # noqa: BLE001
+        return _Item("current_project", "error", f"resolve failed: {e}")
+    return _Item(
+        "current_project",
+        "ok" if pid else "info",
+        pid or "not_linked",
+    )
+
+
+def _check_marker(repo: Path) -> _Item:
+    """cwd-local .pkm-link consistency check.
+
+    Returns status=ok when marker state matches resolver, else status=missing
+    with detail prefixed by the diagnosis code (MARKER_MISSING/MISMATCH/
+    ORPHAN/INVALID).
+    """
+    from pkm import marker
+    from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+    try:
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        pid = resolve_project_id(Path.cwd(), project_index=idx, local_overrides=ovs)
+    except Exception as e:  # noqa: BLE001
+        return _Item("marker", "error", f"resolve failed: {type(e).__name__}")
+
+    diag = marker.diagnose(Path.cwd(), pid)
+    if diag is None:
+        return _Item("marker", "ok", None)
+    return _Item("marker", "missing", f"{diag.code}: {diag.detail}")
+
+
 def _check_schema_version(root: Path) -> _Item:
     """M12: report schema_version (current/latest). Missing if below latest."""
     from pkm.store.index_db import connect
@@ -185,6 +236,73 @@ def _check_schema_version(root: Path) -> _Item:
     )
 
 
+def _check_pkm_install() -> _Item:
+    """Check if `pkm install --for claude-code` has been run on this PC.
+
+    Looks at HOME (per-machine), not the data repo. Status is "optional"
+    (rather than "missing") when not installed so the row doesn't trip the
+    generic any_bad strict gate — there is a separate, named PKM_INSTALL_MISSING
+    gate for that case (raised below in the strict-mode path).
+    """
+    claude_md = Path.home() / ".claude" / "CLAUDE.md"
+    if not claude_md.is_file():
+        return _Item(
+            "pkm_install",
+            "optional",
+            "claude-code: not installed (run `pkm install --for claude-code`)",
+        )
+    try:
+        text = claude_md.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    if "<!-- pkm:start" not in text:
+        return _Item(
+            "pkm_install",
+            "optional",
+            "claude-code: managed block not found (run `pkm install --for claude-code`)",
+        )
+    skills_present = (Path.home() / ".claude" / "skills" / "pkm").is_dir()
+    cmd_present = (Path.home() / ".claude" / "commands" / "pkm-recall.md").is_file()
+    if not (skills_present and cmd_present):
+        return _Item(
+            "pkm_install",
+            "optional",
+            "claude-code: managed block ok, but skills or commands missing",
+        )
+    return _Item("pkm_install", "ok", "claude-code")
+
+
+def _check_unprocessed_sessions(repo: Path) -> _Item:
+    """Informational row — count of unprocessed sessions for the cwd-resolved project."""
+    try:
+        from pkm.session.adapters import ClaudeCodeAdapter
+        from pkm.session.meta import is_processed
+        from pkm.session.registry import (
+            ProjectIndex,
+            load_local_overrides,
+            resolve_project_id,
+        )
+
+        adapter = ClaudeCodeAdapter()
+        idx = ProjectIndex.load(repo)
+        ovs = load_local_overrides(repo)
+        cwd_pid = resolve_project_id(
+            Path.cwd(), project_index=idx, local_overrides=ovs
+        )
+        if not cwd_pid:
+            return _Item("unprocessed_sessions", "info", "cwd not linked")
+        unprocessed = 0
+        for ref in adapter.discover():
+            pid = adapter.resolve_project_id(ref, idx)
+            if pid == cwd_pid and not is_processed(repo, pid, ref.uuid):
+                unprocessed += 1
+        return _Item(
+            "unprocessed_sessions", "info", f"{unprocessed} unprocessed for {cwd_pid}"
+        )
+    except Exception as e:  # noqa: BLE001
+        return _Item("unprocessed_sessions", "info", f"unavailable: {type(e).__name__}")
+
+
 def _check_tokenizer(root: Path) -> _Item:
     """M12: report active tokenizer + version (kiwi only)."""
     from pkm.search.tokenizer import detect_active, get_tokenizer
@@ -216,7 +334,7 @@ def _render_human(items: list[_Item], system: dict[str, object]) -> str:
     lines: list[str] = []
     lines.append("[ Doctor ]")
     for it in items:
-        marker = {"ok": "✓", "missing": "✗", "error": "!", "optional": "~"}[it.status]
+        marker = {"ok": "✓", "missing": "✗", "error": "!", "optional": "~", "info": "i"}.get(it.status, "?")
         detail = f"  {it.detail}" if it.detail else ""
         lines.append(f"  {marker} {it.name:<30} {it.status.upper()}{detail}")
     lines.append("")
@@ -250,8 +368,28 @@ def register(app: typer.Typer) -> None:
             "--download",
             help="Fetch missing models (BAAI/bge-m3) into the cache.",
         ),
+        fix: bool = typer.Option(
+            False,
+            "--fix",
+            help="Repair marker drift (creates/overwrites/removes .pkm-link as needed).",
+        ),
+        acknowledge_release_notes: bool = typer.Option(
+            False,
+            "--acknowledge-release-notes",
+            hidden=True,
+            help="Silence the M13.8 search-default release note.",
+        ),
     ) -> None:
         """Report PKM environment & structure status."""
+        if acknowledge_release_notes:
+            ack_marker = root / ".pkm" / "release_notes_acknowledged"
+            ack_marker.touch()
+            if json_out:
+                typer.echo(json.dumps({"ok": True, "acknowledged": True}, ensure_ascii=False))
+            else:
+                typer.echo("Release notes acknowledged.")
+            return
+
         if download:
             from pkm.store.model_cache import cache_dir, download_models
 
@@ -279,17 +417,92 @@ def register(app: typer.Typer) -> None:
         items.append(_check_index_db(root))
         items.append(_check_schema_version(root))
         items.append(_check_tokenizer(root))
+        items.append(_check_projects(root))
+        items.append(_check_current_project(root))
+        items.append(_check_marker(root))
+
+        if fix:
+            from pkm import marker
+            from pkm.session.registry import ProjectIndex, load_local_overrides, resolve_project_id
+
+            cwd = Path.cwd()
+            try:
+                idx = ProjectIndex.load(root)
+                ovs = load_local_overrides(root)
+                resolved_pid = resolve_project_id(cwd, project_index=idx, local_overrides=ovs)
+            except Exception:  # noqa: BLE001
+                resolved_pid = None
+
+            diag = marker.diagnose(cwd, resolved_pid)
+            if diag is not None:
+                if diag.code in ("MARKER_MISSING", "MARKER_MISMATCH"):
+                    marker.write(cwd, resolved_pid)  # type: ignore[arg-type]
+                elif diag.code == "MARKER_ORPHAN":
+                    marker.delete(cwd)
+                elif diag.code == "MARKER_INVALID":
+                    # delete() refuses directories; fall back to rmtree/unlink
+                    # so `--fix` can recover from a `.pkm-link/` directory or
+                    # other quirky leftovers.
+                    if not marker.delete(cwd):
+                        target = cwd / marker.MARKER_FILENAME
+                        try:
+                            if target.is_dir():
+                                import shutil
+
+                                shutil.rmtree(target)
+                            elif target.exists():
+                                target.unlink()
+                        except OSError:
+                            pass
+                # Refresh the marker row after fix
+                for i, it in enumerate(items):
+                    if it.name == "marker":
+                        items[i] = _check_marker(root)
+                        break
+
+        items.append(_check_pkm_install())
+        items.append(_check_unprocessed_sessions(root))
         items.append(_check_model_cache())
         items.append(_check_git(root))
         items.append(_check_ai_cli())
         system = _system_info()
 
+        # M13.8: release-note row (info status — does NOT fail strict mode).
+        schema_item = next((it for it in items if it.name == "schema_version"), None)
+        schema_version_value = 0
+        if schema_item is not None and schema_item.detail:
+            try:
+                schema_version_value = int(schema_item.detail.split("/")[0])
+            except (ValueError, IndexError):
+                pass
+        release_note_marker = root / ".pkm" / "release_notes_acknowledged"
+        if schema_version_value >= 3 and not release_note_marker.exists():
+            items.append(_Item(
+                "release_notes",
+                "info",
+                "Search default changed when cwd is linked: project:<id>. "
+                "Use --scope all to override. Run `pkm doctor --acknowledge-release-notes` to silence.",
+            ))
+
         any_bad = any(it.status in ("missing", "error") for it in items)
 
         # M12: under --strict, a pending migration surfaces as MIGRATION_PENDING
-        # in the JSON error envelope. Other failures stay as plain exit-1.
-        schema_item = next((it for it in items if it.name == "schema_version"), None)
-        pending_migration = strict and schema_item is not None and schema_item.status == "missing"
+        # in the JSON error envelope. Migrations come first because they are a
+        # repo-level prerequisite for everything else.
+        pending_migration = (
+            strict and schema_item is not None and schema_item.status == "missing"
+        )
+
+        # M14: under --strict, a missing install (HOME-scoped) fires
+        # PKM_INSTALL_MISSING. Only relevant once migrations are applied; if both
+        # are pending, MIGRATION_PENDING wins.
+        install_item = next((it for it in items if it.name == "pkm_install"), None)
+        pending_install = (
+            strict
+            and not pending_migration
+            and install_item is not None
+            and install_item.status != "ok"
+        )
 
         if json_out:
             payload: dict[str, object] = {
@@ -309,9 +522,18 @@ def register(app: typer.Typer) -> None:
                 )
                 payload["ok"] = False
                 payload["error"] = err.to_dict()
+            elif pending_install:
+                from pkm.errors import PKMInstallMissing
+
+                err = PKMInstallMissing(
+                    install_item.detail or "claude-code: not installed",
+                    hint="run `pkm install --for claude-code --data-repo <path>`.",
+                )
+                payload["ok"] = False
+                payload["error"] = err.to_dict()
             typer.echo(json.dumps(payload, ensure_ascii=False))
         else:
             typer.echo(_render_human(items, system))
 
-        if strict and any_bad:
+        if strict and (any_bad or pending_install):
             raise typer.Exit(code=1)

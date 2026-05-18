@@ -14,7 +14,7 @@ import sqlite3
 
 import numpy as np
 
-from pkm.search.bm25 import _BUCKET_MAP, Hit
+from pkm.search.bm25 import _BUCKET_MAP, Hit, _resolve_scope_filter
 
 
 def query_vector(
@@ -22,12 +22,10 @@ def query_vector(
 ) -> list[Hit]:
     if query_vec.ndim != 1:
         query_vec = query_vec.reshape(-1)
-    buckets = _BUCKET_MAP.get(scope)
-    if buckets is None:
-        raise ValueError(f"unknown scope: {scope!r}")
-    placeholders = ",".join("?" for _ in buckets)
 
-    # Fetch a wider top from vec0, then bucket-filter (robust + simple).
+    where_clause, where_params = _resolve_scope_filter(scope)
+
+    # Fetch a wider top from vec0, then scope-filter (robust + simple).
     over_fetch = max(top * 4, 200)
     sql_vec = f"""
         SELECT chunk_id, distance
@@ -50,9 +48,9 @@ def query_vector(
         FROM chunks c
         JOIN documents d ON d.id = c.doc_id
         WHERE c.id IN ({",".join("?" for _ in chunk_ids)})
-          AND d.bucket IN ({placeholders})
+          AND {where_clause}
     """
-    meta_rows = conn.execute(sql_meta, (*chunk_ids, *buckets)).fetchall()
+    meta_rows = conn.execute(sql_meta, (*chunk_ids, *where_params)).fetchall()
 
     hits: list[Hit] = [
         Hit(

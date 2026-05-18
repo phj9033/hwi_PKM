@@ -18,15 +18,17 @@ dependencies = [
     # chain through pkm._mutations → pkm.store.embedder), so it must be a core
     # runtime dep. ml-only optional install used to fail at command registration.
     "numpy>=1.26",
+    # sqlite-vec is loaded inside pkm.store.index_db.connect(), which every
+    # search/index/lint command path reaches. Same "optional-but-always-imported"
+    # trap that bit numpy — keep it core.
+    # Pre-v1: minor bumps may break (per its SemVer policy); pinned to 0.1.x.
+    "sqlite-vec>=0.1,<0.2",
 ]
 
 [project.optional-dependencies]
 # Heavy deps — pinned now so future milestones can `uv sync` consistently
 ml = [
     "sentence-transformers>=2.7",
-    # sqlite-vec is pre-v1; minor bumps may break (per its SemVer policy).
-    # Lock to the 0.1.x line until M3 evaluates 0.2+.
-    "sqlite-vec>=0.1,<0.2",
     "huggingface_hub>=0.23",
 ]
 extract = [

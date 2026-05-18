@@ -17,7 +17,7 @@ runner = CliRunner()
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     runner.invoke(app, ["init", "--root", str(tmp_path), "-f"])
-    style = tmp_path / "data" / "style" / "oauth.md"
+    style = tmp_path / "data" / "style" / "samples" / "oauth.md"
     style.parent.mkdir(parents=True, exist_ok=True)
     style.write_text(
         "---\nslug: oauth\ntitle: OAuth\nlang: ko\n"

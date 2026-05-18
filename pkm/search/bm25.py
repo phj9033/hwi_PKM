@@ -2,7 +2,9 @@
 
 `query_bm25(conn, query, scope, top)` returns ranked Hit rows. The `scope`
 filter joins back to documents.bucket: 'wiki' / 'raw' / 'writing' / 'style' /
-'all'. 'raw' covers both 'captures' and 'chunks' buckets per master spec §5.1.
+'projects' / 'all'. 'raw' covers both 'captures' and 'chunks' buckets per
+master spec §5.1. M13 adds 'projects' (all project knowledge files) and
+'project:<id>' (single-project filter via chunks.project column).
 
 Tokenizer dispatch (M12): pre-m002 repos use the FTS5 trigram tokenizer; the
 ``_build_fts_query`` path applies the boundary-space trick for 2-char CJK
@@ -21,9 +23,27 @@ _BUCKET_MAP: dict[str, tuple[str, ...]] = {
     "wiki": ("wiki",),
     "raw": _RAW_BUCKETS,
     "writing": ("writing",),
-    "style": ("style",),                                          # M8
-    "all": ("wiki", "captures", "chunks", "writing", "style"),    # M8: +style
+    "style": ("style",),                                                    # M8
+    "projects": ("projects",),                                              # M13
+    "all": ("wiki", "captures", "chunks", "writing", "style", "projects"), # M13: +projects
 }
+
+
+def _resolve_scope_filter(scope: str) -> tuple[str, tuple]:
+    """Translate scope string into (sql_where_fragment, params).
+
+    Handles two grammar forms:
+    - 'project:<id>'  → filter by chunks.project column (m003 schema)
+    - everything else → filter by documents.bucket IN (...)
+    """
+    if scope.startswith("project:"):
+        pid = scope[len("project:"):]
+        return ("c.project = ?", (pid,))
+    buckets = _BUCKET_MAP.get(scope)
+    if buckets is None:
+        raise ValueError(f"unknown scope: {scope!r}")
+    placeholders = ",".join("?" for _ in buckets)
+    return (f"d.bucket IN ({placeholders})", tuple(buckets))
 
 
 @dataclass
@@ -75,10 +95,8 @@ def query_bm25(
 ) -> list[Hit]:
     if not query.strip():
         return []
-    buckets = _BUCKET_MAP.get(scope)
-    if buckets is None:
-        raise ValueError(f"unknown scope: {scope!r}")
-    placeholders = ",".join("?" for _ in buckets)
+
+    where_clause, where_params = _resolve_scope_filter(scope)
 
     from pkm.search.tokenizer import detect_active, get_tokenizer, tokenize_for_indexing
 
@@ -96,11 +114,11 @@ def query_bm25(
         JOIN chunks    c ON c.id      = chunks_fts.rowid
         JOIN documents d ON d.id      = c.doc_id
         WHERE chunks_fts MATCH ?
-          AND d.bucket IN ({placeholders})
+          AND {where_clause}
         ORDER BY bm25(chunks_fts) ASC
         LIMIT ?
     """
-    params = (fts_query, *buckets, top)
+    params = (fts_query, *where_params, top)
     rows = conn.execute(sql, params).fetchall()
     return [
         Hit(

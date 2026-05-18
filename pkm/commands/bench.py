@@ -118,7 +118,7 @@ def register(app: typer.Typer) -> None:
                 ms: list[float] = []
                 for q in queries:
                     t0 = time.perf_counter()
-                    _run_pkm(["search", q], cwd=tmp, env=env)
+                    _run_pkm(["search", q, "--root", str(tmp)], cwd=tmp, env=env)
                     ms.append((time.perf_counter() - t0) * 1000)
 
                 p50 = statistics.median(ms)

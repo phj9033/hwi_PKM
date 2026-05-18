@@ -86,6 +86,26 @@ def test_apply_rebuilds_fts_index(tmp_path: Path):
     assert len(hits) >= 1
 
 
+def test_apply_on_empty_chunks(tmp_path: Path):
+    """Regression: m002 must succeed on a fresh repo with zero chunks.
+
+    The original `_rebuild_fts` declared a `title UNINDEXED` column that did
+    not exist on `chunks`, so the external-content `'rebuild'` failed with
+    `no such column: T.title` even when the table was empty. A new repo
+    bootstrapped via `pkm init` hits this path before its first capture.
+    """
+    from pkm.store.migrations import m002_kiwi_tokenizer as mig
+
+    conn = connect(tmp_path)
+    # No seed — chunks table is empty, mirroring `pkm bootstrap` state.
+
+    result = mig.apply(conn)
+    assert result["rows_tokenized"] == 0
+
+    # FTS table must be queryable post-migration.
+    conn.execute("SELECT COUNT(*) FROM chunks_fts WHERE chunks_fts MATCH 'a OR 가'").fetchone()
+
+
 def test_apply_failure_atomic_rollback(tmp_path: Path, monkeypatch):
     """If FTS rebuild fails mid-migration, original chunks_fts must remain queryable."""
     from pkm.store.migrations import m002_kiwi_tokenizer as mig

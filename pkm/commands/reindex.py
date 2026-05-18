@@ -41,13 +41,15 @@ _BUCKETS = {
     "chunks": "data/raw/chunks",
     "writing": "data/writing",
     "style": "data/style",                                    # M8
+    "projects": "data/projects",                              # M13
 }
 _SCOPE_BUCKETS = {
     "wiki": ("wiki",),
     "raw": ("captures", "chunks"),
     "writing": ("writing",),
     "style": ("style",),                                      # M8
-    "all": ("wiki", "captures", "chunks", "writing", "style"),  # M8: +style
+    "projects": ("projects",),                                # M13
+    "all": ("wiki", "captures", "chunks", "writing", "style", "projects"),  # M13: +projects
 }
 
 
@@ -96,6 +98,7 @@ def _index_one(
     vec_opted_in: bool,
     *,
     post_m002: bool = False,
+    post_m003: bool = False,
     tokenizer=None,
 ) -> bool:
     """Index a single file. Returns True if (re)indexed, False if skipped."""
@@ -159,25 +162,44 @@ def _index_one(
     conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM links WHERE src_doc_id = ?", (doc_id,))
 
-    do_vector = (bucket in ("wiki", "style")) or (bucket in ("captures", "chunks") and vec_opted_in)
+    do_vector = (bucket in ("wiki", "style", "projects")) or (bucket in ("captures", "chunks") and vec_opted_in)
     embeddings = None
     if do_vector and chunks:
         embeddings = embedder.embed([c.text for c in chunks])
 
     for i, ch in enumerate(chunks):
-        cur = conn.execute(
-            """
-            INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count)
-            VALUES (?,?,?,?,?)
-            """,
-            (
-                doc_id,
-                ch.chunk_idx,
-                json.dumps(ch.heading_path, ensure_ascii=False),
-                ch.text,
-                ch.token_count,
-            ),
-        )
+        if post_m003:
+            cur = conn.execute(
+                """
+                INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count,
+                                   project, category, session_id)
+                VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (
+                    doc_id,
+                    ch.chunk_idx,
+                    json.dumps(ch.heading_path, ensure_ascii=False),
+                    ch.text,
+                    ch.token_count,
+                    fm.get("project"),
+                    fm.get("category"),
+                    fm.get("session_id"),
+                ),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO chunks(doc_id, chunk_idx, heading_path, text, token_count)
+                VALUES (?,?,?,?,?)
+                """,
+                (
+                    doc_id,
+                    ch.chunk_idx,
+                    json.dumps(ch.heading_path, ensure_ascii=False),
+                    ch.text,
+                    ch.token_count,
+                ),
+            )
         chunk_id = cur.lastrowid
         if post_m002:
             # Post-m002: write pre-tokenized text into chunks.text_tokenized.
@@ -298,7 +320,9 @@ def register(app: typer.Typer) -> None:
         ),
         full: bool = typer.Option(False, "--full", help="Drop everything and rebuild."),
         scope: str = typer.Option(
-            "all", "--scope", help="Bucket filter: wiki | raw | writing | style | all."
+            "all",
+            "--scope",
+            help="Bucket filter: wiki | raw | writing | style | projects | all | project:<id>.",
         ),
         low_memory: bool = typer.Option(
             False, "--low-memory", help="Use batch_size=4 for embedder."
@@ -306,8 +330,12 @@ def register(app: typer.Typer) -> None:
         root: Path = typer.Option(Path("."), "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
     ) -> None:
-        if scope not in _SCOPE_BUCKETS:
-            raise PKMError(f"unknown scope: {scope!r}", hint=f"Choose from: {list(_SCOPE_BUCKETS)}")
+        # Resolve project:<id> scope into an explicit file list.
+        _project_id_scope: str | None = None
+        if scope.startswith("project:"):
+            _project_id_scope = scope[len("project:"):]
+        elif scope not in _SCOPE_BUCKETS:
+            raise PKMError(f"unknown scope: {scope!r}", hint=f"Choose from: {list(_SCOPE_BUCKETS)} or project:<id>")
 
         conn = connect(root)
         try:
@@ -316,6 +344,10 @@ def register(app: typer.Typer) -> None:
             active = detect_active(conn)
             post_m002 = active == "kiwi"
             tokenizer = get_tokenizer(active) if post_m002 else None
+
+            # Detect m003 columns (project/category/session_id) — mirrors post_m002 idiom.
+            chunks_columns = {r[1] for r in conn.execute("PRAGMA table_info(chunks)")}
+            post_m003 = "project" in chunks_columns
 
             if full:
                 _drop_all(conn, post_m002=post_m002)
@@ -332,6 +364,19 @@ def register(app: typer.Typer) -> None:
                         hint=f"Allowed roots: {list(_BUCKETS.values())}",
                     )
                 files = [(bucket, abs_path)]
+            elif _project_id_scope is not None:
+                # project:<id> — walk only data/projects/<id>/**/*.md
+                project_dir = root.resolve() / "data" / "projects" / _project_id_scope
+                if not project_dir.exists():
+                    raise PKMStateError(
+                        f"project directory not found: data/projects/{_project_id_scope}",
+                        hint="Create the project with `pkm project link` first.",
+                    )
+                files = [
+                    ("projects", p)
+                    for p in sorted(project_dir.rglob("*.md"))
+                    if p.is_file()
+                ]
             else:
                 files = _walk_files(root.resolve(), _SCOPE_BUCKETS[scope])
 
@@ -346,6 +391,7 @@ def register(app: typer.Typer) -> None:
                     embedder,
                     vec_opt,
                     post_m002=post_m002,
+                    post_m003=post_m003,
                     tokenizer=tokenizer,
                 ):
                     indexed += 1

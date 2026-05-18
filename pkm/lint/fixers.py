@@ -60,6 +60,60 @@ def fix_missing_field(root: Path, finding: LintFinding) -> bool:
     return True
 
 
+def fix_missing_project_field(root: Path, finding: LintFinding) -> bool:
+    """Set frontmatter.project from the path's <id> segment."""
+    if finding.code != "MISSING_PROJECT_FIELD":
+        return False
+    p = root / finding.path
+    if not p.is_file():
+        return False
+    parts = finding.path.split("/")
+    # parts: ["data", "projects", "<id>", ...]
+    if len(parts) < 3:
+        return False
+    pid = parts[2]
+    fm, body = parse(p.read_text(encoding="utf-8"))
+    fm["project"] = pid
+    atomic_write(p, serialize(fm, body))
+    post_mutation(
+        root,
+        LogEvent(
+            type="lint.fix",
+            ref=fm.get("slug") or p.stem,
+            message=f"missing_project_field project={pid}",
+        ),
+        paths=[finding.path],
+    )
+    return True
+
+
+def fix_category_path_mismatch(root: Path, finding: LintFinding) -> bool:
+    """Set frontmatter.category from the path's <category> segment."""
+    if finding.code != "CATEGORY_PATH_MISMATCH":
+        return False
+    p = root / finding.path
+    if not p.is_file():
+        return False
+    parts = finding.path.split("/")
+    # parts: ["data", "projects", "<id>", "<category>", ...]
+    if len(parts) < 4:
+        return False
+    path_cat = parts[3]
+    fm, body = parse(p.read_text(encoding="utf-8"))
+    fm["category"] = path_cat
+    atomic_write(p, serialize(fm, body))
+    post_mutation(
+        root,
+        LogEvent(
+            type="lint.fix",
+            ref=fm.get("slug") or p.stem,
+            message=f"category_path_mismatch category={path_cat}",
+        ),
+        paths=[finding.path],
+    )
+    return True
+
+
 def fix_orphan_promoted_source(root: Path, finding: LintFinding) -> bool:
     """Set the promoted_from source's status to 'archived'. Returns True if mutated."""
     if finding.code != "ORPHAN_PROMOTED_SOURCE" or not finding.fixable:

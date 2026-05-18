@@ -17,7 +17,7 @@ runner = CliRunner()
 @pytest.fixture
 def repo_with_style(tmp_path: Path) -> Path:
     runner.invoke(app, ["init", "--root", str(tmp_path), "-f"])
-    style = tmp_path / "data" / "style" / "oauth-token-storage.md"
+    style = tmp_path / "data" / "style" / "samples" / "oauth-token-storage.md"
     style.parent.mkdir(parents=True, exist_ok=True)
     style.write_text(
         "---\nslug: oauth-token-storage\ntitle: OAuth\nlang: ko\n"
@@ -41,7 +41,7 @@ def test_search_scope_style_returns_sample(repo_with_style: Path):
     assert result.exit_code == 0, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     paths = [r["path"] for r in payload["results"]]
-    assert any("data/style/oauth-token-storage.md" in p for p in paths)
+    assert any("data/style/samples/oauth-token-storage.md" in p for p in paths)
 
 
 def test_search_scope_style_excludes_other_buckets(repo_with_style: Path, tmp_path):

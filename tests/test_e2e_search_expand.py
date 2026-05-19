@@ -67,9 +67,10 @@ def repo_with_fake_claude(tmp_path: Path):
             env=base_env,
         )
 
-    # 3. reindex
+    # 3. reindex — pass --root explicitly so the subprocess can't fall back
+    #    to the dev's ~/.pkm/config.toml and pollute their data repo.
     subprocess.run(
-        [sys.executable, "-m", "pkm", "reindex", "db", "--full"],
+        [sys.executable, "-m", "pkm", "reindex", "db", "--full", "--root", str(tmp_path)],
         cwd=tmp_path,
         check=True,
         capture_output=True,

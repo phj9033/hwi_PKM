@@ -26,7 +26,8 @@ from pathlib import Path
 
 import typer
 
-from pkm.errors import PKMError, PKMStateError
+from pkm.config.global_config import resolve_data_repo
+from pkm.errors import PKMConfigError, PKMError, PKMStateError
 from pkm.store.chunker import split_markdown
 from pkm.store.embedder import get_embedder
 from pkm.store.frontmatter import parse as parse_fm
@@ -159,6 +160,9 @@ def _index_one(
         "DELETE FROM chunks_vec WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?)",
         (doc_id,),
     )
+    # docs_vec.doc_id is PRIMARY KEY in a vec0 virtual table — no FK cascade
+    # from documents, and the INSERT below would hit UNIQUE on re-index.
+    conn.execute("DELETE FROM docs_vec WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM links WHERE src_doc_id = ?", (doc_id,))
 
@@ -327,9 +331,18 @@ def register(app: typer.Typer) -> None:
         low_memory: bool = typer.Option(
             False, "--low-memory", help="Use batch_size=4 for embedder."
         ),
-        root: Path = typer.Option(Path("."), "--root", "-r"),
+        root: Path | None = typer.Option(None, "--root", "-r"),
         json_out: bool = typer.Option(False, "--json"),
     ) -> None:
+        if root is None:
+            resolved = resolve_data_repo()
+            if resolved is None:
+                raise PKMConfigError(
+                    "Cannot resolve data repo for reindex.",
+                    hint="Pass -r <path>, set PKM_DATA_REPO, or run `pkm install`.",
+                )
+            root = resolved
+
         # Resolve project:<id> scope into an explicit file list.
         _project_id_scope: str | None = None
         if scope.startswith("project:"):

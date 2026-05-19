@@ -111,7 +111,7 @@ def register(app: typer.Typer) -> None:
                 _synth_docs(tmp, docs)
 
                 t0 = time.perf_counter()
-                _run_pkm(["reindex", "db", "--full"], cwd=tmp, env=env)
+                _run_pkm(["reindex", "db", "--full", "--root", str(tmp)], cwd=tmp, env=env)
                 reindex_s = time.perf_counter() - t0
 
                 queries = ["임베딩", "재정렬", "한국어", "RRF", "Karpathy"]

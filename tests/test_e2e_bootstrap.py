@@ -29,6 +29,9 @@ def test_pkm_bootstrap_fresh_repo_succeeds(tmp_path: Path):
         "PKM_TEST_STUB_EMBEDDER": "1",
         "PKM_TEST_STUB_RERANKER": "1",
         "PKM_TEST_SKIP_DOWNLOAD": "1",
+        # Pin PKM_DATA_REPO so the reindex subprocess inside bootstrap
+        # can't fall back to the dev's ~/.pkm/config.toml.
+        "PKM_DATA_REPO": str(tmp_path),
     }
 
     # Stand in for `git clone`: lay down the SCHEMA.md / .gitignore /

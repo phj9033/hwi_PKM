@@ -96,3 +96,74 @@ def test_reindex_scope_wiki_only(tmp_path: Path):
     payload = json.loads(res.output)
     assert payload["ok"] is True
     assert payload["stats"]["documents_indexed"] == 1  # only wiki
+
+
+def test_reindex_incremental_after_content_change_no_docs_vec_collision(tmp_path: Path):
+    """Re-indexing a vector-eligible doc after a content change must not hit
+    UNIQUE on docs_vec.doc_id (PRIMARY KEY, no FK cascade from documents).
+
+    Exercised on the post-m002/m003 path (production schema) where users hit
+    this; pre-m002 has its own contentless-FTS DELETE quirks not in scope here.
+    """
+    pytest.importorskip("kiwipiepy", reason="post-m002 schema requires kiwipiepy")
+    _scaffold(tmp_path)
+    runner = CliRunner()
+    mres = runner.invoke(app, ["migrate", "--apply", "--root", str(tmp_path)])
+    assert mres.exit_code == 0, mres.output
+    runner.invoke(app, ["reindex", "db", "--full", "--root", str(tmp_path)])
+
+    wiki = tmp_path / "data" / "wiki" / "concepts" / "alpha.md"
+    wiki.write_text(
+        "---\ntitle: alpha\nlang: ko\n---\n\n# Alpha\n\n알파 본문 변경됨.\n",
+        encoding="utf-8",
+    )
+    res = runner.invoke(app, ["reindex", "db", "--root", str(tmp_path), "--json"])
+    assert res.exit_code == 0, res.output
+    payload = json.loads(res.output)
+    assert payload["stats"]["documents_indexed"] == 1
+    assert payload["stats"]["documents_skipped"] == 1
+
+    conn = connect(tmp_path)
+    try:
+        wiki_id = conn.execute("SELECT id FROM documents WHERE bucket='wiki'").fetchone()[0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM docs_vec WHERE doc_id=?", (wiki_id,)
+        ).fetchone()[0]
+        assert count == 1  # exactly one row after re-index, not zero, not duplicated
+    finally:
+        conn.close()
+
+
+def test_reindex_uses_resolve_data_repo_when_root_not_passed(tmp_path: Path, monkeypatch):
+    """When -r is omitted, reindex falls back to resolve_data_repo() (env/config/cwd)."""
+    data_repo = tmp_path / "datarepo"
+    data_repo.mkdir()
+    _scaffold(data_repo)
+
+    other_cwd = tmp_path / "elsewhere"
+    other_cwd.mkdir()
+    monkeypatch.chdir(other_cwd)
+    monkeypatch.setenv("PKM_DATA_REPO", str(data_repo))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["reindex", "db", "--full", "--json"])
+    assert res.exit_code == 0, res.output
+    payload = json.loads(res.output)
+    assert payload["ok"] is True
+    assert payload["stats"]["documents_indexed"] >= 2
+
+
+def test_reindex_errors_when_no_data_repo_resolvable(tmp_path: Path, monkeypatch):
+    """No env, no config, no .pkm/ in cwd → PKMConfigError (handled at CLI
+    top-level via pkm.cli.main; CliRunner surfaces it as res.exception)."""
+    from pkm.errors import PKMConfigError
+
+    monkeypatch.delenv("PKM_DATA_REPO", raising=False)
+    monkeypatch.setattr(
+        "pkm.config.global_config.GLOBAL_CONFIG_PATH", tmp_path / "missing.toml"
+    )
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    res = runner.invoke(app, ["reindex", "db", "--json"])
+    assert res.exit_code != 0
+    assert isinstance(res.exception, PKMConfigError)

@@ -45,8 +45,9 @@ def _pkm(
 
 
 def _reindex(repo: Path) -> None:
-    """Run `pkm reindex db --full`."""
-    _pkm(repo, "reindex", "db", "--full")
+    """Run `pkm reindex db --full`. Pass --root explicitly so the subprocess
+    can't fall back to the dev's ~/.pkm/config.toml and pollute their data repo."""
+    _pkm(repo, "reindex", "db", "--full", "--root", str(repo))
 
 
 def test_full_flow_capture_through_dashboard(tmp_path: Path) -> None:

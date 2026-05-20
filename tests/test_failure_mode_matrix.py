@@ -37,6 +37,11 @@ from pathlib import Path
 
 import pytest
 
+from pkm.adapters.hn import HNError  # noqa: F401 — register subclass for all_error_codes()
+from pkm.adapters.jina import JinaError  # noqa: F401
+from pkm.adapters.openalex import OpenAlexError  # noqa: F401
+from pkm.adapters.reddit import RedditError  # noqa: F401
+from pkm.adapters.youtube import YouTubeError  # noqa: F401
 from pkm.errors import all_error_codes
 
 # ---------------------------------------------------------------------------
@@ -55,6 +60,15 @@ DEFERRED_CODES: dict[str, str] = {
     # PKMInfoError is a base class; only its concrete subclasses (e.g. ALREADY_LINKED)
     # are raised directly.
     "PKM_INFO_ERROR": "base class — V1 raisers always pick a concrete info subclass",
+    # Adapter errors only fire on real network/yt-dlp failures, which the
+    # in-process tests under tests/adapters/ already cover via httpx.MockTransport
+    # and subprocess monkeypatch. Driving them through a full `pkm` subprocess
+    # would require live network or a fake yt-dlp on PATH — not worth it.
+    "JINA_ERROR": "network failure — covered by tests/adapters/test_jina.py",
+    "HN_ERROR": "network failure — covered by tests/adapters/test_hn.py",
+    "REDDIT_ERROR": "network failure — covered by tests/adapters/test_reddit.py",
+    "YOUTUBE_ERROR": "subprocess failure — covered by tests/adapters/test_youtube.py",
+    "OPENALEX_ERROR": "network failure — covered by tests/adapters/test_openalex.py",
 }
 
 
@@ -549,6 +563,18 @@ SCENARIOS.update({
 SCENARIOS.update({
     "CORRUPT_TRANSCRIPT":           _scenario_corrupt_transcript,
     "PKM_INSTALL_MISSING":          _scenario_pkm_install_missing,
+})
+
+# Adapter codes are deferred (see DEFERRED_CODES) — they only surface on real
+# network/subprocess failures. The scenario map still needs entries so
+# test_scenario_set_matches_registry passes; the deferred guard skips the
+# parametrized reachability check.
+SCENARIOS.update({
+    "JINA_ERROR":     _scenario_pkm_error,
+    "HN_ERROR":       _scenario_pkm_error,
+    "REDDIT_ERROR":   _scenario_pkm_error,
+    "YOUTUBE_ERROR":  _scenario_pkm_error,
+    "OPENALEX_ERROR": _scenario_pkm_error,
 })
 
 

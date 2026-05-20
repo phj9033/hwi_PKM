@@ -259,4 +259,10 @@ def _fake_response(task: str, prompt: str) -> str:
         return f"{prompt}\n{prompt} en\n{prompt} alt"
     if task == "lint_summary":
         return f"FAKE-LINT-SUMMARY({prompt[:40]})"
+    if task == "tldr":
+        return "FAKE-TLDR: 결론. 근거. 한계."
+    if task == "tags":
+        return '["fake-tag-a","fake-tag-b"]'
+    if task == "related":
+        return "wiki-slug-a\nwiki-slug-b"
     return f"FAKE({task}):{prompt[:80]}"

@@ -18,6 +18,14 @@ from collections.abc import Callable
 
 import pytest
 
+# Adapter error classes are defined in `pkm/adapters/*` but only imported
+# lazily by `pkm.commands.adapter`. Force-import them here so they appear in
+# `PKMError.__subclasses__()` regardless of which test file pytest collects.
+from pkm.adapters.hn import HNError  # noqa: F401
+from pkm.adapters.jina import JinaError  # noqa: F401
+from pkm.adapters.openalex import OpenAlexError  # noqa: F401
+from pkm.adapters.reddit import RedditError  # noqa: F401
+from pkm.adapters.youtube import YouTubeError  # noqa: F401
 from pkm.errors import (
     BOOTSTRAP_STEP_FAILED,  # noqa: F401 (re-exported constant)
     EMBED_MODEL_MISSING,  # noqa: F401
@@ -154,6 +162,23 @@ SCENARIOS: dict[str, Callable[[], PKMError]] = {
         "claude-code: not installed",
         hint="run `pkm install --for claude-code --data-repo <path>`.",
     ),
+    # Adapters (pkm/adapters/*) — network-aware errors. Imported lazily so
+    # the registry test still passes when [adapters] extra is uninstalled.
+    "JINA_ERROR": lambda: __import__("pkm.adapters.jina", fromlist=["JinaError"]).JinaError(
+        "jina HTTP 503"
+    ),
+    "HN_ERROR": lambda: __import__("pkm.adapters.hn", fromlist=["HNError"]).HNError(
+        "HN search HTTP 500"
+    ),
+    "REDDIT_ERROR": lambda: __import__("pkm.adapters.reddit", fromlist=["RedditError"]).RedditError(
+        "reddit HTTP 500"
+    ),
+    "YOUTUBE_ERROR": lambda: __import__(
+        "pkm.adapters.youtube", fromlist=["YouTubeError"]
+    ).YouTubeError("yt-dlp not found on PATH"),
+    "OPENALEX_ERROR": lambda: __import__(
+        "pkm.adapters.openalex", fromlist=["OpenAlexError"]
+    ).OpenAlexError("openalex: no work found"),
 }
 
 

@@ -14,7 +14,7 @@ from pathlib import Path
 import typer
 
 from pkm._mutations import post_mutation
-from pkm.errors import PKMError, PKMStateError
+from pkm.errors import PKMError, PKMStateError, PKMValidationError
 from pkm.store.files import atomic_write, date_prefix_slug
 from pkm.store.frontmatter import serialize
 from pkm.store.frontmatter_schemas import capture_defaults, validate_capture
@@ -33,6 +33,27 @@ def _read_body(from_file: Path | None) -> str:
     return sys.stdin.read()
 
 
+def _parse_tags(raw: str | None) -> list[str] | None:
+    """Accept either a JSON array (`["a","b"]`) or comma-separated (`a,b,c`)."""
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return []
+    if s.startswith("["):
+        try:
+            parsed = json.loads(s)
+        except json.JSONDecodeError as e:
+            raise PKMValidationError(
+                f"--tags JSON could not be parsed: {e}",
+                hint='Use either JSON like \'["a","b"]\' or comma-separated "a,b,c".',
+            ) from None
+        if not isinstance(parsed, list) or not all(isinstance(t, str) for t in parsed):
+            raise PKMValidationError("--tags JSON must be a list of strings")
+        return [t.strip() for t in parsed if t.strip()]
+    return [t.strip() for t in s.split(",") if t.strip()]
+
+
 def _do_create(
     root: Path,
     *,
@@ -42,6 +63,8 @@ def _do_create(
     from_file: Path | None,
     status: str,
     lang: str,
+    tags: list[str] | None = None,
+    summary: str | None = None,
 ) -> dict:
     # Accept both `--slug foo` (auto-prefix today's date) and
     # `--slug 2026-05-01-foo` (already date-prefixed) without producing
@@ -54,7 +77,10 @@ def _do_create(
             hint="Pick a different slug or remove the existing capture.",
         )
     body = _read_body(from_file)
-    fm = capture_defaults(slug=full_slug, title=title, source_url=url, status=status, lang=lang)
+    fm = capture_defaults(
+        slug=full_slug, title=title, source_url=url, status=status, lang=lang,
+        tags=tags, summary=summary,
+    )
     validate_capture(fm)
     atomic_write(target, serialize(fm, body))
     sha = post_mutation(
@@ -163,11 +189,19 @@ def register(app: typer.Typer) -> None:
         ),
         status: str = typer.Option("draft", "--status", help="draft | reviewed"),
         lang: str = typer.Option("ko", "--lang", help="ko | en | mixed"),
+        tags: str | None = typer.Option(
+            None, "--tags",
+            help='Tags as JSON array \'["a","b"]\' or comma-separated "a,b,c".',
+        ),
+        summary: str | None = typer.Option(
+            None, "--summary", help="Short summary stored in frontmatter."
+        ),
         root: Path = typer.Option(Path("."), "--root", "-r", help="PKM root."),
         json_out: bool = typer.Option(False, "--json", help="Emit JSON summary."),
     ) -> None:
         """Create a new capture under data/raw/captures/."""
         try:
+            tag_list = _parse_tags(tags)
             result = _do_create(
                 root,
                 slug=slug,
@@ -176,6 +210,8 @@ def register(app: typer.Typer) -> None:
                 from_file=from_file,
                 status=status,
                 lang=lang,
+                tags=tag_list,
+                summary=summary,
             )
         except PKMError as e:  # PKMStateError (existing) | PKMValidationError (bad enum)
             if json_out:

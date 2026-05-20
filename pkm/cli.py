@@ -129,6 +129,14 @@ def _register_all() -> None:
 
     install_cmd.register(app)
 
+    from pkm.commands import adapter as adapter_cmd
+
+    adapter_cmd.register(app)
+
+    from pkm.commands import enrich as enrich_cmd
+
+    enrich_cmd.register(app)
+
 
 _register_all()
 

@@ -35,6 +35,10 @@ extract = [
     "pdfplumber>=0.11",
     "markdownify>=0.13",
 ]
+adapters = [
+    "httpx>=0.27",
+    "yt-dlp>=2024.10",
+]
 korean = [
     # Lang-aware Korean morphological tokenizer used by M12 m002 migration.
     # Without this extra, `pkm migrate` cleanly skips m002 — schema stays at v1.

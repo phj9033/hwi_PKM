@@ -11,7 +11,7 @@ _Auto-generated. Do not edit by hand._
 - [2026-05-21-zenject-extenject-patterns](raw/captures/2026-05-21-zenject-extenject-patterns.md) — Extenject — Zenject DI Framework (actively maintained fork) [draft]
 
 ## Chunks
-_(none)_
+- [unity-architecture-di](raw/chunks/unity-architecture-di/README.md) — Unity 아키텍쳐·DI 패턴 모음 (VContainer, Zenject/Extenject, MVP/MVC, MessagePipe 이벤트 버스) [collecting]
 
 ## Wiki
 _(empty until M4)_

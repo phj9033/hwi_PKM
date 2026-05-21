@@ -11,3 +11,4 @@ _Append-only event log. Do not edit by hand._
 | 2026-05-21T10:39:00+09:00 | capture.create | 2026-05-21-vcontainer-vs-zenject-comparison | VContainer vs Zenject — Official Comparison |
 | 2026-05-21T10:39:49+09:00 | capture.create | 2026-05-21-unity-mvp-mvc-patterns | Unity 6 — MVC·MVP Programming Patterns (Unity Learn) |
 | 2026-05-21T10:40:22+09:00 | capture.create | 2026-05-21-messagepipe-event-bus-pattern | MessagePipe — High-perf Pub/Sub & Event Bus (Cysharp) |
+| 2026-05-21T10:40:53+09:00 | capture.create | 2026-05-21-unity-architecture-patterns-overview | Unity Game Architecture — Patterns Overview (MVC/MVP/MVVM/ECS) |

@@ -4,6 +4,7 @@ _Auto-generated. Do not edit by hand._
 
 ## Captures
 - [2026-05-21-messagepipe-event-bus-pattern](raw/captures/2026-05-21-messagepipe-event-bus-pattern.md) — MessagePipe — High-perf Pub/Sub & Event Bus (Cysharp) [draft]
+- [2026-05-21-unity-architecture-patterns-overview](raw/captures/2026-05-21-unity-architecture-patterns-overview.md) — Unity Game Architecture — Patterns Overview (MVC/MVP/MVVM/ECS) [draft]
 - [2026-05-21-unity-mvp-mvc-patterns](raw/captures/2026-05-21-unity-mvp-mvc-patterns.md) — Unity 6 — MVC·MVP Programming Patterns (Unity Learn) [draft]
 - [2026-05-21-vcontainer-overview-patterns](raw/captures/2026-05-21-vcontainer-overview-patterns.md) — VContainer — About & Architecture [draft]
 - [2026-05-21-vcontainer-vs-zenject-comparison](raw/captures/2026-05-21-vcontainer-vs-zenject-comparison.md) — VContainer vs Zenject — Official Comparison [draft]

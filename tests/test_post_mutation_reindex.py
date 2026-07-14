@@ -47,6 +47,56 @@ def test_post_mutation_indexes_new_capture(tmp_path: Path):
         conn.close()
 
 
+def test_post_mutation_indexes_into_kiwi_fts(tmp_path: Path, capsys):
+    """Regression: incremental reindex must honor a post-m002 (kiwi) FTS.
+
+    reindex_changed_paths must detect the active tokenizer and drive the
+    content-table FTS5 the same way `pkm reindex db` does. Before the fix it
+    called _index_one with the default post_m002=False, hitting the pre-m002
+    `INSERT INTO chunks_fts(rowid, text)` path — which fails with
+    'table chunks_fts has no column named text' on the text_tokenized FTS.
+    """
+    from pkm.store.migrations._runner import _is_extra_available, apply_all
+
+    if not _is_extra_available("korean"):
+        pytest.skip("kiwipiepy not installed — cannot build a post-m002 FTS")
+
+    root = _bare_pkm(tmp_path)
+
+    # Advance the DB to the latest schema (m002 → kiwi content-table FTS).
+    conn = connect(root)
+    try:
+        apply_all(conn)
+        conn.commit()
+        active_fts = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name='chunks_fts'"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert "text_tokenized" in active_fts, "fixture must be a post-m002 FTS"
+
+    rel = "data/raw/captures/2026-05-02-zebrafish.md"
+    (root / rel).write_text(
+        "---\ntitle: zebra\nslug: 2026-05-02-zebrafish\nstatus: draft\nlang: en\n"
+        "source_type: text\ncreated_at: 2026-05-02T00:00:00+00:00\n---\n\n"
+        "The zebrafish swims upstream.\n",
+        encoding="utf-8",
+    )
+    event = LogEvent(type="capture.create", ref="2026-05-02-zebrafish", message="z")
+    post_mutation(root, event, paths=[rel])
+
+    assert "post_mutation reindex failed" not in capsys.readouterr().err
+
+    conn = connect(root)
+    try:
+        hits = conn.execute(
+            "SELECT COUNT(*) FROM chunks_fts WHERE chunks_fts MATCH 'zebrafish'"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert hits >= 1, "incrementally-indexed doc is not searchable in the FTS"
+
+
 def test_post_mutation_no_paths_skips_reindex(tmp_path: Path):
     """Backward compat: callers that don't pass paths still get log + TOC."""
     root = _bare_pkm(tmp_path)

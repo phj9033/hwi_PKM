@@ -52,9 +52,20 @@ def post_mutation(root: Path, event: LogEvent, paths: list[str] | None = None) -
 
 def reindex_changed_paths(root: Path, paths: list[str]) -> None:
     from pkm.commands.reindex import _bucket_for, _index_one, _vec_opted_in
+    from pkm.search.tokenizer import detect_active, get_tokenizer
 
     conn = connect(root)
     try:
+        # Mirror `pkm reindex db`: pick the indexing path from the DB's active
+        # tokenizer/columns, not the _index_one defaults. Without this the
+        # incremental path assumes a pre-m002 contentless FTS and fails on a
+        # post-m002 (kiwi) content-table FTS with "no column named text".
+        active = detect_active(conn)
+        post_m002 = active == "kiwi"
+        tokenizer = get_tokenizer(active) if post_m002 else None
+        chunks_columns = {r[1] for r in conn.execute("PRAGMA table_info(chunks)")}
+        post_m003 = "project" in chunks_columns
+
         embedder = get_embedder()
         vec_opt = _vec_opted_in(root)
         for rel in paths:
@@ -64,7 +75,21 @@ def reindex_changed_paths(root: Path, paths: list[str]) -> None:
             bucket = _bucket_for(root, abs_p)
             if bucket is None:
                 continue
-            _index_one(conn, root, bucket, abs_p, embedder, vec_opt)
+            _index_one(
+                conn,
+                root,
+                bucket,
+                abs_p,
+                embedder,
+                vec_opt,
+                post_m002=post_m002,
+                post_m003=post_m003,
+                tokenizer=tokenizer,
+            )
+        # Post-m002 content-table FTS5 doesn't auto-sync on chunks UPDATEs;
+        # a single 'rebuild' after the loop resyncs it (matches reindex_db).
+        if post_m002:
+            conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild')")
         conn.commit()
     finally:
         conn.close()
